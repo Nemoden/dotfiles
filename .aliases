@@ -1,0 +1,54 @@
+# vim: ft=bash
+if [[ -f ~/lynx.cfg ]]; then
+    alias lynx="lynx -accept_all_cookies -cfg=~/lynx.cfg"
+else
+    alias lynx="lynx -accept_all_cookies"
+fi
+
+alias kk="kubectl"
+alias ka="kubectl apply"
+alias ke="kubectl exec -it"
+alias kd="kubectl describe"
+alias kdp="kubectl describe pod"
+alias kds="kubectl describe svc"
+alias kdd="kubectl describe deployment"
+alias kdn="kubectl describe node"
+alias kg="kubectl get"
+alias kgp="kubectl get po -o wide"
+alias kgs="kubectl get svc"
+alias kgi="kubectl get ingress"
+alias kgd="kubectl get deployment"
+alias kge="kubectl get event"
+alias kgn="kubectl get nodes"
+alias kl="kubectl logs"
+alias kn="kubectl get nodes --no-headers -o custom-columns=NAME:.metadata.name"
+alias kfailed="kubectl get pods --all-namespaces --field-selector 'status.phase==Failed'"
+alias e="vim"
+
+# IP addresses
+alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias localip="ipconfig getifaddr en0"
+
+# Show active network interfaces
+alias ifactive="ifconfig | pcregrep -M -o '^[^\t:]+:([^\n]|\n\t)*status: active'"
+
+# Kill tabs in Chrome to free up some memory.
+alias chromekill="ps ux | grep '[C]hrome Helper --type=renderer' | grep -v extension-process | tr -s ' ' | cut -d ' ' -f2 | xargs kill"
+
+# Lock the screen (when going AFK)
+alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+
+# Print each PATH entry on a separate line
+alias path='echo -e ${PATH//:/\\n}'
+
+alias tre="tree -aC -I '.git|node_modules|bower_components' --dirsfirst . | less -FRNX"
+
+# upgrade cat
+if [[ -x "$(command -v bat)" ]]; then
+    alias cat="bat -pp"
+    alias caat="bat -n"
+    alias caaat="bat"
+else
+    alias caat="cat -n"
+    alias caaat="cat -n"
+fi

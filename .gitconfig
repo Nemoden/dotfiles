@@ -1,0 +1,51 @@
+[user]
+    name = Kirill Kovalchuk
+    email = kkovalchuk@switch.tv
+[color "branch"]
+    current = red
+    remote = green
+[core]
+    autocrlf = input
+    excludesfile = /Users/kkovalchuk/.gitignore.global
+    editor = vim
+    pager = delta
+[alias]
+    st = status
+    s = status -s
+    co = checkout
+    d = !"git diff-index --quiet HEAD -- || clear; git --no-pager diff --patch-with-stat"
+    di = !"d() { git diff --patch-with-stat HEAD~$1; }; git diff-index --quiet HEAD -- || clear; d"
+    br = branch
+    amend = commit --amend
+    staged = diff --staged
+    ci = commit
+    uncommit = reset HEAD^
+    unci = reset HEAD^
+    unstage = reset HEAD
+    ls = ls-files
+    l = log --oneline --graph --decorate
+    ll = log --pretty='%C(auto)%h %d <%an> %s' --graph
+    ld = log --pretty='%C(auto)%h %d <%an> %s' --graph --cc
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    features = line-numbers decorations
+    whitespace-error-style = 22 reverse
+[delta "decorations"]
+    commit-decoration-style = bold yellow box ul
+    file-style = bold yellow ul
+    file-decoration-style = none
+[format]
+    pretty = %Cgreen%h%Creset %ad%x09%Cred%d%Creset%n%C(yellow)%s%Creset by %an <%ce> %ar
+[http]
+    sslVerify = true
+[push]
+    default = matching
+[difftool "sourcetree"]
+    cmd = opendiff \"$LOCAL\" \"$REMOTE\"
+    path =
+[mergetool "sourcetree"]
+    cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+    trustExitCode = true
+[credential]
+	helper = store

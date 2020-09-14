@@ -1,0 +1,430 @@
+if &compatible
+  set nocompatible
+end
+
+" Remove declared plugins
+function! s:UnPlug(plug_name)
+  if has_key(g:plugs, a:plug_name)
+    call remove(g:plugs, a:plug_name)
+  endif
+endfunction
+command!  -nargs=1 UnPlug call s:UnPlug(<args>)
+
+let g:has_async = v:version >= 800 || has('nvim')
+
+if empty(glob('~/.vim/autoload/plug.vim'))
+  silent !curl -fLo ~/.vim/autoload/plug.vim --create-dirs
+    \ https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
+
+" All the plugins are specified as full URLs because I can Cmd+click on them.
+" Each plugin is followed up with it's settings, making individual plugins'
+" settings easier to manage, i.e. no need to find which settigns belong to
+" which plugin across .vimrc.
+call plug#begin('~/.vim/plugged')
+
+    function! Cond(cond, ...)
+      let opts = get(a:000, 0, {})
+      return a:cond ? opts : extend(opts, { 'on': [], 'for': [] })
+    endfunction
+
+    Plug 'https://github.com/chriskempson/base16-vim'
+
+    " configure airline to reduce unnecessary noise (i.e. % of scroll, etc.)
+    " h: airline-default-sections
+    Plug 'https://github.com/vim-airline/vim-airline' | Plug 'https://github.com/vim-airline/vim-airline-themes'
+        let g:airline_powerline_fonts = 1
+        let g:airline_theme='base16_spacemacs'
+        let g:airline#extensions#tabline#enabled = 1
+        let g:airline#extensions#tabline#formatter = 'unique_tail_improved'
+        let g:airline_extensions = ['branch', 'tabline', 'hunks', 'fugitiveline']
+        let g:airline#extensions#disable_rtp_load = 1
+
+    Plug 'https://github.com/tpope/vim-fugitive'
+
+    Plug 'https://github.com/mhinz/vim-startify'
+        autocmd BufDelete * if empty(filter(tabpagebuflist(), '!buflisted(v:val)')) | Startify | endif
+        let g:startify_change_to_dir = 0
+        let g:startify_lists = [
+              \ { 'type': 'dir',       'header': ['   MRU '. getcwd()] },
+              \ { 'type': 'files',     'header': ['   MRU']            },
+              \ { 'type': 'sessions',  'header': ['   Sessions']       },
+              \ { 'type': 'bookmarks', 'header': ['   Bookmarks']      },
+              \ { 'type': 'commands',  'header': ['   Commands']       },
+          \ ]
+        let g:startify_files_number = 5
+        let g:startify_bookmarks = [
+              \ { 'c': '~/.vimrc' },
+              \ { 'b': '~/.vimrc.bundles' },
+          \ ]
+        let g:startify_custom_header = [
+            \ '    ██╗   ██╗   ██╗   ███╗   ███╗',
+            \ '    ██║   ██║   ██║   ████╗ ████║',
+            \ '    ██║   ██║   ██║   ██╔████╔██║',
+            \ '    ╚██╗ ██╔╝   ██║   ██║╚██╔╝██║',
+            \ '     ╚████╔╝    ██║   ██║ ╚═╝ ██║',
+            \ '      ╚═══╝     ╚═╝   ╚═╝     ╚═╝',
+            \ ]
+
+    Plug 'https://github.com/jmcantrell/vim-virtualenv', { 'for': 'python' }
+
+    " Plug 'https://github.com/terryma/vim-multiple-cursors
+
+    Plug 'https://github.com/junegunn/fzf', { 'do': { -> fzf#install() } } | Plug 'https://github.com/junegunn/fzf.vim'
+        " Todo explore an option of always using :Files (it seems to be just faster compared to :GFiles)
+        if exists('g:loaded_fugitive')
+            nnoremap <expr> <C-p> fugitive#head() != '' ? ':GFiles! --cached --others --exclude-standard<CR>' : ':Files!<CR>'
+            nnoremap <expr> <C-o> fugitive#head() != '' ? ':GFiles!?<CR>' : ''
+        else
+            silent! !git rev-parse --is-inside-work-tree
+            if v:shell_error == 0
+              nnoremap <silent> <C-p> :GFiles! --cached --others --exclude-standard<CR>
+              nnoremap <silent> <C-o> :GFiles!?<CR>
+            else
+              nnoremap <silent> <C-p> :Files!<CR>
+              nnoremap <silent> <C-o> :echo "Not a GIT repo ¯\\_(ツ)_/¯"<CR>
+            endif
+        endif
+        nnoremap <silent> <leader>bb :Buffers!<CR>
+        nnoremap <silent> <leader>fb :BLines!<CR>
+        nnoremap <silent> <leader>bl :BLines!<CR>
+        nnoremap <silent> <leader>fl :Lines!<CR>
+        nnoremap <silent> <leader>/ :History/<CR>
+
+        command! -bang -nargs=* Rg
+                    \ call fzf#vim#grep(
+                    \   'rg --column --line-number --hidden --ignore-case --no-heading --color=always '.shellescape(<q-args>), 1,
+                    \   <bang>0 ? fzf#vim#with_preview({'options': '--delimiter : --nth 4..'}, 'up:60%')
+                    \           : fzf#vim#with_preview({'options': '--delimiter : --nth 4..'}, 'right:50%:hidden', '?'),
+                    \   <bang>0)
+
+        function! RipgrepFzf(query, fullscreen)
+            let command_fmt = 'rg --column --line-number --no-heading --color=always --smart-case %s || true'
+            let initial_command = printf(command_fmt, shellescape(a:query))
+            let reload_command = printf(command_fmt, '{q}')
+            let spec = {'options': ['--phony', '--query', a:query, '--bind', 'change:reload:'.reload_command]}
+            call fzf#vim#grep(initial_command, 1, fzf#vim#with_preview(spec), a:fullscreen)
+        endfunction
+        command! -nargs=* -bang RG call RipgrepFzf(<q-args>, <bang>0)
+
+        nnoremap <silent> <leader>ff :Rg!<CR>
+        nnoremap <silent> <leader>FF :RG!<CR>
+
+        " find directory
+        function! s:append_dir_with_fzf(line)
+            call fzf#run(fzf#wrap({
+                        \ 'options': ['--prompt', a:line.'> '],
+                        \ 'source': 'find . -type d',
+                        \ 'sink': {line -> feedkeys("\<esc>:".a:line.line, 'n')}}))
+            return ''
+        endfunction
+        cnoremap <expr> <c-x><c-d> <sid>append_dir_with_fzf(getcmdline())
+
+        command! -nargs=* -complete=dir Cd
+                    \ call fzf#run(fzf#wrap({
+                          \ 'source': 'find '.(empty(<f-args>) ? '.' : <f-args>).' -type d -exec echo {}/ \;',
+                          \ 'sink': 'NERDTreeFind'
+                    \ }))
+
+        nnoremap <leader>fd Cd .<CR>
+
+    Plug 'https://github.com/preservim/nerdtree', { 'on': ['NERDTreeToggle', 'NERDTreeFind', 'NERDTreeCWD'] }
+        \ | Plug 'https://github.com/Xuyuanp/nerdtree-git-plugin'
+        noremap <silent> <F2> :NERDTreeToggle <CR>
+        " Tree Toggle.
+        nnoremap <silent> <leader>tt :NERDTreeToggle <CR>
+        " Tree Reveal.
+        nnoremap <silent> <leader>TT :NERDTreeFind <CR>
+        " Tree CWD.
+        nnoremap <silent> <leader>tc :NERDTreeCWD <CR>:echo "Changed NERD tree CWD"<CR>
+
+        let NERDTreeWinSize=40
+        let NERDTreeShowHidden=1
+        " let NERDTreeQuitOnOpen=1
+        let NERDTreeSortHiddenFirst=0
+        let NERDTreeAutoDeleteBuffer = 1
+        let NERDTreeIgnore=['\.pyc$', '\.bak$', '.git[[dir]]']
+        let NERDTreeMinimalUI=1
+        let NERDTreeMinimalMenu=0
+        let g:NERDTreeShowIgnoredStatus = 1
+
+        " NERDTress File highlighting
+        " https://github.com/preservim/nerdtree/issues/433#issuecomment-92590696
+        "function! NERDTreeHighlightFile(extension, fg, bg, guifg, guibg)
+            "exec 'autocmd filetype nerdtree highlight ' . a:extension .' ctermbg='. a:bg .' ctermfg='. a:fg .' guibg='. a:guibg .' guifg='. a:guifg
+            "exec 'autocmd filetype nerdtree syn match ' . a:extension .' #^\s\+.*'. a:extension .'$#'
+        "endfunction
+
+        " If the only remaining buffer is NERDTree, exit vim.
+        autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+        " If more than one window and previous buffer was NERDTree, go back to
+        " it. Prevents opening buffers in NERDTree.
+        autocmd BufEnter * if bufname('#') =~# "^NERD_tree_" && winnr('$') > 1 | b# | endif
+
+        augroup nerdtreeconcealbrackets
+            autocmd!
+            autocmd FileType nerdtree syntax match hideBracketsInNerdTree "\]" contained conceal containedin=ALL
+            autocmd FileType nerdtree syntax match hideBracketsInNerdTree "\[" contained conceal containedin=ALL
+            autocmd FileType nerdtree setlocal conceallevel=3
+            autocmd FileType nerdtree setlocal concealcursor=nvic
+        augroup END
+
+    Plug 'https://github.com/preservim/nerdcommenter'
+        nmap <silent> <C-_> :call NERDComment("n","Invert") <CR>
+        nmap <silent> <D-_> :call NERDComment("n","Invert") <CR>
+
+    Plug 'https://github.com/fatih/vim-go', { 'do': ':GoUpdateBinaries', 'for': 'go' }
+        autocmd FileType go nmap <leader>gi <Plug>(go-info)
+        autocmd FileType go nmap <leader>gd <Plug>(go-def)
+        autocmd FileType go nmap <leader>b :GoDefPop<CR>
+        autocmd FileType go nmap <leader>s :GoSameIds<CR>
+        autocmd FileType go nmap <leader>r :GoRename<CR>
+        " autocmd FileType go let g:go_auto_type_info = 1
+
+    Plug 'https://github.com/tpope/vim-surround'
+
+    Plug 'https://github.com/plasticboy/vim-markdown', { 'for': 'markdown' }
+
+    " @TODO: find out which one is better works for me (cucumber, etc)
+    " Plug 'https://github.com/junegunn/vim-easy-align'
+    " Plug 'https://github.com/godlygeek/tabular'
+
+    " annoying enables table mode while interacting with nerdtree (no idea why, tho)
+    " disabled for now
+    "Plug 'https://github.com/dhruvasagar/vim-table-mode', { 'for': ['markdown', 'cucumber'] }
+        " Options: https://github.com/dhruvasagar/vim-table-mode/blob/master/t/config/options.vim
+        "autocmd FileType markdown :TableModeEnable
+        "autocmd FileType markdown let g:table_mode_corner="|"
+        " tt is taken for Tree Toggle. Don't use t prefix at all.
+        "let g:table_mode_disable_mappings = 1
+
+    Plug 'https://github.com/vim-scripts/kwbdi.vim'
+
+    Plug 'https://github.com/sheerun/vim-polyglot'
+
+    " Plug 'https://github.com/vim-vdebug/vdebug'
+
+    " Extensions: https://github.com/neoclide/coc.nvim/wiki/Using-coc-extensions
+    Plug 'https://github.com/neoclide/coc.nvim', {'branch': 'release'}
+        if executable('/usr/local/bin/node')
+            let g:coc_node_path = '/usr/local/bin/node'
+        endif
+        let g:coc_global_extensions = [
+                    \ 'coc-fish',
+                    \ 'coc-git',
+                    \ 'coc-html',
+                    \ 'coc-json',
+                    \ 'coc-phpls',
+                    \ 'coc-python',
+                    \ 'coc-yaml',
+                    \]
+        " load additional configuration
+        if filereadable(expand("~/.vim/coc-user-config.vim"))
+          source ~/.vim/coc-user-config.vim
+        endif
+        " Use <CR> to confirm completion, `<C-g>u` means break undo chain at current
+        " position. Coc only does snippet and additional edit on confirm.
+        if exists('*complete_info')
+            inoremap <expr> <CR> complete_info()["selected"] != "-1" ? "\<C-y>" : "\<C-g>u\<CR>"
+        else
+            imap <expr> <CR> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
+        endif
+        " GoTo code navigation.
+        nmap <silent> <leader>gd :call CocActionAsync('jumpDefinition')<CR>
+        nmap <silent> <leader>gr :call CocActionAsync('jumpReferences')<CR>
+        nmap <leader>rn <Plug>(coc-rename)
+        nmap <silent> <leader>gy <Plug>(coc-type-definition)
+        nmap <silent> <leader>gi <Plug>(coc-implementation)
+        " Use K to show documentation in preview window.
+        nnoremap <silent> K :call <SID>show_documentation()<CR>
+        function! s:show_documentation()
+            if (index(['vim','help'], &filetype) >= 0)
+                execute 'h '.expand('<cword>')
+            else
+                call CocAction('doHover')
+            endif
+        endfunction
+
+        " Use tab for trigger completion with characters ahead and navigate.
+        " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
+        " other plugin before putting this into your config.
+        inoremap <silent><expr> <TAB>
+                    \ pumvisible() ? "\<C-n>" :
+                    \ <SID>check_back_space() ? "\<TAB>" :
+                    \ coc#refresh()
+        inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+
+        function! s:check_back_space() abort
+            let col = col('.') - 1
+            return !col || getline('.')[col - 1]  =~# '\s'
+        endfunction
+
+        inoremap <silent><expr> <c-space> coc#refresh()
+        nnoremap <silent> <leader>k :call CocAction('showSignatureHelp')<CR>
+        inoremap <silent> <C-k> <Esc>:call CocActionAsync('showSignatureHelp')<CR>a
+        " inoremap <C-p> <Plug>(coc-codeaction)<CR>
+        augroup CocAu
+            autocmd!
+            autocmd CursorHold * silent call CocActionAsync('highlight')
+            "autocmd CursorHoldI * silent call CocAction('showSignatureHelp')
+            "autocmd User CocJumpPlaceholder silent call CocActionAsync('showSignatureHelp')
+        augroup END
+
+        " navigate to a symbol in current buffer (for now php only).
+        autocmd FileType php nnoremap <leader>gs :CocList outline<CR>
+
+        " Don't pass messages to |ins-completion-menu|.
+        set shortmess+=c
+
+        " Always show the signcolumn, otherwise it would shift the text each time
+        " diagnostics appear/become resolved.
+        set signcolumn=yes
+
+        " TODO: create a menu / mapping.
+        " https://github.com/neoclide/coc-git
+
+    Plug 'https://github.com/airblade/vim-gitgutter'
+
+    "if g:has_async
+        "Plug 'https://github.com/desmap/ale-sensible' | Plug 'https://github.com/dense-analysis/ale'
+            "let b:ale_fixers = {'php': ['phpcbf']}
+    "else
+        "Plug 'https://github.com/vim-syntastic/syntastic'
+            "autocmd FileType php let g:syntastic_php_checkers = ['php']
+    "endif
+
+    " Using both since not yet decided which one I prefer better.
+    Plug 'https://github.com/simnalamburt/vim-mundo', { 'on': 'MundoToggle' }
+        let g:mundo_width = 40
+        let g:mundo_preview_height = 15
+        let g:mundo_right = 1
+        let g:mundo_close_on_revert = 1
+        let g:mundo_playback_delay = 200
+        let g:mundo_preview_bottom = 1
+        nnoremap <silent> <leader>U :MundoToggle <CR>
+
+    Plug 'https://github.com/mbbill/undotree', { 'on': 'UndotreeToggle' }
+        nnoremap <silent> <leader>u :UndotreeToggle <CR>
+        let g:undotree_WindowLayout = 4
+        let g:undotree_SetFocusWhenToggle = 1
+        let g:undotree_ShortIndicators = 1
+        let g:undotree_SplitWidth = 40
+        let g:undotree_DiffAutoOpen = 1
+
+        let s:debug = 1
+        let s:debugfile = '/tmp/undotree_debug.log'
+
+    " Plug 'https://github.com/liuchengxu/vista.vim'
+        ":help vista-commands
+
+        " show symbols.
+        nnoremap <silent> <leader>SS :Vista!! <CR>
+        " finder is more useful as navigation through Vista sidebar is more
+        " cumbersome.
+        nnoremap <silent> <leader>ss :Vista finder fzf:coc <CR>
+
+        let g:vista_default_executive = 'coc'
+        let g:vista_floating_delay = 0
+        " blink 0 times by 0 milliseconds.
+        let g:vista_blink = [0, 0]
+        let g:vista_close_on_jump = 1
+        " g:vista_php_executive = 'coc'
+        let g:vista_executive_for = {
+                    \ 'php': 'coc',
+                    \ }
+        let g:vista_icon_indent = ["╰─▸ ", "├─▸ "]
+        let g:vista_fzf_preview = ['right:50%']
+        let g:vista#renderer#enable_icon = 1
+        let g:vista_keep_fzf_colors = 1
+        let g:vista#renderer#icons = {
+                    \  "function": "\uf794",
+                    \  "variable": "\uf71b",
+                    \ }
+        let g:vista_update_on_text_changed = 1
+        let g:vista_update_on_text_changed_delay = 250
+        let g:vista_ignore_kinds = ['Variable']
+        let g:vista_sidebar_width = 40
+
+    Plug 'https://github.com/luochen1990/rainbow', { 'for':
+            \ [
+                \ 'c',
+                \ 'cpp',
+                \ 'go',
+                \ 'java',
+                \ 'javascript',
+                \ 'javascriptreact',
+                \ 'lisp',
+                \ 'php',
+                \ 'rust',
+                \ 'typescript',
+                \ 'typescriptreact',
+            \ ]
+        \ }
+        let g:rainbow_active = 1
+
+    Plug 'https://github.com/chrisbra/Colorizer'
+
+    Plug 'https://github.com/junegunn/limelight.vim'
+        let g:limelight_conceal_ctermfg = 'gray'
+        let g:limelight_conceal_ctermfg = 240
+
+    Plug 'https://github.com/junegunn/goyo.vim', { 'on': 'Goyo' }
+        let g:goyo_width = 120
+        let g:goyo_height = '90%'
+        nnoremap <silent> <Space> :Goyo<CR>
+        function! s:goyo_enter()
+            if executable('tmux') && strlen($TMUX)
+                call system('tmux set status off')
+                call system('tmux list-panes -F ''\#F'' | grep -q Z || tmux resize-pane -Z')
+            endif
+            set noshowmode
+            set noshowcmd
+            set nocursorline
+            set scrolloff=999
+            set signcolumn=no
+            GitGutterDisable
+            Limelight
+        endfunction
+
+        function! s:goyo_leave()
+            if executable('tmux') && strlen($TMUX)
+                call system('tmux set status on')
+                call system('tmux list-panes -F ''\#F'' | grep -q Z && tmux resize-pane -Z')
+            endif
+            set showmode
+            set showcmd
+            set scrolloff=9
+            set cursorline
+            set signcolumn=auto
+            GitGutterEnable
+            Limelight!
+        endfunction
+
+        autocmd! User GoyoEnter nested call <SID>goyo_enter()
+        autocmd! User GoyoLeave nested call <SID>goyo_leave()
+
+    " Inportant: devicons should stay at the bottom, because otherwise, if
+    " loaded BEFORE nerdtree + nerdtree git, it would break icons alignment!
+    Plug 'https://github.com/ryanoasis/vim-devicons'
+        " after a re-source, fix syntax matching issues (concealing brackets):
+        if exists('g:loaded_webdevicons')
+            call webdevicons#refresh()
+        endif
+
+    if filereadable(expand("~/.vimrc.bundles.local"))
+      source ~/.vimrc.bundles.local
+    endif
+
+
+    " https://github.com/norcalli/nvim-colorizer.lua
+
+    " ervandew/supertab
+    " Chiel92/vim-autoformat
+    " editorconfig/editorconfig-vim
+    " stephpy/vim-php-cs-fixer
+    " jwalton512/vim-blade
+    " isRuslan/vim-es6
+    " mxw/vim-jsx
+
+:call plug#end()

@@ -73,19 +73,20 @@ call plug#begin('~/.vim/plugged')
 
     Plug 'https://github.com/junegunn/fzf', { 'do': { -> fzf#install() } } | Plug 'https://github.com/junegunn/fzf.vim'
         " Todo explore an option of always using :Files (it seems to be just faster compared to :GFiles)
-        if exists('g:loaded_fugitive')
-            nnoremap <expr> <C-p> fugitive#head() != '' ? ':GFiles! --cached --others --exclude-standard<CR>' : ':Files!<CR>'
-            nnoremap <expr> <C-o> fugitive#head() != '' ? ':GFiles!?<CR>' : ''
-        else
-            silent! !git rev-parse --is-inside-work-tree
-            if v:shell_error == 0
-              nnoremap <silent> <C-p> :GFiles! --cached --others --exclude-standard<CR>
-              nnoremap <silent> <C-o> :GFiles!?<CR>
-            else
-              nnoremap <silent> <C-p> :Files!<CR>
-              nnoremap <silent> <C-o> :echo "Not a GIT repo ¯\\_(ツ)_/¯"<CR>
-            endif
-        endif
+        nnoremap <silent> <C-p> :Files!<CR>
+        "if exists('g:loaded_fugitive')
+            "nnoremap <expr> <C-p> fugitive#head() != '' ? ':GFiles! --cached --others --exclude-standard<CR>' : ':Files!<CR>'
+            "nnoremap <expr> <C-o> fugitive#head() != '' ? ':GFiles!?<CR>' : ''
+        "else
+            "silent! !git rev-parse --is-inside-work-tree
+            "if v:shell_error == 0
+              "nnoremap <silent> <C-p> :GFiles! --cached --others --exclude-standard<CR>
+              "nnoremap <silent> <C-o> :GFiles!?<CR>
+            "else
+              "nnoremap <silent> <C-p> :Files!<CR>
+              "nnoremap <silent> <C-o> :echo "Not a GIT repo ¯\\_(ツ)_/¯"<CR>
+            "endif
+        "endif
         nnoremap <silent> <leader>bb :Buffers!<CR>
         nnoremap <silent> <leader>fb :BLines!<CR>
         nnoremap <silent> <leader>bl :BLines!<CR>
@@ -217,6 +218,7 @@ call plug#begin('~/.vim/plugged')
                     \ 'coc-json',
                     \ 'coc-phpls',
                     \ 'coc-python',
+                    \ 'coc-tsserver',
                     \ 'coc-yaml',
                     \]
         " load additional configuration
@@ -404,6 +406,8 @@ call plug#begin('~/.vim/plugged')
         autocmd! User GoyoEnter nested call <SID>goyo_enter()
         autocmd! User GoyoLeave nested call <SID>goyo_leave()
 
+    Plug 'https://github.com/vimwiki/vimwiki'
+
     " Inportant: devicons should stay at the bottom, because otherwise, if
     " loaded BEFORE nerdtree + nerdtree git, it would break icons alignment!
     Plug 'https://github.com/ryanoasis/vim-devicons'
@@ -412,10 +416,11 @@ call plug#begin('~/.vim/plugged')
             call webdevicons#refresh()
         endif
 
+    Plug 'https://github.com/liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
+
     if filereadable(expand("~/.vimrc.bundles.local"))
       source ~/.vimrc.bundles.local
     endif
-
 
     " https://github.com/norcalli/nvim-colorizer.lua
 

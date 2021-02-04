@@ -36,8 +36,7 @@ set laststatus=2                " always show statusline
 " source: https://www.reddit.com/r/vim/comments/2391u5/delay_while_using_esc_to_exit_insert_mode/
 set ttimeout
 set ttimeoutlen=10
-set timeoutlen=3000
-
+set timeoutlen=1000
 
 """ SEARCH
 set incsearch                   " search while typing
@@ -158,10 +157,10 @@ if has("autocmd")
 endif
 
 " Removes trailing whitespaces
-augroup removeTrailiingWhitespaces
-    autocmd!
-    autocmd BufWrite * execute "normal! mz" |  keeppatterns %s/\v\s+$//e | normal `z
-augroup END
+"augroup removeTrailiingWhitespaces
+    "autocmd!
+    "autocmd BufWrite * execute "normal! mz" |  keeppatterns %s/\v\s+$//e | normal `z
+"augroup END
 
 
 language time en_US.UTF-8
@@ -194,15 +193,16 @@ map <silent> <leader>fcd :cd %:h<cr>:pwd<cr>
 " cd into system pwd
 map <silent> <leader>cd :call GetPwd()<cr>:pwd<cr>
 
-nnoremap <silent> <C-c> :noh<return><esc>
-inoremap <silent> <C-c> <esc>
+nnoremap <silent> <C-[> :noh<return><esc>
+"inoremap <silent> <C-c><esc>:echom "Ctrl+C is for EXIT!"
+
 " Sort
 vnoremap <silent> <leader>s :'<,'>%sort<cr>
 " Reverse sort
 vnoremap <silent> <leader>S :'<,'>%sort!<cr>
 
 " copy name
-nnoremap <silent> ,cn :let @*=expand("%:.")<CR>:echo "file name copied to the clipboard!"<CR>
+nnoremap <silent> ,cf :let @*=expand("%:.")<CR>:echo "file name copied to the clipboard!"<CR>
 " copy path
 nnoremap <silent> ,cp :let @*=expand("%:p")<CR>:echo "file path copied to the clipboard!"<CR>
 " copy contents

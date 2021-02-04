@@ -26,6 +26,7 @@
     l = log --oneline --graph --decorate
     ll = log --pretty='%C(auto)%h %d <%an> %s' --graph
     ld = log --pretty='%C(auto)%h %d <%an> %s' --graph --cc
+	lg = log --graph --format='%Cred%h%Creset %s %Cgreen(%cr) %C(blue)<%an>%Creset%C(yellow)%d%Creset' --no-merges
 [interactive]
     diffFilter = delta --color-only
 [delta]
@@ -35,8 +36,8 @@
     commit-decoration-style = bold yellow box ul
     file-style = bold yellow ul
     file-decoration-style = none
-[format]
-    pretty = %Cgreen%h%Creset %ad%x09%Cred%d%Creset%n%C(yellow)%s%Creset by %an <%ce> %ar
+#[format]
+#    pretty = %Cgreen%h%Creset %ad%x09%Cred%d%Creset%n%C(yellow)%s%Creset by %an <%ce> %ar
 [http]
     sslVerify = true
 [push]

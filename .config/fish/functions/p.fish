@@ -1,8 +1,13 @@
-# Todo: if argument has been passed, i.e.
-# $ p blog
-# Use zoxide to see if it can resolve 'blog' to anything in projects root. If it can, jump straight in.
-function p --description "Navigates to a project"
+function p --description "Navigates to a project" --argument-names 'project'
     set PROJECTS_DIR ~/Projects
+    if command -sq zoxide && test -n $project
+        set -l zoxide_match (zoxide query $PROJECTS_DIR (string split "" $project) 2> /dev/null)
+        if test -n "$zoxide_match"
+            z $zoxide_match
+            return
+        end
+    end
+
     if command -sq fzf
         set -l source
         set -l list (find ~/Projects -maxdepth 3 -type d)

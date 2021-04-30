@@ -143,6 +143,7 @@ autocmd FileType python let g:python_highlight_builtins=0
 autocmd FileType python let g:python_slow_sync=1
 autocmd FileType cucumber setlocal expandtab shiftwidth=2 tabstop=2 comments=:#\:,:#
 autocmd FileType yaml setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType helm setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType json setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType go setlocal nolist noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType make setlocal noexpandtab tabstop=4 shiftwidth=4

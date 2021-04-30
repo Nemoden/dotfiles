@@ -1,6 +1,6 @@
 function p --description "Navigates to a project" --argument-names 'project'
     set PROJECTS_DIR ~/Projects
-    if command -sq zoxide && test -n $project
+    if command -sq zoxide && test -n "$project"
         set -l zoxide_match (zoxide query $PROJECTS_DIR (string split "" $project) 2> /dev/null)
         if test -n "$zoxide_match"
             z $zoxide_match

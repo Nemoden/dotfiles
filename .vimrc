@@ -194,7 +194,8 @@ map <silent> <leader>fcd :cd %:h<cr>:pwd<cr>
 " cd into system pwd
 map <silent> <leader>cd :call GetPwd()<cr>:pwd<cr>
 
-nnoremap <silent> <C-[> :noh<return><esc>
+" FOR SOME REASON THE VERY NEXT LINE MESSES VIM UP (starts in REPLACE mode)
+" nnoremap <silent> <C-[> :noh<return><esc>
 "inoremap <silent> <C-c><esc>:echom "Ctrl+C is for EXIT!"
 
 " Sort

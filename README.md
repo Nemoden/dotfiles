@@ -1,8 +1,11 @@
 Install
 ---
 
-    git clone --bare https://github.com/Nemoden/dotfiles.git $HOME/.dot
+Install [brew](https://brew.sh/) first (follow the instructions from the homebrew website)
+
+    git clone --bare git@github.com:Nemoden/dotfiles.git $HOME/.dot
     git --git-dir=$HOME/.dot --work-tree=$HOME checkout
+    echo "*" > ~/.gitignore
     brew bundle
 
 Usage

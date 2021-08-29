@@ -9,9 +9,9 @@ Install [brew](https://brew.sh/) first (follow the instructions from the homebre
     git clone --bare git@github.com:Nemoden/dotfiles.git $HOME/.dot
     git --git-dir=$HOME/.dot --work-tree=$HOME checkout
     echo "*" > ~/.gitignore
+    brew bundle
     echo "/usr/local/bin/fish" | sudo tee -a /etc/shells
     chsh -s /usr/local/bin/fish
-    brew bundle
     /usr/local/opt/fzf/install
     
 In a nutshell

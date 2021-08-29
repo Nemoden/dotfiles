@@ -7,6 +7,7 @@ Install [brew](https://brew.sh/) first (follow the instructions from the homebre
     git --git-dir=$HOME/.dot --work-tree=$HOME checkout
     echo "*" > ~/.gitignore
     brew bundle
+    /usr/local/opt/fzf/install
 
 Usage
 ---

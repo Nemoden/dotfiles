@@ -6,8 +6,22 @@ Install [brew](https://brew.sh/) first (follow the instructions from the homebre
     git clone --bare git@github.com:Nemoden/dotfiles.git $HOME/.dot
     git --git-dir=$HOME/.dot --work-tree=$HOME checkout
     echo "*" > ~/.gitignore
+    echo "/usr/local/bin/fish" | sudo tee -a /etc/shells
+    chsh -s /usr/local/bin/fish
     brew bundle
     /usr/local/opt/fzf/install
+    
+In a nutshell
+---
+
+This:
+
+- creates a bare repo in `~/.dot` and track all the files in the `~`.
+- adds all files in `~` to `.gitignore`, so that we don't add any private files into git inadvertently (files MUST be added forcefully using `-f` flag)
+- changes shell to [`fish`](https://fishshell.com/)
+- installs [some software](/Brewfile) from homebrew
+- creates a special git alias named [`dot`](/.config/fish/functions/dot.fish) which is specifilly for working with the dotfiles located in `~`
+
 
 Usage
 ---

@@ -406,8 +406,6 @@ call plug#begin('~/.vim/plugged')
         autocmd! User GoyoEnter nested call <SID>goyo_enter()
         autocmd! User GoyoLeave nested call <SID>goyo_leave()
 
-    Plug 'https://github.com/vimwiki/vimwiki'
-
     " Inportant: devicons should stay at the bottom, because otherwise, if
     " loaded BEFORE nerdtree + nerdtree git, it would break icons alignment!
     Plug 'https://github.com/ryanoasis/vim-devicons'

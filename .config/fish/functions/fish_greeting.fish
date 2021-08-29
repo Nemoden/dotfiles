@@ -8,7 +8,7 @@ function fish_greeting --description Greeting
         if test -n $COLUMNS
             set width (math -s0 $COLUMNS / 2)
         end
-        cowsay -f small -s -W $width  -- $greeting
+        echo "$greeting" | cowsay -f small -s -W $width
     else
         echo $greeting
     end

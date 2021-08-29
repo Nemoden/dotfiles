@@ -1,3 +1,6 @@
+[Old repo](https://github.com/Nemoden/dotfiles.old)
+---
+
 Install
 ---
 

@@ -2,6 +2,8 @@ if command -sq starship
     starship init fish | source
 end
 
+set -x PROJECTS_DIRS ~/Projects
+
 if command -sq git
     abbr -a -g gs   git status --show-stash
     abbr -a -g gss  git status --short
@@ -169,4 +171,8 @@ end
 
 if test -f "$HOME/.phpbrew/phpbrew.fish"
     source ~/.phpbrew/phpbrew.fish
+end
+
+if test -e ~/.config/fish/config.local.fish
+    source ~/.config/fish/config.local.fish
 end

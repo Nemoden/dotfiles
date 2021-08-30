@@ -1,16 +1,26 @@
 function p --description "Navigates to a project" --argument-names 'project'
-    set PROJECTS_DIR ~/Projects
     if command -sq zoxide && test -n "$project"
-        set -l zoxide_match (zoxide query $PROJECTS_DIR (string split "" $project) 2> /dev/null)
+        set zoxide_match
+        for PROJECTS_DIR in $PROJECTS_DIRS
+            set search_term (string split "" $project)
+            set zoxide_match $zoxide_match (string collect (zoxide query "$PROJECTS_DIR" $search_term 2> /dev/null))
+        end
         if test -n "$zoxide_match"
-            z $zoxide_match
+            if test (count $zoxide_match) -gt 1
+                z (echo $zoxide_match | string split " " | fzf)
+            else
+                z $zoxide_match
+            end
             return
         end
     end
 
     if command -sq fzf
         set -l source
-        set -l list (find ~/Projects -maxdepth 3 -type d)
+        set list
+        for PROJECTS_DIR in $PROJECTS_DIRS
+            set list $list (string collect (find $PROJECTS_DIR -maxdepth 3 -type d))
+        end
         # fd is glitchy
         #if command -sq fd
             #set list (fd --full-path ~/Projects -t d -d 4)

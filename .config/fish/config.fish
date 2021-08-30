@@ -2,6 +2,10 @@ if command -sq starship
     starship init fish | source
 end
 
+if command -sq direnv
+    direnv hook fish | source
+end
+
 set -x PROJECTS_DIRS ~/Projects
 
 if command -sq git
@@ -169,7 +173,7 @@ if command -sq batman
     alias man='batman'
 end
 
-if test -f "$HOME/.phpbrew/phpbrew.fish"
+if test -f ~/.phpbrew/phpbrew.fish
     source ~/.phpbrew/phpbrew.fish
 end
 

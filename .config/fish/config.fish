@@ -6,6 +6,8 @@ if command -sq direnv
     direnv hook fish | source
 end
 
+# load_nvm
+
 set -x PROJECTS_DIRS ~/Projects
 
 if command -sq git

@@ -44,7 +44,7 @@ staged = "🗃️  ×${count}"
 renamed = "📛 ×${count}"
 deleted = "🗑️  ×${count}"
 style = "bright-white"
-format = "$all_status$ahead_behind"
+format = "$all_status$ahead_behind "
 
 [hostname]
 ssh_only = false

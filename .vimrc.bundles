@@ -69,6 +69,34 @@ call plug#begin('~/.vim/plugged')
 
     Plug 'https://github.com/jmcantrell/vim-virtualenv', { 'for': 'python' }
 
+    Plug 'https://github.com/vim-vdebug/vdebug'
+        let g:vdebug_keymap = {
+            \  "run" : "<Leader>d/",
+            \  "run_to_cursor" : "<Down>",
+            \  "step_over" : "<Up>",
+            \  "step_into" : "<Left>",
+            \  "step_out" : "<Right>",
+            \  "close" : "q",
+            \  "detach" : "<Leader>dd",
+            \  "set_breakpoint" : "<Leader>db",
+            \  "eval_visual" : "<Leader>dv"
+            \}
+        " Allows Vdebug to bind to all interfaces.
+        let g:vdebug_options = { 'port' : 9003 }
+
+        " Stops execution at the first line.
+        let g:vdebug_options['break_on_open'] = 1
+        let g:vdebug_options['max_children'] = 128
+
+        " Use the compact window layout.
+        let g:vdebug_options['watch_window_style'] = 'compact'
+
+        " This is what we use for webapp
+        let g:vdebug_options['ide_key'] = 'default'
+
+        " Need to set as empty for this to work with Vagrant boxes.
+        let g:vdebug_options['server'] = ""
+
     " Plug 'https://github.com/terryma/vim-multiple-cursors
 
     Plug 'https://github.com/junegunn/fzf', { 'do': { -> fzf#install() } } | Plug 'https://github.com/junegunn/fzf.vim'
@@ -193,18 +221,18 @@ call plug#begin('~/.vim/plugged')
 
     " annoying enables table mode while interacting with nerdtree (no idea why, tho)
     " disabled for now
-    "Plug 'https://github.com/dhruvasagar/vim-table-mode', { 'for': ['markdown', 'cucumber'] }
+    Plug 'https://github.com/dhruvasagar/vim-table-mode', { 'for': 'markdown' }
         " Options: https://github.com/dhruvasagar/vim-table-mode/blob/master/t/config/options.vim
-        "autocmd FileType markdown :TableModeEnable
-        "autocmd FileType markdown let g:table_mode_corner="|"
+        " autocmd FileType markdown :TableModeEnable
+         "autocmd FileType markdown let g:table_mode_corner="|"
         " tt is taken for Tree Toggle. Don't use t prefix at all.
-        "let g:table_mode_disable_mappings = 1
+        let g:table_mode_disable_mappings = 0
+        let g:table_mode_tableize_map = '<Leader>ti'
+        let g:table_mode_tableize_d_map = '<Leader>Ti'
 
     Plug 'https://github.com/vim-scripts/kwbdi.vim'
 
     Plug 'https://github.com/sheerun/vim-polyglot'
-
-    " Plug 'https://github.com/vim-vdebug/vdebug'
 
     " Extensions: https://github.com/neoclide/coc.nvim/wiki/Using-coc-extensions
     Plug 'https://github.com/neoclide/coc.nvim', {'branch': 'release'}

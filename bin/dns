@@ -1,0 +1,198 @@
+#!/usr/bin/env php
+<?php
+/** Please dont judge the code quality, or try writing same sort of tool in under 30m yourself */
+
+$cmd = array_slice($argv, 1, count($argv)-1);
+
+if (isset($cmd[0]) &&$cmd[0]  == '-h') {
+    echo <<<HELP
+dns <- Lists dns entries
+> 1.1.1.1 8.8.8.8
+
+dns -1.1.1.1 <- Deletes 1.1.1.1
+> 8.8.8.8
+
+dns 1.1.1.1 +5.5.5.5 <- Adds 1.1.1.1, 5.5.5.5
+> 8.8.8.8 1.1.1.1 5.5.5.5
+
+dns t 5.5.5.5 <- Propagates 5.5.5.5 to the top
+> 5.5.5.5 8.8.8.8 1.1.1.1
+
+dns t 3 <- Propagates 3rd entry (1.1.1.1) to the top
+> 1.1.1.1 5.5.5.5 8.8.8.8
+
+dns d 1 3 <- Deletes 1st and 3rd entry (1.1.1.1 and 8.8.8.8)
+> 5.5.5.5
+
+dns -h This help
+HELP;
+    die();
+}
+
+$r = new Router($cmd);
+$r->exec();
+
+class Router
+{
+    protected $cmd;
+    protected $_cmd;
+    public function __construct($cmd)
+    {
+        $this->cmd = $cmd;
+        $this->_cmd = $cmd;
+    }
+
+    public function exec()
+    {
+        $map = [
+            'show' => [],
+            'flushaugment' => ['before' => ['show'], 'after' => ['show', 'reconcilefromcopy']],
+            'flush' => ['before' => ['show'], 'after' => ['show']],
+            'dellist' => ['before' => ['show'], 'after' => ['show']],
+            'top' => ['before' => ['show'], 'after' => ['show']],
+            'augment' => ['before' => ['show'], 'after' => ['show']],
+        ];
+        $command = 'show';
+        if (count($this->cmd) == 1 && $this->cmd[0] == '-') {
+            $command = 'flush';
+        } else if (count($this->cmd) > 1 && $this->cmd[0] == '-') {
+            $command = 'flushaugment';
+        } else if (count($this->cmd) > 1 && $this->cmd[0] == 't') {
+            $command = 'top';
+        } else if (count($this->cmd) > 1 && $this->cmd[0] == 'd') {
+            $command = 'dellist';
+        } else if (count($this->cmd)) {
+            $command = 'augment';
+        }
+
+        if (isset($map[$command]['before'])) {
+            echo "=== BEFORE ===\n";
+            foreach ($map[$command]['before'] as $before) {
+                if (is_callable($before)) {
+                    $before();
+                } else {
+                    $this->{$before}();
+                }
+            }
+        }
+        $this->{$command}();
+        if (isset($map[$command]['after'])) {
+            echo "=== AFTER ===\n";
+            foreach ($map[$command]['after'] as $after) {
+                if (is_callable($after)) {
+                    $after();
+                } else {
+                    $this->{$after}();
+                }
+            }
+        }
+    }
+
+    protected function flush()
+    {
+        flushdns();
+    }
+
+    protected function dellist()
+    {
+        dellist(array_slice($this->cmd, 1));
+    }
+
+    protected function top()
+    {
+        topdns($this->cmd[1]);
+    }
+
+    protected function augment()
+    {
+        augment($this->cmd);
+    }
+
+    protected function show()
+    {
+        $ips = get();
+        echo implode(' ', $ips) . "\n";
+    }
+    protected function flushaugment()
+    {
+        flushdns();
+        unset($this->cmd[0]);
+        augment($this->cmd);
+    }
+    protected function reconcilefromcopy()
+    {
+        $this->cmd = $this->_cmd;
+    }
+}
+function flushdns()
+{
+    exec('networksetup -setdnsservers Wi-Fi 1.1.1.1', $out);
+}
+
+function get() 
+{
+    $cmd = exec('networksetup -getdnsservers Wi-Fi', $out);
+    return $out;
+}
+
+function augment($list) {
+    $current = get();
+    $add = $remove = [];
+    foreach ($list as $ip) {
+        if ($ip[0] == '+' || in_array((int)$ip[0], [1,2,3,4,5,6,7,8,9])) {
+            $add[] = trim($ip, '+');
+        } elseif ($ip[0] == '-') {
+            $remove[] = trim($ip, '-');
+        }
+    }
+    $newlist = [];
+    foreach ($remove as $rem) {
+        while (false !== ($idx = array_search($rem, $current))) {
+            unset($current[$idx]);
+        }
+    }
+    foreach ($add as $a) {
+        $current[] = $a;
+    }
+    return set($current);
+}
+
+function set($list)
+{
+    $list = array_unique($list);
+    $cmd = sprintf('networksetup -setdnsservers Wi-Fi %s', implode(' ', $list));
+    exec($cmd, $out, $ret);
+    return $ret;
+}
+
+
+function topdns($ip)
+{
+    $c = get();
+    if (is_numeric($ip)) {
+        // ip is index
+        $ip = $c[$ip-1];
+    }
+    if (!in_array($ip, $c)) {
+        array_unshift($c, $ip);
+    } else {
+        usort($c, function($a, $b) use ($ip) {
+            return $ip == $a ? -1 : 1;
+        });
+    }
+    return set($c);
+}
+
+function dellist($idx)
+{
+    $c = get();
+
+    $minus1 = function ($a) { return --$a ; };
+    $idx = array_map($minus1, $idx);
+    sort($idx);
+    $idx = array_reverse($idx);
+    foreach ($idx as $i) {
+        unset($c[$i]);
+    }
+    set($c);
+}

@@ -61,9 +61,9 @@ end
 if test -d "/usr/local/opt/findutils/libexec/gnubin" && not contains "/usr/local/opt/findutils/libexec/gnubin" $PATH
     set -x PATH "/usr/local/opt/findutils/libexec/gnubin" $PATH
 end
-if test -d "/usr/local/opt/gnu-sed/libexec/gnubin" && not contains "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
-    set -x PATH "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
-end
+#if test -d "/usr/local/opt/gnu-sed/libexec/gnubin" && not contains "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
+    #set -x PATH "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
+#end
 
 alias ..='cd ..'
 alias ...='cd ../../'

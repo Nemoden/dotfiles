@@ -149,6 +149,9 @@ class Router
 }
 function flushdns()
 {
+    // Cann't be left empty, so adding 1.1.1.1 (not exactly flushing)
+    // Calling `networksetup -setdnsservers Wi-Fi` leaving a list of DNS be blank doesnt work :(
+    // dafq???
     exec('networksetup -setdnsservers Wi-Fi 1.1.1.1', $out);
 }
 

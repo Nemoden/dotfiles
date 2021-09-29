@@ -1,6 +1,10 @@
 #!/usr/bin/env php
 <?php
-/** Please dont judge the code quality, or try writing same sort of tool in under 30m yourself */
+/**
+ * This tool only works on MacOS (since it's using a macos specific cli to set / remove DNS entries).
+ *
+ * Please dont judge the code quality, or try writing same sort of tool in under 1hr yourself.
+ */
 
 $cmd = array_slice($argv, 1, count($argv)-1);
 
@@ -21,7 +25,10 @@ dns t 5.5.5.5 <- Propagates 5.5.5.5 to the top
 dns t 3 <- Propagates 3rd entry (1.1.1.1) to the top
 > 1.1.1.1 5.5.5.5 8.8.8.8
 
-dns d 1 3 <- Deletes 1st and 3rd entry (1.1.1.1 and 8.8.8.8)
+dns r 2.2.2.2 <- Replaces first entry with 2.2.2.2
+> 2.2.2.2 5.5.5.5 8.8.8.8
+
+dns d 1 3 <- Deletes 1st and 3rd entry (2.2.2.2 and 8.8.8.8)
 > 5.5.5.5
 
 dns -h This help
@@ -38,6 +45,11 @@ class Router
     protected $_cmd;
     public function __construct($cmd)
     {
+        if (count($cmd) && in_array($cmd[0][0], ['t', 'r', 'd']) && strlen($cmd[0]) > 1) {
+            $c = $cmd[0][0];
+            $cmd[0] = substr($cmd[0], 1);
+            array_unshift($cmd, $c);
+        }
         $this->cmd = $cmd;
         $this->_cmd = $cmd;
     }
@@ -47,6 +59,7 @@ class Router
         $map = [
             'show' => [],
             'flushaugment' => ['before' => ['show'], 'after' => ['show', 'reconcilefromcopy']],
+            'replacetop' => ['before' => ['show'], 'after' => ['show']],
             'flush' => ['before' => ['show'], 'after' => ['show']],
             'dellist' => ['before' => ['show'], 'after' => ['show']],
             'top' => ['before' => ['show'], 'after' => ['show']],
@@ -59,6 +72,8 @@ class Router
             $command = 'flushaugment';
         } else if (count($this->cmd) > 1 && $this->cmd[0] == 't') {
             $command = 'top';
+        } else if (count($this->cmd) > 1 && $this->cmd[0] == 'r') {
+            $command = 'replacetop';
         } else if (count($this->cmd) > 1 && $this->cmd[0] == 'd') {
             $command = 'dellist';
         } else if (count($this->cmd)) {
@@ -91,6 +106,11 @@ class Router
     protected function flush()
     {
         flushdns();
+    }
+
+    protected function replacetop()
+    {
+        replacetop($this->cmd[1]);
     }
 
     protected function dellist()
@@ -165,6 +185,13 @@ function set($list)
     return $ret;
 }
 
+
+function replacetop($ip)
+{
+    $c = get();
+    $c[0] = $ip;
+    return set($c);
+}
 
 function topdns($ip)
 {

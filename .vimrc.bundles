@@ -76,7 +76,7 @@ call plug#begin('~/.vim/plugged')
             \  "step_over" : "<Up>",
             \  "step_into" : "<Left>",
             \  "step_out" : "<Right>",
-            \  "close" : "q",
+            \  "close" : "<Leader>dq",
             \  "detach" : "<Leader>dd",
             \  "set_breakpoint" : "<Leader>db",
             \  "eval_visual" : "<Leader>dv"

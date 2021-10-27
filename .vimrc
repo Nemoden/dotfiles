@@ -168,6 +168,8 @@ language time en_US.UTF-8
 nnoremap <F5> "=strftime("%c")<cr>P
 inoremap <F5> <C-R>=strftime("%c")<cr>
 
+nnoremap <silent> <Leader>p "*P
+
 " alternate between 2 last files
 nnoremap <leader><leader> <C-^>
 nnoremap <silent> <leader>R :source ~/.vimrc<cr>:echo ".vimrc reloaded!"<cr>

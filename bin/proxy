@@ -1,0 +1,121 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Code written in 30m, please misregard the (none-existent) quality.
+ *
+ * Usage (macos only, the iface is Wi-Fi / doesnt work with any other network interface as it's hardcoded):
+ *
+ * ./proxy <- just print web proxy status
+ * ./proxy localhost 8080 <- sets web proxy to localhost:8080
+ * ./proxy localhost:8080 <- same
+ * ./proxy 8080 <- a shortcut, the host is localhost by default, so this cmd is the same with the prev 2
+ * ./proxy off <- disables web proxy
+ * ./proxy on <- enables web proxy
+ */
+
+if ($argc === 1) {
+    printState();
+    die();
+}
+$mod = $argv[1];
+$offvals = ['off', '0'];
+$onvals = ['on', '1'];
+if (in_array(strtolower($mod), $offvals)) {
+    off();
+    printState();
+    die();
+}
+if (in_array(strtolower($mod), $onvals)) {
+    on();
+    printState();
+    die();
+}
+
+if ($argc >= 1) {
+    $args = array_slice($argv, 1);
+    $settings = implode(':', $args);
+}
+$defaultHost = 'localhost';
+if (is_numeric($settings)) {
+    set($defaultHost, $settings);
+} else {
+    [$host, $port] = explode(':', $settings);
+    set($host, $port);
+}
+
+function set($host, $port)
+{
+    exec("networksetup -setwebproxy Wi-Fi $host $port off");
+    exec("networksetup -setsecurewebproxy Wi-Fi $host $port off");
+}
+
+function get()
+{
+    $states = [];
+    $out = null;
+    exec("networksetup -getwebproxy Wi-Fi", $out);
+    $states[] = ProxyState::fromShellOut(false, $out);
+    $out = null;
+    exec("networksetup -getsecurewebproxy Wi-Fi", $out);
+    $states[] = ProxyState::fromShellOut(true, $out);
+    return $states;
+}
+
+function printState()
+{
+    foreach (get() as $state) {
+        echo "$state\n";
+    }
+}
+
+function on()
+{
+    exec('networksetup -setwebproxystate Wi-Fi on');
+    exec('networksetup -setsecurewebproxystate Wi-Fi on');
+}
+
+function off()
+{
+    exec('networksetup -setwebproxystate Wi-Fi off');
+    exec('networksetup -setsecurewebproxystate Wi-Fi off');
+}
+
+class ProxyState
+{
+    protected $state;
+    public function __construct($iface, $secure, $enabled, $host, $port, $auth = false)
+    {
+        $this->state = compact('iface', 'secure', 'enabled', 'host', 'port', 'auth');
+    }
+
+    public function __toString()
+    {
+        return sprintf(
+            "[%s] %s %s:%d",
+            $this->state['enabled'] ? 'ON' : 'OFF',
+            $this->state['secure'] ? 'HTTPS' : 'HTTP',
+            $this->state['host'],
+            $this->state['port']
+        );
+    }
+
+    public static function fromShellOut($secure, $out)
+    {
+        $kv = [];
+        foreach ($out as $line) {
+            [$k, $v] = array_map('trim', explode(':', $line));
+            $kv[str_replace(' ', '', strtolower($k))] = $v;
+        }
+        return new self(
+            'Wi-Fi',
+            $secure ? true : false,
+            $kv['enabled'] == 'No' ? false : true,
+            $kv['server'],
+            $kv['port'],
+            $kv['authenticatedproxyenabled'] ? true : false
+        );
+    }
+
+}
+printState();
+die();

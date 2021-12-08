@@ -236,10 +236,13 @@ call plug#begin('~/.vim/plugged')
 
     Plug 'https://github.com/vim-scripts/kwbdi.vim'
 
-    Plug 'https://github.com/sheerun/vim-polyglot'
+    " Plug 'https://github.com/sheerun/vim-polyglot'
 
     " Extensions: https://github.com/neoclide/coc.nvim/wiki/Using-coc-extensions
     Plug 'https://github.com/neoclide/coc.nvim', {'branch': 'release'}
+        " Useful commands:
+        " :CocList sources
+        " :CocList services
         if executable('/usr/local/bin/node')
             let g:coc_node_path = '/usr/local/bin/node'
         endif

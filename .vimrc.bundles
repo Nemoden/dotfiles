@@ -399,7 +399,7 @@ call plug#begin('~/.vim/plugged')
                 \ 'typescriptreact',
             \ ]
         \ }
-        let g:rainbow_active = 1
+        let g:rainbow_active = 0
 
     Plug 'https://github.com/chrisbra/Colorizer'
 

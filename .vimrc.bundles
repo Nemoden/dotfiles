@@ -252,6 +252,7 @@ call plug#begin('~/.vim/plugged')
                     \ 'coc-html',
                     \ 'coc-json',
                     \ 'coc-phpls',
+                    \ 'coc-protobuf',
                     \ 'coc-pyright',
                     \ 'coc-tsserver',
                     \ 'coc-yaml',

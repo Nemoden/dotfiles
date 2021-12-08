@@ -212,6 +212,9 @@ nnoremap <silent> ,cf :let @*=expand("%:.")<CR>:echo "file name copied to the cl
 nnoremap <silent> ,cp :let @*=expand("%:p")<CR>:echo "file path copied to the clipboard!"<CR>
 " copy contents
 
+
+nnoremap <silent> <Leader>gh :exe "!gh browse " . shellescape(expand("%:.")) .  ":" . line(".") . " --branch (git rev-parse --abbrev-ref HEAD)" <CR>
+
  " nnoremap <silent> ,cc :let @*=expand("%:p")<CR>:echo "file path copied to the clipboard!"<CR>
 
 " source: https://superuser.com/questions/401926/how-to-get-shiftarrows-and-ctrlarrows-working-in-vim-in-tmux

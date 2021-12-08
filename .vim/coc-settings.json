@@ -53,5 +53,12 @@
   "intelephense.completion.triggerParameterHints": false,
   "intelephense.format.enable": false,
   "intelephense.trace.server": "off",
-  "git.enableGutters": false
+  "git.enableGutters": false,
+  "languageserver": {
+      "golang": {
+          "command": "gopls",
+          "rootPatterns": ["go.mod", ".vim/", ".git/", ".hg/"],
+          "filetypes": ["go"]
+      }
+  }
 }

@@ -204,11 +204,15 @@ call plug#begin('~/.vim/plugged')
         nmap <silent> <D-_> :call NERDComment("n","Invert") <CR>
 
     Plug 'https://github.com/fatih/vim-go', { 'do': ':GoUpdateBinaries', 'for': 'go' }
+        autocmd FileType go nmap <leader>i :GoImport 
         autocmd FileType go nmap <leader>gi <Plug>(go-info)
-        autocmd FileType go nmap <leader>gd <Plug>(go-def)
+        " autocmd FileType go nmap <leader>gd <Plug>(go-def)
         autocmd FileType go nmap <leader>b :GoDefPop<CR>
         autocmd FileType go nmap <leader>s :GoSameIds<CR>
-        autocmd FileType go nmap <leader>r :GoRename<CR>
+        autocmd FileType go nmap <leader>r :GoRun<CR>
+        let g:go_def_mode='gopls'
+        let g:go_info_mode='gopls'
+        let g:go_def_mapping_enabled = 0
         " autocmd FileType go let g:go_auto_type_info = 1
 
     Plug 'https://github.com/tpope/vim-surround'

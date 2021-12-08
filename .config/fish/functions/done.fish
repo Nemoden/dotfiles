@@ -18,17 +18,17 @@ function done
         # args empty, assume what's done today
         set cmd $cmd start:today
     else
-        set modifier (string sub -e 1 -- $argv[1])
-        if [ $argv[1] = "+all" ]
+        set modifier (string sub -e 1 -- "$argv[1]")
+        if [ "$argv[1]" = "+all" ]
             # pass
         else if [ $modifier = "+" ]
-            set when (string sub -s 2 -- $argv[1])
+            set when (string sub -s 2 -- "$argv[1]")
             set cmd $cmd start:$when
         else if [ $modifier = "-" ]
-            set id (string sub -s 2 -- $argv[1])
+            set id (string sub -s 2 -- "$argv[1]")
             set cmd task done $id
         else
-            set cmd $cmd add start:sod end:eod $argv
+            set cmd $cmd add start:sod end:eod "$argv"
         end
     end
     eval $cmd

@@ -44,7 +44,7 @@ call plug#begin('~/.vim/plugged')
     Plug 'https://github.com/tpope/vim-fugitive'
 
     Plug 'https://github.com/mhinz/vim-startify'
-        autocmd BufDelete * if empty(filter(tabpagebuflist(), '!buflisted(v:val)')) | Startify | endif
+        " autocmd BufDelete * if empty(filter(tabpagebuflist(), '!buflisted(v:val)')) | Startify | endif
         let g:startify_change_to_dir = 0
         let g:startify_lists = [
               \ { 'type': 'dir',       'header': ['   MRU '. getcwd()] },

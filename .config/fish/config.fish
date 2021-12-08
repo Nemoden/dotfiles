@@ -6,6 +6,8 @@ if command -sq direnv
     direnv hook fish | source
 end
 
+alias killchrome="ps ux | grep '[C]hrome Helper (Renderer) --type=renderer' | grep -v extension-process | tr -s ' ' | cut -d ' ' -f2 | xargs kill"
+
 # load_nvm
 
 set -x PROJECTS_DIRS ~/Projects

@@ -34,6 +34,10 @@ if command -sq nvim
     alias vim='nvim'
 end
 
+if command -sq lynx
+    alias lynx='lynx -cfg ~/lynx.cfg'
+end
+
 if command -sq rg
     alias rg='rg --no-heading'
 end

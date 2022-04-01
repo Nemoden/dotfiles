@@ -26,7 +26,7 @@
     l = log --oneline --graph --decorate
     ll = log --pretty='%C(auto)%h %d <%an> %s' --graph
     ld = log --pretty='%C(auto)%h %d <%an> %s' --graph --cc
-	lg = log --graph --format='%Cred%h%Creset %s %Cgreen(%cr) %C(blue)<%an>%Creset%C(yellow)%d%Creset' --no-merges
+	lg = log --graph --format='%Cred%h%Creset %s %Cgreen(%cr, %cs) %C(blue)<%an>%Creset%C(yellow)%d%Creset' --no-merges
 	merge-commits = "!funct() { git log --merges --reverse --oneline --ancestry-path $1..origin | grep \"Merge pull request\";  }; funct"
 	pr-number = "!funct() { git merge-commits $1 | head -n1 | sed -n \"s/^.*Merge pull request #\\s*\\([0-9]*\\).*$/\\1/p\"; }; funct"
 	web-url = "!funct() { git config remote.origin.url | sed -e\"s/git@/https:\\/\\//\" -e\"s/\\.git$//\" | sed -E \"s/(\\/\\/[^:]*):/\\1\\//\"; }; funct"

@@ -116,6 +116,11 @@ call plug#begin('~/.vim/plugged')
             "endif
         "endif
         nnoremap <silent> <leader>bb :Buffers!<CR>
+        "Getting used to leader+dot, it seems to be a better alternate as it's
+        "a comma-dot which are close to each other on the keyboard and it's a
+        "1 less keystroke. I tend to use it a lot, so faster alternative
+        "should be better.
+        nnoremap <silent> <leader>. :Buffers!<CR>
         nnoremap <silent> <leader>fb :BLines!<CR>
         nnoremap <silent> <leader>bl :BLines!<CR>
         nnoremap <silent> <leader>fl :Lines!<CR>

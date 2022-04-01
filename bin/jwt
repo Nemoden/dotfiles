@@ -1,0 +1,66 @@
+#!/usr/bin/env php
+<?php
+
+/** Sample usage:
+
+    $ jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+    Header:
+    {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+
+    Payload:
+    {
+        "sub": "1234567890",
+        "name": "John Doe",
+        "iat": 1516239022
+    }
+
+*/
+
+$jwt = $argv[1];
+
+$parts = explode('.', $jwt);
+$i = 0;
+foreach ($parts as $part) {
+    $i++;
+    if (!canDecode($part)) {
+        if ($i < 3) {
+            // assume signature.
+            echo "Can't decode part #$i: $part\n";
+        }
+        continue;
+    }
+    echo isHeader($part) ? "Header:\n" : "Payload:\n";
+    echo decorateJsonString(decodePublicPart($part));
+    echo "\n";
+    if (isset($parts[$i]) && canDecode($parts[$i])) {
+        echo "\n";
+    }
+}
+
+function decodePublicPart($str)
+{
+    $str = str_replace(['-', '_'], ['+', '/'], $str);
+    $addEqPadding = 4 - strlen($str) % 4;
+    if ($addEqPadding > 0) {
+        $str .= str_repeat('=', $addEqPadding);
+    }
+    return base64_decode($str);
+}
+
+function decorateJsonString($str)
+{
+    return json_encode(json_decode($str, true), JSON_PRETTY_PRINT);
+}
+
+function isHeader($str)
+{
+    return array_key_exists('alg', json_decode(decodePublicPart($str), true));
+}
+
+function canDecode($str)
+{
+    return json_decode(decodePublicPart($str), true) !== null;
+}

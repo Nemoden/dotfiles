@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+# https://stackoverflow.com/questions/1527049/how-can-i-join-elements-of-an-array-in-bash
+function join_by {
+    local d=${1-} f=${2-}
+    if shift 2; then
+        printf %s "$f" "${@/#/$d}"
+    fi
+}
+
+reqs=(fzf gh awk)
+for cmd in "${reqs[@]}"
+do
+    if ! command -v "$cmd" &> /dev/null;  then
+        echo "This script requires "$(join_by ", " "${reqs[@]}")" to be installed, haven't found $cmd"
+        exit
+    fi
+done
+
+if [[ ! -z $1 ]]; then
+    echo '1'
+    gh pr view --web $1
+else
+    prs=$(gh pr list --author @me | awk 'FNR > 0{print $0}')
+
+    if [[ -n $prs ]]; then
+        pr=$(echo "$prs" | fzf --prompt="PR:")
+    else
+        echo "no prs"
+        exit
+    fi
+
+    prnum="$(echo "$pr" | cut -f1)"
+    msg="$(echo "$pr" | cut -f2)"
+    branch="$(echo "$pr" | cut -f3)"
+    [[ -n "$prnum" ]] && gh pr view --web $prnum && echo "Opening PR $prnum, Branch: $branch, Message: $msg"
+fi

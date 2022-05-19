@@ -121,9 +121,8 @@ call plug#begin('~/.vim/plugged')
         "1 less keystroke. I tend to use it a lot, so faster alternative
         "should be better.
         nnoremap <silent> <leader>. :Buffers!<CR>
-        nnoremap <silent> <leader>fb :BLines!<CR>
         nnoremap <silent> <leader>bl :BLines!<CR>
-        nnoremap <silent> <leader>fl :Lines!<CR>
+        nnoremap <silent> <leader>ll :Lines!<CR>
         nnoremap <silent> <leader>/ :History/<CR>
 
         command! -bang -nargs=* Rg

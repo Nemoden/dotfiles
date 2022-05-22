@@ -14,6 +14,7 @@ Install [brew](https://brew.sh/) first (follow the instructions from the homebre
     chsh -s /usr/local/bin/fish
     /usr/local/opt/fzf/install
     vim +PlugInstall +q
+    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
     
 In a nutshell
 ---

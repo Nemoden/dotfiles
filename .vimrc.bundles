@@ -454,7 +454,13 @@ call plug#begin('~/.vim/plugged')
             call webdevicons#refresh()
         endif
 
-    Plug 'https://github.com/liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
+    " Plug 'https://github.com/liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
+
+    " Let's give it a go
+    Plug 'https://github.com/SirVer/ultisnips' | Plug 'https://github.com/honza/vim-snippets'
+        let g:UltiSnipsExpandTrigger="<c-l>"
+        let g:UltiSnipsListSnippets="<c-h>"
+        "let g:UltiSnipsEnableSnipMate=1
 
     if filereadable(expand("~/.vimrc.bundles.local"))
       source ~/.vimrc.bundles.local

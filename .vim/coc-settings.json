@@ -39,8 +39,7 @@
   },
   "list.insertMappings": {
     "<C-c>": "do:refresh",
-    "<C-o>": "call:CocAction('showSignatureHelp')",
-    "<C-p>": "action.triggerParameterHints"
+    "<C-o>": "call:CocAction('showSignatureHelp')"
   },
   "cursors.cancelKey": "<C-c>",
   "cursors.nextKey": "<C-j>",

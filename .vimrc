@@ -148,6 +148,7 @@ autocmd FileType json setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType go setlocal nolist noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType make setlocal noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType ruby setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType css setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType javascript setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType vue setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType rust nmap <leader>cb :!cargo build<Return>

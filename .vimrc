@@ -149,7 +149,7 @@ autocmd FileType go setlocal nolist noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType make setlocal noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType ruby setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType css setlocal expandtab shiftwidth=2 tabstop=2
-autocmd FileType javascript setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType javascript setlocal expandtab shiftwidth=4 tabstop=4
 autocmd FileType vue setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType rust nmap <leader>cb :!cargo build<Return>
 autocmd FileType rust nmap <leader>cr :!cargo run<Return>
@@ -203,9 +203,9 @@ map <silent> <leader>cd :call GetPwd()<cr>:pwd<cr>
 "inoremap <silent> <C-c><esc>:echom "Ctrl+C is for EXIT!"
 
 " Sort
-vnoremap <silent> <leader>s :'<,'>%sort<cr>
+vnoremap <silent> <leader>s :%sort<cr>
 " Reverse sort
-vnoremap <silent> <leader>S :'<,'>%sort!<cr>
+vnoremap <silent> <leader>S :%sort!<cr>
 
 " copy name
 nnoremap <silent> ,cf :let @*=expand("%:.")<CR>:echo "file name copied to the clipboard!"<CR>

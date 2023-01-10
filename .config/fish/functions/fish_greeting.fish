@@ -1,5 +1,8 @@
 function fish_greeting --description Greeting
     set greeting ""
+    if set -q NOGREETING
+        return
+    end
     if command -s fortune > /dev/null
         set greeting (fortune -s)
     end

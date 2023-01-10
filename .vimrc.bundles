@@ -265,13 +265,10 @@ call plug#begin('~/.vim/plugged')
         if filereadable(expand("~/.vim/coc-user-config.vim"))
           source ~/.vim/coc-user-config.vim
         endif
-        " Use <CR> to confirm completion, `<C-g>u` means break undo chain at current
-        " position. Coc only does snippet and additional edit on confirm.
-        if exists('*complete_info')
-            inoremap <expr> <CR> complete_info()["selected"] != "-1" ? "\<C-y>" : "\<C-g>u\<CR>"
-        else
-            imap <expr> <CR> pumvisible() ? "\<C-y>" : "\<C-g>u\<CR>"
-        endif
+        " Make <CR> to accept selected completion item or notify coc.nvim to format
+        " <C-g>u breaks current undo, please make your own choice
+        inoremap <silent><expr> <CR> coc#pum#visible() ? coc#pum#confirm()
+                                      \: "\<C-g>u\<CR>\<c-r>=coc#on_enter()\<CR>"
         " GoTo code navigation.
         nmap <silent> <leader>gd :call CocActionAsync('jumpDefinition')<CR>
         nmap <silent> <leader>gr :call CocActionAsync('jumpReferences')<CR>
@@ -288,20 +285,25 @@ call plug#begin('~/.vim/plugged')
             endif
         endfunction
 
-        " Use tab for trigger completion with characters ahead and navigate.
+        " Use tab for trigger completion with characters ahead and navigate
+        " NOTE: There's always complete item selected by default, you may want to enable
+        " no select by `"suggest.noselect": true` in your configuration file
         " NOTE: Use command ':verbose imap <tab>' to make sure tab is not mapped by
-        " other plugin before putting this into your config.
+        " other plugin before putting this into your config
         inoremap <silent><expr> <TAB>
-                    \ pumvisible() ? "\<C-n>" :
-                    \ <SID>check_back_space() ? "\<TAB>" :
-                    \ coc#refresh()
-        inoremap <expr><S-TAB> pumvisible() ? "\<C-p>" : "\<C-h>"
+              \ coc#pum#visible() ? coc#pum#next(1) :
+              \ CheckBackspace() ? "\<Tab>" :
+              \ coc#refresh()
+        inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
         function! s:check_back_space() abort
             let col = col('.') - 1
             return !col || getline('.')[col - 1]  =~# '\s'
         endfunction
 
+        " https://vi.stackexchange.com/questions/21457/how-to-remap-autocomplete-on-controln-to-controlspace
+        map <Nul> <c-space>
+        map! <Nul> <c-space>
         inoremap <silent><expr> <c-space> coc#refresh()
         nnoremap <silent> <leader>k :call CocAction('showSignatureHelp')<CR>
         inoremap <silent> <C-k> <Esc>:call CocActionAsync('showSignatureHelp')<CR>a
@@ -354,7 +356,7 @@ call plug#begin('~/.vim/plugged')
         let g:undotree_SplitWidth = 40
         let g:undotree_DiffAutoOpen = 1
 
-        let s:debug = 1
+        let s:debug = 0
         let s:debugfile = '/tmp/undotree_debug.log'
 
     " Plug 'https://github.com/liuchengxu/vista.vim'
@@ -461,6 +463,8 @@ call plug#begin('~/.vim/plugged')
         let g:UltiSnipsExpandTrigger="<c-l>"
         let g:UltiSnipsListSnippets="<c-h>"
         "let g:UltiSnipsEnableSnipMate=1
+
+    Plug 'https://github.com/hashivim/vim-terraform', { 'for': 'terraform' }
 
     if filereadable(expand("~/.vimrc.bundles.local"))
       source ~/.vimrc.bundles.local

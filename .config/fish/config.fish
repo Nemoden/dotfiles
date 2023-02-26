@@ -39,7 +39,7 @@ if command -sq lynx
 end
 
 if command -sq rg
-    alias rg='rg --no-heading'
+    alias rg='rg --no-heading -M 150'
 end
 
 if command -sq kubectl

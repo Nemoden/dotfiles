@@ -209,15 +209,49 @@ call plug#begin('~/.vim/plugged')
 
     Plug 'https://github.com/fatih/vim-go', { 'do': ':GoUpdateBinaries', 'for': 'go' }
         autocmd FileType go nmap <leader>i :GoImport 
-        autocmd FileType go nmap <leader>gi <Plug>(go-info)
+        " autocmd FileType go nmap <leader>gi <Plug>(go-info)
         " autocmd FileType go nmap <leader>gd <Plug>(go-def)
-        autocmd FileType go nmap <leader>b :GoDefPop<CR>
+        " run :GoBuild or :GoTestCompile based on the go file
+        function! s:build_go_files()
+          let l:file = expand('%')
+          if l:file =~# '^\f\+_test\.go$'
+            call go#test#Test(0, 1)
+          elseif l:file =~# '^\f\+\.go$'
+            call go#cmd#Build(0)
+          endif
+        endfunction
+
+        autocmd FileType go nmap <leader>b :<C-u>call <SID>build_go_files()<CR>
         autocmd FileType go nmap <leader>s :GoSameIds<CR>
         autocmd FileType go nmap <leader>r :GoRun<CR>
+        autocmd FileType go nmap fs :GoFillStruct<CR>
+
+        " Debugging
+        autocmd FileType go nmap <leader>ds :GoDebugStart 
+        autocmd FileType go nmap dp :call go#debug#Print(expand('<cword>'))<CR>
+        autocmd FileType go nmap dn :GoDebugContinue<CR>
+        autocmd FileType go nmap dj :GoDebugNext<CR>
+        autocmd FileType go nmap db :GoDebugBreakpoint<CR>
+        autocmd FileType go nmap <leader>dq :GoDebugStop<CR>
+        autocmd FileType go nmap <leader>dr :GoDebugRestart<CR>
+        autocmd FileType go nmap dl :GoDebugStep<CR>
+        autocmd FileType go nmap dk :GoDebugStepOut<CR>
+
+        let g:go_debug_windows = {
+            \ 'vars':  'rightbelow 60vnew',
+        \ }
+
         let g:go_def_mode='gopls'
         let g:go_info_mode='gopls'
         let g:go_def_mapping_enabled = 0
-        " autocmd FileType go let g:go_auto_type_info = 1
+        " disable auto type info in case if it causes problems.
+        let g:go_auto_type_info = 1
+        let g:go_fmt_command = "goimports"
+        let g:go_highlight_types = 1
+        let g:go_highlight_fields = 1
+        let g:go_highlight_functions = 1
+        let g:go_highlight_function_calls = 1
+        let g:go_highlight_extra_types = 1
 
     Plug 'https://github.com/tpope/vim-surround'
 
@@ -275,6 +309,9 @@ call plug#begin('~/.vim/plugged')
         nmap <leader>rn <Plug>(coc-rename)
         nmap <silent> <leader>gy <Plug>(coc-type-definition)
         nmap <silent> <leader>gi <Plug>(coc-implementation)
+        " allows scrolling PUM without mouse.
+        inoremap <nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1, 1)\<cr>" : "\<Right>"
+        inoremap <nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0, 1)\<cr>" : "\<Left>"
         " Use K to show documentation in preview window.
         nnoremap <silent> K :call <SID>show_documentation()<CR>
         function! s:show_documentation()
@@ -359,7 +396,7 @@ call plug#begin('~/.vim/plugged')
         let s:debug = 0
         let s:debugfile = '/tmp/undotree_debug.log'
 
-    " Plug 'https://github.com/liuchengxu/vista.vim'
+    Plug 'https://github.com/liuchengxu/vista.vim'
         ":help vista-commands
 
         " show symbols.

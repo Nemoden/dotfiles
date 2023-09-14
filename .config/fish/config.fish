@@ -28,7 +28,7 @@ function echo_np
     # A space in front of vi is intentional,
     # I don't want typing vi and get suggested
     # to edit a tmp notepad file
-    echo " vi $name"
+    echo " vi +star $name"
 end
 
 abbr -a bb --position anywhere --function echo_brbr

@@ -12,6 +12,44 @@ alias killchrome="ps ux | grep '[C]hrome Helper (Renderer) --type=renderer' | gr
 
 set -x PROJECTS_DIRS ~/Projects
 
+function echo_tsts
+    echo (ts):(ts)
+end
+abbr -a tt --position anywhere --function echo_tsts
+
+function echo_brbr
+    set --local br (git branch  | grep \* | sed 's/* //')
+    echo "$br:$br"
+end
+
+function echo_np
+    set --local name (mktemp '/tmp/np-'(date +%Y%m%d)'-'(ts)'.XXXXXX')
+    rm -f $name
+    # A space in front of vi is intentional,
+    # I don't want typing vi and get suggested
+    # to edit a tmp notepad file
+    echo " vi $name"
+end
+
+abbr -a bb --position anywhere --function echo_brbr
+
+abbr -a ts --position anywhere --function ts
+
+# Create a temp notepad
+abbr -a np --position anywhere --function echo_np
+
+function bangbang
+    echo $history[1]
+end
+
+abbr -a !! --position anywhere --function bangbang
+
+function dollarunderscore
+    echo $history[1] | awk '{print $NF}'
+end
+
+abbr -a \$_ --position anywhere --function dollarunderscore
+
 if command -sq git
     abbr -a -g gs   git status --show-stash
     abbr -a -g gss  git status --short

@@ -35,15 +35,23 @@ call plug#begin('~/.vim/plugged')
     " h: airline-default-sections
     Plug 'https://github.com/vim-airline/vim-airline' | Plug 'https://github.com/vim-airline/vim-airline-themes'
         let g:airline_powerline_fonts = 1
-        let g:airline_theme='base16_spacemacs'
+        let g:airline_theme='base16_tomorrow_night'
         let g:airline#extensions#tabline#enabled = 1
         let g:airline#extensions#tabline#formatter = 'unique_tail_improved'
-        let g:airline_extensions = ['branch', 'tabline', 'hunks', 'fugitiveline']
+        let g:airline#extensions#coc#enabled = 1
+        let g:airline#extensions#tabline#buffer_nr_format = '%s '
+        let g:airline#extensions#tabline#buffer_nr_show = 1
+        let g:airline#extensions#tabline#tab_nr_type = 1
+        let g:airline#extensions#tabline#show_tab_nr = 1
+        let g:airline#extensions#tabline#fnametruncate = 16
+        let g:airline#extensions#tabline#fnamecollapse = 2
+        let g:airline#extensions#tabline#buffer_idx_mode = 1
+        let g:airline_extensions = ['branch', 'tabline', 'hunks', 'fugitiveline', 'coc']
         let g:airline#extensions#disable_rtp_load = 1
 
     Plug 'https://github.com/tpope/vim-fugitive'
 
-    Plug 'https://github.com/mhinz/vim-startify'
+    Plug'https://github.com/mhinz/vim-startify'
         " autocmd BufDelete * if empty(filter(tabpagebuflist(), '!buflisted(v:val)')) | Startify | endif
         let g:startify_change_to_dir = 0
         let g:startify_lists = [
@@ -120,7 +128,8 @@ call plug#begin('~/.vim/plugged')
         "a comma-dot which are close to each other on the keyboard and it's a
         "1 less keystroke. I tend to use it a lot, so faster alternative
         "should be better.
-        nnoremap <silent> <leader>. :Buffers!<CR>
+        nnoremap <silent> <leader>. :Buffers<CR>
+        nnoremap <silent> <leader>m :Marks<CR>
         nnoremap <silent> <leader>bl :BLines!<CR>
         nnoremap <silent> <leader>ll :Lines!<CR>
         nnoremap <silent> <leader>/ :History/<CR>
@@ -174,7 +183,7 @@ call plug#begin('~/.vim/plugged')
 
         let NERDTreeWinSize=40
         let NERDTreeShowHidden=1
-        " let NERDTreeQuitOnOpen=1
+        let NERDTreeQuitOnOpen=1
         let NERDTreeSortHiddenFirst=0
         let NERDTreeAutoDeleteBuffer = 1
         let NERDTreeIgnore=['\.pyc$', '\.bak$', '.git[[dir]]']
@@ -227,7 +236,7 @@ call plug#begin('~/.vim/plugged')
         autocmd FileType go nmap fs :GoFillStruct<CR>
 
         " Debugging
-        autocmd FileType go nmap <leader>ds :GoDebugStart 
+        autocmd FileType go nmap <leader>ds :GoDebugStart
         autocmd FileType go nmap dp :call go#debug#Print(expand('<cword>'))<CR>
         autocmd FileType go nmap dn :GoDebugContinue<CR>
         autocmd FileType go nmap dj :GoDebugNext<CR>
@@ -352,8 +361,33 @@ call plug#begin('~/.vim/plugged')
             "autocmd User CocJumpPlaceholder silent call CocActionAsync('showSignatureHelp')
         augroup END
 
-        " navigate to a symbol in current buffer (for now php only).
-        autocmd FileType php nnoremap <leader>gs :CocList outline<CR>
+        " navigate to a symbol in current buffer.
+        nnoremap <leader>gs :CocList --auto-preview outline<CR>
+        nnoremap gs :CocList -I --top --auto-preview --ignore-case symbols<CR>
+
+        " GIT --- https://github.com/neoclide/coc-git "
+        " navigate chunks of current buffer
+        nmap [g <Plug>(coc-git-prevchunk)
+        nmap ]g <Plug>(coc-git-nextchunk)
+        " navigate conflicts of current buffer
+        nmap [c <Plug>(coc-git-prevconflict)
+        nmap ]c <Plug>(coc-git-nextconflict)
+        " show commit contains current position
+        nmap gc <Plug>(coc-git-commit)
+
+        " Show chunk info under cursor.
+        nmap ci :CocCommand git.chunkInfo<cr>
+        " Undo current chunk.
+        nmap cu :CocCommand git.chunkUndo<cr>
+        " Stage current chunk.
+        nmap cs :CocCommand git.chunkStage<cr>
+        " Unstage chunk that contains current line.
+        nmap cS :CocCommand git.chunkUnstage<cr>
+        " Fold unchanged lines of current buffer.
+        nmap fu :CocCommand git.foldUnchanged<cr>
+
+        nmap ]d :call CocAction('diagnosticNext')<CR>
+        nmap [d :call CocAction('diagnosticPrevious')<CR>
 
         " Don't pass messages to |ins-completion-menu|.
         set shortmess+=c
@@ -376,25 +410,25 @@ call plug#begin('~/.vim/plugged')
     "endif
 
     " Using both since not yet decided which one I prefer better.
-    Plug 'https://github.com/simnalamburt/vim-mundo', { 'on': 'MundoToggle' }
-        let g:mundo_width = 40
-        let g:mundo_preview_height = 15
-        let g:mundo_right = 1
-        let g:mundo_close_on_revert = 1
-        let g:mundo_playback_delay = 200
-        let g:mundo_preview_bottom = 1
-        nnoremap <silent> <leader>U :MundoToggle <CR>
+    "Plug 'https://github.com/simnalamburt/vim-mundo', { 'on': 'MundoToggle' }
+        "let g:mundo_width = 40
+        "let g:mundo_preview_height = 15
+        "let g:mundo_right = 1
+        "let g:mundo_close_on_revert = 1
+        "let g:mundo_playback_delay = 200
+        "let g:mundo_preview_bottom = 1
+        "nnoremap <silent> <leader>U :MundoToggle <CR>
 
-    Plug 'https://github.com/mbbill/undotree', { 'on': 'UndotreeToggle' }
-        nnoremap <silent> <leader>u :UndotreeToggle <CR>
-        let g:undotree_WindowLayout = 4
-        let g:undotree_SetFocusWhenToggle = 1
-        let g:undotree_ShortIndicators = 1
-        let g:undotree_SplitWidth = 40
-        let g:undotree_DiffAutoOpen = 1
+    "Plug 'https://github.com/mbbill/undotree', { 'on': 'UndotreeToggle' }
+        "nnoremap <silent> <leader>u :UndotreeToggle <CR>
+        "let g:undotree_WindowLayout = 4
+        "let g:undotree_SetFocusWhenToggle = 1
+        "let g:undotree_ShortIndicators = 1
+        "let g:undotree_SplitWidth = 40
+        "let g:undotree_DiffAutoOpen = 1
 
-        let s:debug = 0
-        let s:debugfile = '/tmp/undotree_debug.log'
+        "let s:debug = 0
+        "let s:debugfile = '/tmp/undotree_debug.log'
 
     Plug 'https://github.com/liuchengxu/vista.vim'
         ":help vista-commands
@@ -427,22 +461,31 @@ call plug#begin('~/.vim/plugged')
         let g:vista_ignore_kinds = ['Variable']
         let g:vista_sidebar_width = 40
 
-    Plug 'https://github.com/luochen1990/rainbow', { 'for':
-            \ [
-                \ 'c',
-                \ 'cpp',
-                \ 'go',
-                \ 'java',
-                \ 'javascript',
-                \ 'javascriptreact',
-                \ 'lisp',
-                \ 'php',
-                \ 'rust',
-                \ 'typescript',
-                \ 'typescriptreact',
-            \ ]
-        \ }
-        let g:rainbow_active = 0
+    Plug 'https://github.com/luochen1990/rainbow'
+        let g:rainbow_conf = {
+        \   'separately': {
+        \       'c': 0,
+        \       'cpp': 0,
+        \       'go': 0,
+        \       'java': 0,
+        \       'javascript': 0,
+        \       'javascriptreact': 0,
+        \       'nerdtree': 0,
+        \       'php': 0,
+        \       'python': 0,
+        \       'rust': 0,
+        \       'typescript': 0,
+        \       'typescriptreact': 0,
+        \       'vim': 0,
+        \       'lisp': {
+        \           'guifgs': ['royalblue3', 'darkorange3', 'seagreen3', 'firebrick', 'darkorchid3'],
+        \       },
+        \       'scheme': {
+        \           'guifgs': ['royalblue3', 'darkorange3', 'seagreen3', 'firebrick', 'darkorchid3'],
+        \       },
+        \   }
+        \}
+        let g:rainbow_active = 1
 
     Plug 'https://github.com/chrisbra/Colorizer'
 
@@ -502,6 +545,18 @@ call plug#begin('~/.vim/plugged')
         "let g:UltiSnipsEnableSnipMate=1
 
     Plug 'https://github.com/hashivim/vim-terraform', { 'for': 'terraform' }
+
+    Plug 'https://github.com/github/copilot.vim'
+        if executable('/usr/local/bin/node')
+            let g:copilot_node_command = '/usr/local/bin/node'
+        endif
+        let g:copilot_no_tab_map = v:true
+        " <Tab> is super annoying. <C-I> should be okay.
+        imap <silent><script><expr> <C-I> copilot#Accept("\<CR>")
+        let g:copilot_filetypes = {
+              \ 'scheme': v:false,
+              \ 'lisp': v:false,
+              \ }
 
     if filereadable(expand("~/.vimrc.bundles.local"))
       source ~/.vimrc.bundles.local

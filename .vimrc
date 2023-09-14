@@ -88,7 +88,7 @@ filetype plugin indent on
 set background=dark
 let base16colorspace=256
 set termguicolors
-" snazzy, nord, iceberg
+" tomorrow-night, snazzy, oceanicnext, nord
 colors base16-tomorrow-night
 
 """ BACKUP, SWAP, UNDO, etc.
@@ -151,6 +151,9 @@ autocmd FileType ruby setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType css setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType javascript setlocal expandtab shiftwidth=4 tabstop=4
 autocmd FileType vue setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType proto setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType scheme setlocal expandtab shiftwidth=2 tabstop=2
+autocmd FileType lisp setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType rust nmap <leader>cb :!cargo build<Return>
 autocmd FileType rust nmap <leader>cr :!cargo run<Return>
 
@@ -164,7 +167,6 @@ endif
     "autocmd!
     "autocmd BufWrite * execute "normal! mz" |  keeppatterns %s/\v\s+$//e | normal `z
 "augroup END
-
 
 language time en_US.UTF-8
 nnoremap <F5> "=strftime("%c")<cr>P

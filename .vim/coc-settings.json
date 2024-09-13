@@ -148,6 +148,11 @@
         ],
         "initializationOptions": {},
         "settings": {}
+      },
+      "zls": {
+        "command": "zls",
+        "filetypes": ["zig"],
+        "rootPatterns": ["build.zig", "zls.json"]
       }
   }
 }

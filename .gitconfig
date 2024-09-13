@@ -9,6 +9,8 @@
     excludesfile = /Users/kkovalchuk/.gitignore.global
     editor = vim
     pager = delta
+[branch]
+    sort = authordate
 [alias]
     st = status
     s = status -s

@@ -130,6 +130,7 @@ call plug#begin('~/.vim/plugged')
         "should be better.
         nnoremap <silent> <leader>. :Buffers<CR>
         nnoremap <silent> <leader>m :Marks<CR>
+        nnoremap <silent> <leader>j :Jumps<CR>
         nnoremap <silent> <leader>bl :BLines!<CR>
         nnoremap <silent> <leader>ll :Lines!<CR>
         nnoremap <silent> <leader>/ :History/<CR>
@@ -216,7 +217,9 @@ call plug#begin('~/.vim/plugged')
         nmap <silent> <C-_> :call NERDComment("n","Invert") <CR>
         nmap <silent> <D-_> :call NERDComment("n","Invert") <CR>
 
-    Plug 'https://github.com/fatih/vim-go', { 'do': ':GoUpdateBinaries', 'for': 'go' }
+    " golang
+    " omitted 'do': ':GoUpdateBinaries',
+    Plug 'https://github.com/fatih/vim-go', {  'for': 'go' }
         autocmd FileType go nmap <leader>i :GoImport 
         " autocmd FileType go nmap <leader>gi <Plug>(go-info)
         " autocmd FileType go nmap <leader>gd <Plug>(go-def)
@@ -235,19 +238,29 @@ call plug#begin('~/.vim/plugged')
         autocmd FileType go nmap <leader>r :GoRun<CR>
         autocmd FileType go nmap fs :GoFillStruct<CR>
 
-        " Debugging
+        """ DEBUGGING """
+        " BreakPoint
+        autocmd FileType go nmap bp :GoDebugBreakpoint<CR>
+
         autocmd FileType go nmap <leader>ds :GoDebugStart
+        autocmd FileType go nmap <leader>dt :GoDebugTestFunc<cr>
+
         autocmd FileType go nmap dp :call go#debug#Print(expand('<cword>'))<CR>
-        autocmd FileType go nmap dn :GoDebugContinue<CR>
-        autocmd FileType go nmap dj :GoDebugNext<CR>
-        autocmd FileType go nmap db :GoDebugBreakpoint<CR>
-        autocmd FileType go nmap <leader>dq :GoDebugStop<CR>
-        autocmd FileType go nmap <leader>dr :GoDebugRestart<CR>
-        autocmd FileType go nmap dl :GoDebugStep<CR>
-        autocmd FileType go nmap dk :GoDebugStepOut<CR>
+        autocmd FileType go xnoremap dp :call go#debug#Print("call " .  expand(getline("'<")[getpos("'<")[2]-1:getpos("'>")[2]-1]))<cr>
+
+        autocmd FileType go nmap dc :GoDebugContinue<CR>
+        autocmd FileType go nmap dn :GoDebugNext<CR>
+
+        " quit and restat
+        autocmd FileType go nmap dq :GoDebugStop<CR>
+        autocmd FileType go nmap dr :GoDebugRestart<CR>
+        " step in and step out
+        autocmd FileType go nmap di :GoDebugStep<CR>
+        autocmd FileType go nmap do :GoDebugStepOut<CR>
 
         let g:go_debug_windows = {
-            \ 'vars':  'rightbelow 60vnew',
+            \ 'vars':       'rightbelow 60vnew',
+            "\ 'stack':      'botleft 6new',
         \ }
 
         let g:go_def_mode='gopls'
@@ -262,7 +275,7 @@ call plug#begin('~/.vim/plugged')
         let g:go_highlight_function_calls = 1
         let g:go_highlight_extra_types = 1
 
-    Plug 'https://github.com/tpope/vim-surround'
+    " Plug 'https://github.com/tpope/vim-surround'
 
     Plug 'https://github.com/plasticboy/vim-markdown', { 'for': 'markdown' }
 
@@ -303,7 +316,11 @@ call plug#begin('~/.vim/plugged')
                     \ 'coc-pyright',
                     \ 'coc-tsserver',
                     \ 'coc-yaml',
+                    \ 'coc-zig',
                     \]
+        let g:coc_filetype_map = {
+                    \ 'yaml.ansible': 'ansible',
+                    \ }
         " load additional configuration
         if filereadable(expand("~/.vim/coc-user-config.vim"))
           source ~/.vim/coc-user-config.vim
@@ -319,8 +336,35 @@ call plug#begin('~/.vim/plugged')
         nmap <silent> <leader>gy <Plug>(coc-type-definition)
         nmap <silent> <leader>gi <Plug>(coc-implementation)
         " allows scrolling PUM without mouse.
-        inoremap <nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1, 1)\<cr>" : "\<Right>"
-        inoremap <nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0, 1)\<cr>" : "\<Left>"
+        "inoremap <nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1, 1)\<cr>" : "\<Right>"
+        "inoremap <nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0, 1)\<cr>" : "\<Left>"
+
+        if has('nvim-0.4.0') || has('patch-8.2.0750')
+          nnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
+          nnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
+          inoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(1)\<cr>" : "\<Right>"
+          inoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? "\<c-r>=coc#float#scroll(0)\<cr>" : "\<Left>"
+          vnoremap <silent><nowait><expr> <C-f> coc#float#has_scroll() ? coc#float#scroll(1) : "\<C-f>"
+          vnoremap <silent><nowait><expr> <C-b> coc#float#has_scroll() ? coc#float#scroll(0) : "\<C-b>"
+        endif
+
+        " Applying code actions to the selected code block
+        " Example: `<leader>aap` for current paragraph
+        xmap <leader>a  <Plug>(coc-codeaction-selected)
+        nmap <leader>a  <Plug>(coc-codeaction-selected)
+
+        " Remap keys for applying code actions at the cursor position
+        nmap <leader>ac  <Plug>(coc-codeaction-cursor)
+        " Remap keys for apply code actions affect whole buffer
+        nmap <leader>as  <Plug>(coc-codeaction-source)
+        " Apply the most preferred quickfix action to fix diagnostic on the current line
+        nmap <leader>qf  <Plug>(coc-fix-current)
+
+        " Remap keys for applying refactor code actions
+        nmap <silent> <leader>re <Plug>(coc-codeaction-refactor)
+        xmap <silent> <leader>r  <Plug>(coc-codeaction-refactor-selected)
+        nmap <silent> <leader>r  <Plug>(coc-codeaction-refactor-selected)
+
         " Use K to show documentation in preview window.
         nnoremap <silent> K :call <SID>show_documentation()<CR>
         function! s:show_documentation()
@@ -342,6 +386,8 @@ call plug#begin('~/.vim/plugged')
               \ coc#refresh()
         inoremap <expr><S-TAB> coc#pum#visible() ? coc#pum#prev(1) : "\<C-h>"
 
+        inoremap <silent><expr> <c-space> coc#refresh()
+
         function! s:check_back_space() abort
             let col = col('.') - 1
             return !col || getline('.')[col - 1]  =~# '\s'
@@ -353,7 +399,7 @@ call plug#begin('~/.vim/plugged')
         inoremap <silent><expr> <c-space> coc#refresh()
         nnoremap <silent> <leader>k :call CocAction('showSignatureHelp')<CR>
         inoremap <silent> <C-k> <Esc>:call CocActionAsync('showSignatureHelp')<CR>a
-        " inoremap <C-p> <Plug>(coc-codeaction)<CR>
+
         augroup CocAu
             autocmd!
             autocmd CursorHold * silent call CocActionAsync('highlight')
@@ -398,6 +444,8 @@ call plug#begin('~/.vim/plugged')
 
         " TODO: create a menu / mapping.
         " https://github.com/neoclide/coc-git
+
+    Plug 'https://github.com/yaegassy/coc-ansible', {'do': 'yarn install --frozen-lockfile'}
 
     Plug 'https://github.com/airblade/vim-gitgutter'
 
@@ -492,41 +540,6 @@ call plug#begin('~/.vim/plugged')
     Plug 'https://github.com/junegunn/limelight.vim'
         let g:limelight_conceal_ctermfg = 'gray'
         let g:limelight_conceal_ctermfg = 240
-
-    Plug 'https://github.com/junegunn/goyo.vim', { 'on': 'Goyo' }
-        let g:goyo_width = 120
-        let g:goyo_height = '90%'
-        nnoremap <silent> <Space> :Goyo<CR>
-        function! s:goyo_enter()
-            if executable('tmux') && strlen($TMUX)
-                call system('tmux set status off')
-                call system('tmux list-panes -F ''\#F'' | grep -q Z || tmux resize-pane -Z')
-            endif
-            set noshowmode
-            set noshowcmd
-            set nocursorline
-            set scrolloff=999
-            set signcolumn=no
-            GitGutterDisable
-            Limelight
-        endfunction
-
-        function! s:goyo_leave()
-            if executable('tmux') && strlen($TMUX)
-                call system('tmux set status on')
-                call system('tmux list-panes -F ''\#F'' | grep -q Z && tmux resize-pane -Z')
-            endif
-            set showmode
-            set showcmd
-            set scrolloff=9
-            set cursorline
-            set signcolumn=auto
-            GitGutterEnable
-            Limelight!
-        endfunction
-
-        autocmd! User GoyoEnter nested call <SID>goyo_enter()
-        autocmd! User GoyoLeave nested call <SID>goyo_leave()
 
     " Inportant: devicons should stay at the bottom, because otherwise, if
     " loaded BEFORE nerdtree + nerdtree git, it would break icons alignment!

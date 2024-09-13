@@ -157,6 +157,8 @@ autocmd FileType lisp setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType rust nmap <leader>cb :!cargo build<Return>
 autocmd FileType rust nmap <leader>cr :!cargo run<Return>
 
+autocmd FileType netrw autocmd BufLeave <buffer> if &filetype == 'netrw' | :bd | endif
+
 " vim jumps to the last position when reopening a file
 if has("autocmd")
   autocmd BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
@@ -172,6 +174,8 @@ language time en_US.UTF-8
 nnoremap <F5> "=strftime("%c")<cr>P
 inoremap <F5> <C-R>=strftime("%c")<cr>
 
+nnoremap <silent> <leader>e :Sex<CR>
+nnoremap <silent> <leader>E :Sex .<CR>
 nnoremap <silent> <Leader>p "*P
 
 " alternate between 2 last files

@@ -6,6 +6,10 @@ if command -sq direnv
     direnv hook fish | source
 end
 
+if command -sq aichat
+    alias ai='aichat'
+end
+
 alias killchrome="ps ux | grep '[C]hrome Helper (Renderer) --type=renderer' | grep -v extension-process | tr -s ' ' | cut -d ' ' -f2 | xargs kill"
 
 # load_nvm
@@ -21,6 +25,10 @@ function echo_brbr
     set --local br (git branch  | grep \* | sed 's/* //')
     echo "$br:$br"
 end
+
+abbr -a -g chrome 'open -a "Google Chrome"'
+abbr -a -g preview 'open -a "Preview"'
+abbr -a -g safari 'open -a "Safari"'
 
 function echo_np
     set --local name (mktemp '/tmp/np-'(date +%Y%m%d)'-'(ts)'.XXXXXX')
@@ -49,6 +57,8 @@ function dollarunderscore
 end
 
 abbr -a \$_ --position anywhere --function dollarunderscore
+
+alias cd-='cd -'
 
 if command -sq git
     abbr -a -g gs   git status --show-stash
@@ -182,8 +192,8 @@ if command -sq gron
 end
 
 # upgrade ls
-if command -sq exa
-    alias ls='exa --time-style long-iso'
+if command -sq eza
+    alias ls='eza --time-style long-iso'
     alias l='ls -la --icons'
     alias la='ls -la'
     alias lsd='ls -D'
@@ -191,7 +201,7 @@ if command -sq exa
     alias lnewr='l -snew -r'
     alias lanew='la -snew'
     alias lanewr='la -snew -r'
-    alias tree='exa -T --icons'
+    alias tree='eza -T --icons'
 else
     alias l='ls -lA'
     alias la='ls -lA'

@@ -149,7 +149,7 @@ autocmd FileType go setlocal nolist noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType make setlocal noexpandtab tabstop=4 shiftwidth=4
 autocmd FileType ruby setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType css setlocal expandtab shiftwidth=2 tabstop=2
-autocmd FileType javascript setlocal expandtab shiftwidth=4 tabstop=4
+autocmd FileType javascript setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType vue setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType proto setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType scheme setlocal expandtab shiftwidth=2 tabstop=2

@@ -21,8 +21,12 @@ function echo_tsts
 end
 abbr -a tt --position anywhere --function echo_tsts
 
+function echo_br
+    echo (git branch  | grep \* | sed 's/* //')
+end
+
 function echo_brbr
-    set --local br (git branch  | grep \* | sed 's/* //')
+    set --local br (echo_br)
     echo "$br:$br"
 end
 
@@ -40,6 +44,8 @@ function echo_np
 end
 
 abbr -a bb --position anywhere --function echo_brbr
+
+abbr -a bch --position anywhere --function echo_br
 
 abbr -a ts --position anywhere --function ts
 
@@ -61,16 +67,21 @@ abbr -a \$_ --position anywhere --function dollarunderscore
 alias cd-='cd -'
 
 if command -sq git
-    abbr -a -g gs   git status --show-stash
-    abbr -a -g gss  git status --short
-    abbr -a -g gd   git diff
-    abbr -a -g gadd git add .
-    abbr -a -g gc   git commit
-    abbr -a -g gcam git commit -am
-    abbr -a -g gco  git checkout
-    abbr -a -g gp   git push origin
-    abbr -a -g gpf  git push -f origin
-    abbr -a -g gl   git lg
+    abbr -a -g gs    git status --show-stash
+    abbr -a -g gss   git status --short
+    abbr -a -g gd    git diff
+    abbr -a -g gadd  git add .
+    abbr -a -g gc    git commit
+    abbr -a -g gcam  git commit -am
+    abbr -a -g gco   git checkout
+    abbr -a -g gam   git amend
+    abbr -a -g gp    git push origin
+    abbr -a -g gpf   git push -f origin
+    abbr -a -g gpl   git pull origin
+    abbr -a -g gl    git lg
+    abbr -a -g gr    git rebase
+    abbr -a -g gri   git rebase -i
+    abbr -a -g their git co --theirs
 end
 
 if command -sq zoxide

@@ -11,6 +11,7 @@ set encoding=utf-8
 
 " leader
 let mapleader = ","
+let maplocalleader = " "
 
 if filereadable(expand("~/.vimrc.bundles"))
   source ~/.vimrc.bundles

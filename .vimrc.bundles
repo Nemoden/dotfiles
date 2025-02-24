@@ -50,6 +50,7 @@ call plug#begin('~/.vim/plugged')
         let g:airline#extensions#disable_rtp_load = 1
 
     Plug 'https://github.com/tpope/vim-fugitive'
+        nnoremap <localleader>gb :Git blame<cr>
 
     Plug'https://github.com/mhinz/vim-startify'
         " autocmd BufDelete * if empty(filter(tabpagebuflist(), '!buflisted(v:val)')) | Startify | endif

@@ -91,6 +91,7 @@ end
 if command -sq nvim
     alias vi=(command -s vim)
     alias vim='nvim'
+    alias v='nvim'
 end
 
 if command -sq lynx
@@ -247,3 +248,6 @@ end
 if test -e ~/.config/fish/config.local.fish
     source ~/.config/fish/config.local.fish
 end
+
+# uv
+fish_add_path "/Users/kkovalchuk/.local/bin"

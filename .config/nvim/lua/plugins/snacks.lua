@@ -13,7 +13,7 @@ return {
     indent = { enabled = false },
     input = { enabled = false },
     picker = { enabled = false },
-    notifier = { enabled = true, timeout = 3000 },
+    notifier = { enabled = true, timeout = 3000 }, -- another option is https://github.com/rcarriga/nvim-notify
     quickfile = { enabled = false },
     scope = { enabled = false, },
     scroll = { enabled = false },

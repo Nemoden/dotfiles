@@ -1,9 +1,11 @@
 return {
 	"folke/todo-comments.nvim",
   dependencies = {
-    "nvim-telescope/telescope.nvim",
+    --"nvim-telescope/telescope.nvim",
+    "ibhagwan/fzf-lua",
   },
 	event = "BufRead",
+  enabled = true,
 	config = function()
 		require("todo-comments").setup({
 			highlight = {

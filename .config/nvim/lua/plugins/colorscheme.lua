@@ -17,6 +17,9 @@ return {
 
       require("tokyonight").setup({
         style = "night",
+        styles = {
+          comments = { italic = false }, -- No pesky italic comments
+        },
         on_colors = function(colors)
           colors.bg = bg
           colors.bg_dark = bg_dark
@@ -38,5 +41,11 @@ return {
       -- load the colorscheme here
       vim.cmd([[colorscheme tokyonight]])
     end,
+  },
+  {
+    "rebelot/kanagawa.nvim"
+  },
+  {
+    "https://github.com/EdenEast/nightfox.nvim",
   },
 }

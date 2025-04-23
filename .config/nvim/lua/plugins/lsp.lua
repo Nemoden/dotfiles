@@ -1,4 +1,6 @@
 -- https://github.com/nvim-telescope/telescope.nvim/issues/3328
+-- consider https://github.com/ms-jpq/coq_nvim
+-- consider https://github.com/nvimdev/lspsaga.nvim
 return {
   "neovim/nvim-lspconfig",
   dependencies = {
@@ -12,7 +14,8 @@ return {
     "stevearc/conform.nvim",
     "williamboman/mason-lspconfig.nvim",
     "williamboman/mason.nvim",
-    --"https://github.com/ray-x/lsp_signature.nvim",
+    -- "https://github.com/WhoIsSethDaniel/mason-tool-installer.nvim", -- idk if I need this
+    -- "https://github.com/mfussenegger/nvim-dap" and friends (virtual text, python, etc)
   },
 
   config = function()
@@ -127,8 +130,6 @@ return {
       }),
     })
 
-    --require('lsp_signature').setup({ })
-
     vim.diagnostic.config({
       -- update_in_insert = true,
       float = {
@@ -140,6 +141,23 @@ return {
         prefix = "",
       },
     })
+
+    -- Function to toggle diagnostics
+    function ToggleDiagnostics()
+      local current_state = vim.diagnostic.config().virtual_text
+      vim.diagnostic.config({
+        virtual_text = not current_state,
+        signs = not current_state,
+        underline = not current_state,
+      })
+    end
+    vim.api.nvim_set_keymap(
+      'n',
+      '<localleader>d',
+      ':lua ToggleDiagnostics()<CR>',
+      { noremap = true, silent = true }
+    )
+
     vim.api.nvim_set_keymap(
       'n',
       '<leader>gd',

@@ -2,6 +2,7 @@
 return {
   "yetone/avante.nvim",
   event = "VeryLazy",
+  enabled = true,
   lazy = false,
   version = false, -- Set this to "*" to always pull the latest release version, or set it to false to update to the latest code changes.
   opts = {
@@ -16,7 +17,7 @@ return {
       max_tokens = 4096,
     },
     rag_service = {
-      enabled = true,
+      enabled = false,
     },
     behaviour = {
       auto_suggestions = false, -- false for now

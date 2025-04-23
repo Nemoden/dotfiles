@@ -26,9 +26,11 @@ return {
     key.set("n", "<leader>.", "<cmd>FzfLua buffers<cr>", { desc="Buffers" })
     key.set("n", "<leader>fb", "<cmd>FzfLua buffers<cr>", { desc="[f]ind [b]uffer" })
     key.set("n", "<leader>//", "<cmd>FzfLua resume<cr>", { desc="Resume fzf" })
-    key.set("n", "gs", "<cmd>FzfLua lsp_live_workspace_symbols<cr>", { desc="LSP Symbols" })
+    -- TODO: check if I like leap.nvim replace GS with gs otherwise
+    key.set("n", "GS", "<cmd>FzfLua lsp_live_workspace_symbols<cr>", { desc="LSP Symbols" })
     key.set("n", "<leader>gs", "<cmd>FzfLua lsp_document_symbols<cr>", { desc="LSP Symbols" })
     key.set("n", "<leader>gr", "<cmd>FzfLua lsp_references<cr>", { desc = "LSP references" })
     key.set("n", "<leader>gi", "<cmd>FzfLua lsp_implementations<cr>", { desc = "LSP implementations" })
+    key.set("n", "<leader>ca", "<cmd>FzfLua lsp_code_actions<cr>", { desc = "LSP code actions" })
   end,
 }

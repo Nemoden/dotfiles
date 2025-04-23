@@ -37,4 +37,20 @@ return {
       require('mini.indentscope').setup()
     end
   },
+  {
+    'echasnovski/mini.ai',
+    enabled = false,
+    version = false,
+    config = function ()
+      require("mini.ai").setup({})
+    end
+  },
+  {
+    'echasnovski/mini.surround',
+    enabled = false, -- messes up s -> replace + go into insert mode by addin delay waiting for surround
+    version = false,
+    config = function ()
+      require("mini.surround").setup({})
+    end
+  },
 }

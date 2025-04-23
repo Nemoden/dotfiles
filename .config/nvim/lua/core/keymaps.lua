@@ -17,7 +17,7 @@ local keymap = vim.keymap -- for conciseness
 -- keymap.set("n", "x", '"_x')
 
 -- increment/decrement numbers
-keymap.set("n", "<localleader>+", "<C-a>", { desc = "Increment number" }) -- increment
+keymap.set("n", "<localleader>=", "<C-a>", { desc = "Increment number" }) -- increment
 keymap.set("n", "<localleader>-", "<C-x>", { desc = "Decrement number" }) -- decrement
 keymap.set("n", "<leader><leader>", "<C-^>", { desc = "Back to previous" }) -- decrement
 
@@ -40,3 +40,18 @@ keymap.set("n", "<leader>df", function() vim.diagnostic.open_float({ focusable =
 -- keymap.set("n", "<leader>tn", "<cmd>tabn<CR>", { desc = "Go to next tab" }) --  go to next tab
 -- keymap.set("n", "<leader>tp", "<cmd>tabp<CR>", { desc = "Go to previous tab" }) --  go to previous tab
 -- keymap.set("n", "<leader>tf", "<cmd>tabnew %<CR>", { desc = "Open current buffer in new tab" }) --  move current buffer to new tab
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "python",
+  callback = function()
+    vim.keymap.set("n", "<localleader>R", [[:term PYTHONPATH=$(git rev-parse --show-toplevel) python3 %<CR>]], { buffer = true })
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "python",
+  callback = function()
+    vim.keymap.set("n", "<localleader>r", function()
+      vim.cmd("vsplit | terminal PYTHONPATH=$(git rev-parse --show-toplevel) python3 " .. vim.fn.expand("%"))
+    end, { buffer = true })
+  end
+})

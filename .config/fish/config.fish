@@ -75,13 +75,34 @@ if command -sq git
     abbr -a -g gcam  git commit -am
     abbr -a -g gco   git checkout
     abbr -a -g gam   git amend
+    abbr -a -g gpm   git push origin main
+    abbr -a -g gpom  git push origin main
     abbr -a -g gp    git push origin
     abbr -a -g gpf   git push -f origin
     abbr -a -g gpl   git pull origin
     abbr -a -g gl    git lg
     abbr -a -g gr    git rebase
     abbr -a -g gri   git rebase -i
+    abbr -a -g gcb   git co -b
     abbr -a -g their git co --theirs
+end
+
+if command -sq docker
+    abbr -a -g dps    'docker ps'
+    abbr -a -g dpsa   'docker ps -a'
+    abbr -a -g dim    'docker images'
+    abbr -a -g dbuild 'docker build'
+    abbr -a -g drun   'docker run'
+    abbr -a -g dexit  'docker exec -it'
+    abbr -a -g dstop  'docker stop'
+    abbr -a -g dstart 'docker start'
+    abbr -a -g drm    'docker rm'
+    abbr -a -g drmi   'docker rmi'
+    abbr -a -g dnetls 'docker network ls'
+    abbr -a -g dpull  'docker pull'
+    abbr -a -g dlogs  'docker logs'
+    abbr -a -g dcu    'docker-compose up'
+    abbr -a -g dcd    'docker-compose down'
 end
 
 if command -sq zoxide

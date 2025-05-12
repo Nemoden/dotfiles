@@ -55,3 +55,15 @@ vim.api.nvim_create_autocmd("FileType", {
     end, { buffer = true })
   end
 })
+
+vim.api.nvim_create_user_command("PrettyJson", function(opts)
+  require("pretty_json").pretty_print_json_range(opts.line1, opts.line2)
+end, {
+  range = true,  -- 💡 this allows :'<,'> to pass line1 and line2
+})
+vim.keymap.set("v", "<localleader>pj", [[:'<,'>PrettyJson<CR>]], { desc = "Pretty-print JSON", silent = true })
+
+
+--  vim.keymap.set("v", "<localleader>ppj", function()
+--    require("pretty_json").pretty_print_json_range()
+--  end, { desc = "Pretty print selected JSON" })

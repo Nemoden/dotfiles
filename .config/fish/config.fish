@@ -84,6 +84,8 @@ if command -sq git
     abbr -a -g gr    git rebase
     abbr -a -g gri   git rebase -i
     abbr -a -g gcb   git co -b
+    abbr -a -g grc   git rebase --continue
+    abbr -a -g gra   git rebase --abort
     abbr -a -g their git co --theirs
 end
 

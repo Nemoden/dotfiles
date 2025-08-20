@@ -24,6 +24,7 @@ if filereadable(expand("~/.vim/abbreviations"))
 endif
 
 """ GENERAL SETTINGS
+set nofixeol                    " don't try to fix EOL by adding LF
 set nocompatible                " not compatible with vi
 set modeline                    " read per-file settings
 set autowrite

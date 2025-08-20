@@ -1,3 +1,5 @@
+let mapleader = ","
+
 set ideajoin
 " https://github.com/JetBrains/ideavim
 "
@@ -28,8 +30,6 @@ inoremap <C-j> <C-o>j
 inoremap <C-k> <C-o>k
 inoremap <C-l> <C-o>l
 
-" Шорткаты (нужны?)
-let mapleader = ";"
 
 " n и N
 " Search matches are always in center

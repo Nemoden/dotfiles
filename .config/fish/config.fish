@@ -1,6 +1,31 @@
+if command -sq brew
+    source /opt/homebrew/opt/fzf/shell/key-bindings.fish
+end
 if command -sq starship
     starship init fish | source
 end
+
+if command -sq asdf
+    # ASDF configuration code
+    if test -z $ASDF_DATA_DIR
+        set _asdf_shims "$HOME/.asdf/shims"
+    else
+        set _asdf_shims "$ASDF_DATA_DIR/shims"
+    end
+
+    # Do not use fish_add_path (added in Fish 3.2) because it
+    # potentially changes the order of items in PATH
+    if not contains $_asdf_shims $PATH
+        set -gx --prepend PATH $_asdf_shims
+    end
+    set --erase _asdf_shims
+end
+
+# Homebrew core bin paths first
+set -gx PATH /opt/homebrew/bin /opt/homebrew/sbin $PATH
+
+# Homebrew Python 3.13 unversioned symlinks
+set -gx PATH /opt/homebrew/opt/python@3.13/libexec/bin $PATH
 
 if command -sq direnv
     direnv hook fish | source
@@ -43,7 +68,7 @@ function echo_np
     echo " vi +star $name"
 end
 
-abbr -a bb --position anywhere --function echo_brbr
+abbr -a brbr --position anywhere --function echo_brbr
 
 abbr -a bch --position anywhere --function echo_br
 
@@ -188,8 +213,13 @@ if command -sq fnm
     set -gx FNM_LOGLEVEL error
 end
 
+if not contains $HOME/.local/bin $PATH
+    set -gx PATH $HOME/.local/bin $PATH;
+end
+
 # navi
 if command -sq navi
+    navi widget fish | source
     alias ne="navi"
     alias n="navi --print"
 end

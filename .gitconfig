@@ -1,6 +1,6 @@
 [user]
-    name = Kirill Kovalchuk
-    email = kkovalchuk@deputy.com
+	name = Kirill Kovalchuk
+	email = kkovalchuk@atlassian.com
 [color "branch"]
     current = red
     remote = green
@@ -61,3 +61,8 @@
 	defaultBranch = main
 [fetch]
 	prune = true
+[trace2]
+	eventTarget = af_unix:/Users/kkovalchuk/.gittrace/trace.sock
+	eventBrief = true
+	eventNesting = 1
+	configparams = custom.metacommands

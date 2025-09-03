@@ -112,6 +112,7 @@ if command -sq git
     abbr -a -g grc   git rebase --continue
     abbr -a -g gra   git rebase --abort
     abbr -a -g their git co --theirs
+    abbr -a -g grm   git rebase -i (git-divergent | awk '{print $1}' | string sub --length 8)^ "# " (git-divergent | awk '{$1=""; print $0}')
 end
 
 if command -sq docker

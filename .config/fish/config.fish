@@ -89,6 +89,10 @@ end
 
 abbr -a \$_ --position anywhere --function dollarunderscore
 
+function echo_git_divergent
+    echo git rebase -i (git-divergent | awk '{print $1}' | string sub --length 8)^ "# " (git-divergent | awk '{$1=""; print $0}')
+end
+
 alias cd-='cd -'
 
 if command -sq git
@@ -112,7 +116,7 @@ if command -sq git
     abbr -a -g grc   git rebase --continue
     abbr -a -g gra   git rebase --abort
     abbr -a -g their git co --theirs
-    abbr -a -g grm   git rebase -i (git-divergent | awk '{print $1}' | string sub --length 8)^ "# " (git-divergent | awk '{$1=""; print $0}')
+    abbr -a -g grm   --function echo_git_divergent
 end
 
 if command -sq docker
@@ -201,6 +205,12 @@ if command -sq go
     if not contains $GOBIN $PATH
         set -x PATH $PATH $GOBIN
     end
+end
+
+if command -sq goenv
+    set -x GOENV_ROOT $HOME/.goenv
+    set -gx PATH $GOENV_ROOT/shims $PATH
+    status --is-interactive; and source (goenv init -|psub)
 end
 
 # fnm

@@ -1,2 +1,46 @@
-gh pr list --author @me
+#!/usr/bin/env bash
 
+# Function to detect repository type (github or bitbucket)
+function detect_repo_type {
+    # Find git root directory
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+    
+    # Check git config for origin URL
+    origin_url=$(git config --get remote.origin.url 2>/dev/null)
+    if [[ -z "$origin_url" ]]; then
+        echo "Error: No origin remote found"
+        exit 1
+    fi
+    
+    # Check if it's bitbucket or github
+    if [[ "$origin_url" == *"bitbucket.org"* ]]; then
+        echo "bitbucket"
+    elif [[ "$origin_url" == *"github.com"* ]]; then
+        echo "github"
+    else
+        echo "Error: Unsupported repository type. Only GitHub and Bitbucket are supported."
+        exit 1
+    fi
+}
+
+# Detect repository type
+repo_type=$(detect_repo_type)
+
+# Check if required CLI tool is available
+if [[ "$repo_type" == "bitbucket" ]]; then
+    if ! command -v bb &> /dev/null; then
+        echo "Error: bb (Bitbucket CLI) is required but not installed"
+        exit 1
+    fi
+    bb pr list --authored
+else
+    if ! command -v gh &> /dev/null; then
+        echo "Error: gh (GitHub CLI) is required but not installed"
+        exit 1
+    fi
+    gh pr list --author @me
+fi

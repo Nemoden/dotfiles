@@ -8,7 +8,43 @@ function join_by {
     fi
 }
 
-reqs=(fzf gh awk)
+# Function to detect repository type (github or bitbucket)
+function detect_repo_type {
+    # Find git root directory
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+    
+    # Check git config for origin URL
+    origin_url=$(git config --get remote.origin.url 2>/dev/null)
+    if [[ -z "$origin_url" ]]; then
+        echo "Error: No origin remote found"
+        exit 1
+    fi
+    
+    # Check if it's bitbucket or github
+    if [[ "$origin_url" == *"bitbucket.org"* ]]; then
+        echo "bitbucket"
+    elif [[ "$origin_url" == *"github.com"* ]]; then
+        echo "github"
+    else
+        echo "Error: Unsupported repository type. Only GitHub and Bitbucket are supported."
+        exit 1
+    fi
+}
+
+# Detect repository type
+repo_type=$(detect_repo_type)
+
+# Set required commands based on repository type
+if [[ "$repo_type" == "bitbucket" ]]; then
+    reqs=(fzf bb awk)
+else
+    reqs=(fzf gh awk)
+fi
+
 for cmd in "${reqs[@]}"
 do
     if ! command -v "$cmd" &> /dev/null;  then
@@ -18,10 +54,33 @@ do
 done
 
 if [[ ! -z $1 ]]; then
-    echo '1'
-    gh pr view --web $1
+    if [[ "$repo_type" == "bitbucket" ]]; then
+        bb pr open $1
+    else
+        gh pr view --web $1
+    fi
 else
-    prs=$(gh pr list --author @me | awk 'FNR > 0{print $0}')
+    if [[ "$repo_type" == "bitbucket" ]]; then
+        # Get PRs using bb cli and parse the table output
+        prs_raw=$(bb pr list --authored 2>/dev/null)
+        if [[ $? -ne 0 ]]; then
+            echo "Error: Failed to get PRs from Bitbucket"
+            exit 1
+        fi
+        
+        # Parse the bb output - skip header lines and extract PR info
+        prs=$(echo "$prs_raw" | awk '
+            /^│/ && !/^┃/ && !/^┡/ && !/^└/ {
+                # Remove table borders and clean up
+                gsub(/^│ */, "")
+                gsub(/ *│ */, "\t")
+                gsub(/ *│$/, "")
+                print
+            }
+        ')
+    else
+        prs=$(gh pr list --author @me | awk 'FNR > 0{print $0}')
+    fi
 
     if [[ -n $prs ]]; then
         pr=$(echo "$prs" | fzf --prompt="PR:")
@@ -30,8 +89,16 @@ else
         exit
     fi
 
-    prnum="$(echo "$pr" | cut -f1)"
-    msg="$(echo "$pr" | cut -f2)"
-    branch="$(echo "$pr" | cut -f3)"
-    [[ -n "$prnum" ]] && gh pr view --web $prnum && echo "Opening PR $prnum, Branch: $branch, Message: $msg"
+    if [[ "$repo_type" == "bitbucket" ]]; then
+        prnum="$(echo "$pr" | cut -f1)"
+        msg="$(echo "$pr" | cut -f2)"
+        author="$(echo "$pr" | cut -f3)"
+        target="$(echo "$pr" | cut -f4)"
+        [[ -n "$prnum" ]] && bb pr open $prnum && echo "Opening PR $prnum, Title: $msg, Author: $author, Target: $target"
+    else
+        prnum="$(echo "$pr" | cut -f1)"
+        msg="$(echo "$pr" | cut -f2)"
+        branch="$(echo "$pr" | cut -f3)"
+        [[ -n "$prnum" ]] && gh pr view --web $prnum && echo "Opening PR $prnum, Branch: $branch, Message: $msg"
+    fi
 fi

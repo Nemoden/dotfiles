@@ -1,0 +1,45 @@
+-- Make setup quiet while loading
+\set QUIET 1
+
+-- Encoding and locale-aware number formatting
+\encoding UTF8
+\pset numericlocale on
+
+-- Pager: no wrap, quit if one screen, keep output visible, support colors
+\setenv PAGER 'less -S -F -X -R'
+\pset pager on
+
+-- Pretty printing
+\x auto
+\pset border 2
+\pset linestyle unicode
+\pset null '∅'
+\pset format aligned
+
+-- Timing and errors
+\timing on
+\set VERBOSITY verbose
+\set SHOW_CONTEXT errors
+\set ON_ERROR_ROLLBACK interactive
+\set ON_ERROR_STOP off
+
+-- Command completion style
+\set COMP_KEYWORD_CASE upper
+
+-- History settings
+\set HISTFILE ~/.psql_history
+\set HISTSIZE 50000
+\set HISTCONTROL ignoreboth
+
+-- Prompts (green user@host, blue db; shows txn state and superuser)
+-- %n=user %M=host %/=db %#=# if superuser, > otherwise %R=prompt status
+\set PROMPT1 '%[%033[1;32m%]%n@%M%[%033[0m%] %[%033[1;34m%]%/%[%033[0m%]%R%# '
+\set PROMPT2 '%[%033[1;33m%]... %R%[%033[0m%] '
+
+-- Helpful display tweaks
+\pset tuples_only off
+\pset locale C
+\pset columns 200
+
+-- Done bootstrapping
+\unset QUIET

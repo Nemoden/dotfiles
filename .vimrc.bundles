@@ -553,9 +553,9 @@ call plug#begin('~/.vim/plugged')
     " Plug 'https://github.com/liuchengxu/vim-which-key', { 'on': ['WhichKey', 'WhichKey!'] }
 
     " Let's give it a go
-    Plug 'https://github.com/SirVer/ultisnips' | Plug 'https://github.com/honza/vim-snippets'
-        let g:UltiSnipsExpandTrigger="<c-l>"
-        let g:UltiSnipsListSnippets="<c-h>"
+    "Plug 'https://github.com/SirVer/ultisnips' | Plug 'https://github.com/honza/vim-snippets'
+        ""let g:UltiSnipsExpandTrigger="<c-l>"
+        """let g:UltiSnipsListSnippets="<c-h>"
         "let g:UltiSnipsEnableSnipMate=1
 
     Plug 'https://github.com/hashivim/vim-terraform', { 'for': 'terraform' }

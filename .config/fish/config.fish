@@ -5,6 +5,10 @@ if command -sq starship
     starship init fish | source
 end
 
+if test -d ~/Projects/navi-cheatsheets;
+    add_navi_path ~/Projects/navi-cheatsheets
+end
+
 if command -sq asdf
     # ASDF configuration code
     if test -z $ASDF_DATA_DIR
@@ -315,3 +319,7 @@ end
 
 # uv
 fish_add_path "/Users/kkovalchuk/.local/bin"
+
+# Added by OrbStack: command-line tools and integration
+# This won't be added again if you remove it.
+source ~/.orbstack/shell/init2.fish 2>/dev/null || :

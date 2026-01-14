@@ -67,3 +67,66 @@ vim.keymap.set("v", "<localleader>pj", [[:'<,'>PrettyJson<CR>]], { desc = "Prett
 --  vim.keymap.set("v", "<localleader>ppj", function()
 --    require("pretty_json").pretty_print_json_range()
 --  end, { desc = "Pretty print selected JSON" })
+
+---------------------
+-- Whitespace Utilities -------------------
+
+-- Highlight group for trailing whitespace
+vim.api.nvim_set_hl(0, "TrailingWhitespace", { bg = "#ff5555" })
+
+-- Track whether trailing whitespace highlighting is enabled
+local trailing_ws_visible = false
+local trailing_ws_match_id = nil
+
+-- Toggle trailing whitespace visibility
+local function toggle_trailing_whitespace()
+  if trailing_ws_visible then
+    if trailing_ws_match_id then
+      pcall(vim.fn.matchdelete, trailing_ws_match_id)
+      trailing_ws_match_id = nil
+    end
+    trailing_ws_visible = false
+    vim.notify("Trailing whitespace: hidden", vim.log.levels.INFO)
+  else
+    trailing_ws_match_id = vim.fn.matchadd("TrailingWhitespace", [[\s\+$]])
+    trailing_ws_visible = true
+    vim.notify("Trailing whitespace: visible", vim.log.levels.INFO)
+  end
+end
+
+-- Remove trailing whitespace from the entire file
+local function strip_trailing_whitespace()
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
+  vim.cmd([[%s/\s\+$//e]])
+  vim.api.nvim_win_set_cursor(0, cursor_pos)
+  vim.notify("Trailing whitespace removed", vim.log.levels.INFO)
+end
+
+-- Toggle listchars visibility (tabs, spaces, etc.)
+local function toggle_listchars()
+  vim.wo.list = not vim.wo.list
+  vim.notify("Listchars: " .. (vim.wo.list and "visible" or "hidden"), vim.log.levels.INFO)
+end
+
+-- Convert tabs to spaces in the entire file
+local function tabs_to_spaces()
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
+  vim.cmd("retab")
+  vim.api.nvim_win_set_cursor(0, cursor_pos)
+  vim.notify("Tabs converted to spaces", vim.log.levels.INFO)
+end
+
+-- Convert spaces to tabs in the entire file
+local function spaces_to_tabs()
+  local cursor_pos = vim.api.nvim_win_get_cursor(0)
+  local spaces = string.rep(" ", vim.bo.tabstop)
+  vim.cmd([[%s/]] .. spaces .. [[\ze\S/\t/ge]])
+  vim.api.nvim_win_set_cursor(0, cursor_pos)
+  vim.notify("Leading spaces converted to tabs", vim.log.levels.INFO)
+end
+
+keymap.set("n", "<leader>wt", toggle_trailing_whitespace, { desc = "Toggle trailing whitespace visibility" })
+keymap.set("n", "<leader>wd", strip_trailing_whitespace, { desc = "Delete trailing whitespace" })
+keymap.set("n", "<leader>wl", toggle_listchars, { desc = "Toggle listchars (tabs/spaces)" })
+keymap.set("n", "<leader>ws", tabs_to_spaces, { desc = "Convert tabs to spaces" })
+keymap.set("n", "<leader>wT", spaces_to_tabs, { desc = "Convert spaces to tabs" })

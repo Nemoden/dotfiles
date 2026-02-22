@@ -95,6 +95,22 @@ vim.keymap.set('n', ',cp', function()
   vim.notify_once("file path copied to the clipboard!", vim.log.levels.INFO)
 end, { silent = true })
 
+-- Copy file name with line number (normal) or line range (visual)
+vim.keymap.set({ 'n', 'v' }, ',cv', function()
+  local file = vim.fn.expand("%:.")
+  local mode = vim.fn.mode()
+  if mode == 'v' or mode == 'V' or mode == '\22' then
+    local start_line = vim.fn.line("v")
+    local end_line = vim.fn.line(".")
+    if start_line > end_line then start_line, end_line = end_line, start_line end
+    vim.fn.setreg('+', file .. ":" .. start_line .. "-" .. end_line)
+    vim.notify_once("file:range copied to the clipboard!", vim.log.levels.INFO)
+  else
+    vim.fn.setreg('+', file .. ":" .. vim.fn.line("."))
+    vim.notify_once("file:line copied to the clipboard!", vim.log.levels.INFO)
+  end
+end, { silent = true })
+
 -- Open file in GitHub with line number and branch
 vim.keymap.set('n', '<Leader>gh', function()
   local file = vim.fn.shellescape(vim.fn.expand("%:."))

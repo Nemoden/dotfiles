@@ -1,6 +1,6 @@
 ---
-name: wt
-description: "Create a git worktree from a natural-language description or branch name. Claude generates branch names from descriptions, or uses explicit names directly."
+description: Create a git worktree from a description or branch name
+argument-hint: <description-or-branch-name> [--base <branch>]
 allowed-tools:
   - Bash(git:*)
   - Bash(mkdir:*)
@@ -11,6 +11,7 @@ allowed-tools:
   - Bash(yarn:*)
   - Bash(pnpm:*)
   - Bash(bun:*)
+  - Bash(df:*)
   - Read
   - Glob
 ---

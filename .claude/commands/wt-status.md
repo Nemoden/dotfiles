@@ -1,15 +1,10 @@
 ---
-name: wt-status
-description: "Show the status of the current worktree and list all worktrees in the repository."
+description: Show worktree status and list all worktrees
 allowed-tools:
   - Bash(git:*)
 ---
 
-# /wt-status — Worktree Status
-
 Show the status of the current worktree and an overview of all worktrees.
-
-## Steps
 
 1. **Current worktree info:**
    - Run `git rev-parse --show-toplevel` to get the current worktree path.

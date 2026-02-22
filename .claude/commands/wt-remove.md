@@ -1,6 +1,6 @@
 ---
-name: wt-remove
-description: "Interactively remove a git worktree with safety checks for uncommitted changes and unpushed commits."
+description: Remove a git worktree with safety checks
+argument-hint: [name-or-path]
 allowed-tools:
   - Bash(git:*)
   - Bash(rm:*)

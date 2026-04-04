@@ -8,6 +8,9 @@ import { connect } from "./cdp.js";
 const DEBUG = process.env.DEBUG === "1";
 const log = DEBUG ? (...args) => console.error("[debug]", ...args) : () => {};
 
+const tabArg = process.argv.find((a) => a.startsWith("--tab="))?.slice(6);
+const tabIdArg = process.argv.find((a) => a.startsWith("--tab-id="))?.slice(9);
+
 // Global timeout
 const globalTimeout = setTimeout(() => {
   console.error("✗ Global timeout exceeded (15s)");
@@ -20,10 +23,20 @@ try {
 
   log("getting pages...");
   const pages = await cdp.getPages();
-  const page = pages.at(-1);
+  let page;
+  if (tabIdArg !== undefined) {
+    page = pages.find((p) => p.targetId === tabIdArg);
+  } else if (tabArg !== undefined) {
+    const idx = parseInt(tabArg, 10);
+    page = isNaN(idx)
+      ? pages.find((p) => p.url.includes(tabArg))
+      : pages[idx];
+  } else {
+    page = pages.at(-1);
+  }
 
   if (!page) {
-    console.error("✗ No active tab found");
+    console.error("✗ No matching tab found");
     process.exit(1);
   }
 

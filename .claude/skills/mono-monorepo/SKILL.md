@@ -206,16 +206,70 @@ Brief description.
 
 **State machine:** Status = directory location. Transitions via `git mv`.
 
-| Transition | Command |
-|---|---|
-| Start work | `git mv project/tickets/todo/<name>.md project/tickets/in-progress/` |
-| Complete | `git mv project/tickets/in-progress/<name>.md project/tickets/done/` |
-| Block | `git mv project/tickets/in-progress/<name>.md project/tickets/blocked/` |
-| Unblock | `git mv project/tickets/blocked/<name>.md project/tickets/todo/` |
+| Transition | Command | After |
+|---|---|---|
+| Start work | `git mv project/tickets/todo/<name>.md project/tickets/in-progress/` | — |
+| Complete | `git mv project/tickets/in-progress/<name>.md project/tickets/done/` | → [Post-Completion Review](#7-post-completion-review) |
+| Block | `git mv project/tickets/in-progress/<name>.md project/tickets/blocked/` | — |
+| Unblock | `git mv project/tickets/blocked/<name>.md project/tickets/todo/` | — |
 
 After each transition, commit: `git commit -m "<action>: <ticket-name>"` where action is `start`, `done`, `blocked`, or `unblocked`.
 
 **Contextual use:** When you finish implementing a ticket's acceptance criteria, proactively suggest moving it to done.
+
+### 7. Post-Completion Review
+
+**Trigger:** Automatically after every "Complete" ticket transition.
+
+**Purpose:** Run three parallel reviewers against the completed ticket to catch architectural gaps, documentation inconsistencies, and broken cross-references before they accumulate.
+
+#### Step 1 — Assemble Context
+
+Gather the following before spawning any agents:
+
+1. **Ticket content** — read `project/tickets/done/<ticket>.md`
+2. **Diff** — find the commit that moved this ticket to `in-progress/`:
+   ```
+   git log --oneline --diff-filter=A -- project/tickets/in-progress/<ticket>.md
+   ```
+   Then get all changes since that commit:
+   ```
+   git diff <in-progress-commit> HEAD
+   ```
+   If no in-progress commit is found, ask the user to clarify the diff scope before proceeding.
+3. **Linked SPECs/ADRs** — scan the ticket file for explicit references (e.g. `SPEC-0001`, `ADR-0002`). If none found, fuzzy-match the ticket slug against filenames in `project/specs/` and `project/adr/`. Read all matched files.
+
+#### Step 2 — Spawn Three Parallel Agents
+
+Use `superpowers:dispatching-parallel-agents` to run all three simultaneously:
+
+| Agent | Focus |
+|---|---|
+| `mono-monorepo:architecture-reviewer` | Does implementation match SPEC/ADR? Implicit decisions? Undocumented dependencies? |
+| `mono-monorepo:consistency-checker` | Are acceptance criteria met? Contradictions introduced? Stale specs or ideas? |
+| `mono-monorepo:cross-ref-checker` | Broken or missing cross-references after this ticket's changes? |
+
+Pass each agent: the ticket content, the full diff, and the linked SPEC/ADR content.
+
+#### Step 3 — Output
+
+1. **Write** combined findings to `project/tickets/done/<ticket>-review.md`
+2. **Print** a summary to stdout
+
+The review file format:
+
+```markdown
+# Review: <ticket-name>
+
+## Architecture Review
+<findings from mono-monorepo:architecture-reviewer>
+
+## Consistency Check
+<findings from mono-monorepo:consistency-checker>
+
+## Cross-Reference Check
+<findings from mono-monorepo:cross-ref-checker>
+```
 
 ## Conventions
 
@@ -229,3 +283,8 @@ After each transition, commit: `git commit -m "<action>: <ticket-name>"` where a
 **Order of truth (precedence):** Ticket > SPEC > ADR > Samples. If documents conflict, follow the higher-precedence one and flag the conflict to the user.
 
 **Never modify files under `/project/`** without explicit permission unless fixing clear errors.
+
+**Required agents:** The post-completion review depends on three agents that must exist at `~/.claude/agents/mono-monorepo/`:
+- `architecture-reviewer.md` (name: `mono-monorepo:architecture-reviewer`)
+- `consistency-checker.md` (name: `mono-monorepo:consistency-checker`)
+- `cross-ref-checker.md` (name: `mono-monorepo:cross-ref-checker`)

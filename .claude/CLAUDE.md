@@ -31,3 +31,13 @@ Use the `Skill` tool to invoke skills — don't read skill files directly.
 **Flexible** (patterns): Adapt principles to context.
 
 The skill itself tells you which.
+
+### My personal setup I'm running:
+
+- fish shell
+- dotfiles use git bare repo pattern - aliased using `dot` - a fish function that wraps `git`, so it is a git alias that is specific for working with my dotfiles. In my dotfiles root the .gitignore ignores EVERYTHING (asterisk), so to add files, you must use `-f`
+
+This matters because:
+
+1. whenever you give me any commands, give them in FISH, not BASH/ZSH.
+2. When I ask you to work with my dotfiles, you should use `dot` via `fish -c "dot ..."`

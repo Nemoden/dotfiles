@@ -1,6 +1,111 @@
 vim.g.netrw_liststyle = 3
 
 local opt = vim.opt -- for conciseness
+local fn = vim.fn
+
+local function executable(cmd)
+  return fn.executable(cmd) == 1
+end
+
+local function has_env(name)
+  local value = vim.env[name]
+  return value ~= nil and value ~= ""
+end
+
+local function osc52_copy(lines, _)
+  local text = table.concat(lines, "\n")
+  require("vim.ui.clipboard.osc52").copy("+")(text)
+end
+
+local function osc52_paste()
+  return { fn.getreg('"'), fn.getregtype('"') }
+end
+
+local function set_clipboard_provider()
+  if vim.g.clipboard then
+    return
+  end
+
+  if fn.has("macunix") == 1 and executable("pbcopy") and executable("pbpaste") then
+    vim.g.clipboard = {
+      name = "pbcopy",
+      copy = {
+        ["+"] = "pbcopy",
+        ["*"] = "pbcopy",
+      },
+      paste = {
+        ["+"] = "pbpaste",
+        ["*"] = "pbpaste",
+      },
+      cache_enabled = 0,
+    }
+    return
+  end
+
+  if executable("wl-copy") and executable("wl-paste") and has_env("WAYLAND_DISPLAY") then
+    vim.g.clipboard = {
+      name = "wl-clipboard",
+      copy = {
+        ["+"] = "wl-copy --foreground --type text/plain",
+        ["*"] = "wl-copy --foreground --primary --type text/plain",
+      },
+      paste = {
+        ["+"] = "wl-paste --no-newline",
+        ["*"] = "wl-paste --no-newline --primary",
+      },
+      cache_enabled = 0,
+    }
+    return
+  end
+
+  if executable("xclip") and has_env("DISPLAY") then
+    vim.g.clipboard = {
+      name = "xclip",
+      copy = {
+        ["+"] = "xclip -quiet -i -selection clipboard",
+        ["*"] = "xclip -quiet -i -selection primary",
+      },
+      paste = {
+        ["+"] = "xclip -o -selection clipboard",
+        ["*"] = "xclip -o -selection primary",
+      },
+      cache_enabled = 0,
+    }
+    return
+  end
+
+  if executable("xsel") and has_env("DISPLAY") then
+    vim.g.clipboard = {
+      name = "xsel",
+      copy = {
+        ["+"] = "xsel --clipboard --input",
+        ["*"] = "xsel --primary --input",
+      },
+      paste = {
+        ["+"] = "xsel --clipboard --output",
+        ["*"] = "xsel --primary --output",
+      },
+      cache_enabled = 0,
+    }
+    return
+  end
+
+  if has_env("SSH_TTY") or has_env("TMUX") then
+    vim.g.clipboard = {
+      name = "OSC 52",
+      copy = {
+        ["+"] = osc52_copy,
+        ["*"] = osc52_copy,
+      },
+      paste = {
+        ["+"] = osc52_paste,
+        ["*"] = osc52_paste,
+      },
+    }
+  end
+end
+
+set_clipboard_provider()
 
 opt.fixeol = false
 

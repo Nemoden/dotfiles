@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+data="$(cat)"
+
+if command -v pbcopy >/dev/null 2>&1; then
+  printf '%s' "$data" | pbcopy
+  exit 0
+fi
+
+if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+  printf '%s' "$data" | wl-copy --foreground --type text/plain
+  exit 0
+fi
+
+if [[ -n "${DISPLAY:-}" ]] && command -v xclip >/dev/null 2>&1; then
+  printf '%s' "$data" | xclip -quiet -in -selection clipboard
+  exit 0
+fi
+
+if [[ -n "${DISPLAY:-}" ]] && command -v xsel >/dev/null 2>&1; then
+  printf '%s' "$data" | xsel --clipboard --input
+  exit 0
+fi
+
+if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+  tmux set-buffer -w -- "$data"
+  exit 0
+fi
+
+encoded="$(printf '%s' "$data" | base64 | tr -d '\r\n')"
+printf '\033]52;c;%s\a' "$encoded"

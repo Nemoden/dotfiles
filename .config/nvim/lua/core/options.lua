@@ -13,8 +13,7 @@ local function has_env(name)
 end
 
 local function osc52_copy(lines, _)
-  local text = table.concat(lines, "\n")
-  require("vim.ui.clipboard.osc52").copy("+")(text)
+  require("vim.ui.clipboard.osc52").copy("+")(lines)
 end
 
 local function osc52_paste()

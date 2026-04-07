@@ -20,16 +20,17 @@ if command -sq asdf
     # Do not use fish_add_path (added in Fish 3.2) because it
     # potentially changes the order of items in PATH
     if not contains $_asdf_shims $PATH
-        set -gx --prepend PATH $_asdf_shims
+        fish_add_path -p $_asdf_shims
     end
     set --erase _asdf_shims
 end
 
 # Homebrew core bin paths first
-set -gx PATH /opt/homebrew/bin /opt/homebrew/sbin $PATH
+fish_add_path /opt/homebrew/bin
+fish_add_path /opt/homebrew/sbin
 
 # Homebrew Python 3.13 unversioned symlinks
-set -gx PATH /opt/homebrew/opt/python@3.13/libexec/bin $PATH
+fish_add_path /opt/homebrew/opt/python@3.13/libexec/bin
 
 if command -sq direnv
     direnv hook fish | source
@@ -174,19 +175,21 @@ set -x SHELL fish
 set -x EDITOR vim
 set -x VISUAL vim
 set -x PAGER less
-if test -d $HOME/bin && not contains $HOME/bin $PATH
-    set -x PATH $PATH $HOME/bin
+
+if test -d $HOME/bin
+    fish_add_path $HOME/bin
 end
+if test -d $HOME/.local/bin
+    fish_add_path $HOME/.local/bin
+end
+
 # On MacOS if GNU utils are installed, use those instead on BSD
-if test -d "/usr/local/opt/coreutils/libexec/gnubin" &&not contains "/usr/local/opt/coreutils/libexec/gnubin" $PATH
-    set -x PATH "/usr/local/opt/coreutils/libexec/gnubin" $PATH
+if test -d "/usr/local/opt/coreutils/libexec/gnubin"
+    fish_add_path "/usr/local/opt/coreutils/libexec/gnubin"
 end
-if test -d "/usr/local/opt/findutils/libexec/gnubin" && not contains "/usr/local/opt/findutils/libexec/gnubin" $PATH
-    set -x PATH "/usr/local/opt/findutils/libexec/gnubin" $PATH
+if test -d "/usr/local/opt/findutils/libexec/gnubin"
+    fish_add_path "/usr/local/opt/findutils/libexec/gnubin"
 end
-#if test -d "/usr/local/opt/gnu-sed/libexec/gnubin" && not contains "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
-    #set -x PATH "/usr/local/opt/gnu-sed/libexec/gnubin" $PATH
-#end
 
 alias ..='cd ..'
 alias ...='cd ../../'
@@ -207,29 +210,25 @@ if command -sq go
     set -x GOPATH $HOME/go
     set -x GOBIN $GOPATH/bin
     if not contains $GOBIN $PATH
-        set -x PATH $PATH $GOBIN
+        fish_add_path $GOBIN
     end
 end
 
 if command -sq goenv
     set -x GOENV_ROOT $HOME/.goenv
-    set -gx PATH $GOENV_ROOT/shims $PATH
+    fish_add_path $GOENV_ROOT/shims
     status --is-interactive; and source (goenv init -|psub)
 end
 
 # fnm
 if command -sq fnm
     if not contains $HOME/.fnm/current/bin $PATH
-        set -gx PATH $HOME/.fnm/current/bin $PATH;
+        fish_add_path $HOME/.fnm/current/bin
     end
     set -gx FNM_MULTISHELL_PATH $HOME/.fnm/current;
     set -gx FNM_DIR $HOME/.fnm;
     set -gx FNM_NODE_DIST_MIRROR https://nodejs.org/dist
     set -gx FNM_LOGLEVEL error
-end
-
-if not contains $HOME/.local/bin $PATH
-    set -gx PATH $HOME/.local/bin $PATH;
 end
 
 # navi
@@ -316,9 +315,6 @@ end
 if test -e ~/.config/fish/config.local.fish
     source ~/.config/fish/config.local.fish
 end
-
-# uv
-fish_add_path "/Users/kkovalchuk/.local/bin"
 
 # Added by OrbStack: command-line tools and integration
 # This won't be added again if you remove it.

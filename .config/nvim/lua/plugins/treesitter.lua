@@ -144,6 +144,7 @@ local function setup_treesitter()
   end
 
   treesitter.setup({
+    ensure_installed = parsers,
     install_dir = vim.fn.stdpath("data") .. "/site",
   })
 

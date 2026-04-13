@@ -114,6 +114,7 @@ if command -sq git
     abbr -a -g gp    git push origin
     abbr -a -g gpf   git push -f origin
     abbr -a -g gpl   git pull origin
+    abbr -a -g --position anywhere pushf push --force-with-lease
     abbr -a -g gl    git lg
     abbr -a -g gr    git rebase
     abbr -a -g gri   git rebase -i

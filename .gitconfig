@@ -28,6 +28,7 @@
     l = log --oneline --graph --decorate
     ll = log --pretty='%C(auto)%h %d <%an> %s' --graph
     ld = log --pretty='%C(auto)%h %d <%an> %s' --graph --cc
+    pushf = push --force-with-lease
 	lg = log --graph --format='%Cred%h%Creset %s %Cgreen(%cr, %cs) %C(blue)<%an>%Creset%C(yellow)%d%Creset' --no-merges
 	story = log --oneline -M --stat --follow -- 
 	merge-commits = "!funct() { git log --merges --reverse --oneline --ancestry-path $1..origin | grep \"Merge pull request\";  }; funct"
@@ -48,7 +49,7 @@
 [http]
     sslVerify = true
 [push]
-    default = matching
+	default = current
 [difftool "sourcetree"]
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
 	path = 

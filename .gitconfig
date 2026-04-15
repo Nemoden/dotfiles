@@ -6,7 +6,7 @@
     remote = green
 [core]
     autocrlf = input
-	excludesfile = /Users/kkovalchuk/.gitignore_global
+	excludesfile = ~/.gitignore_global
     editor = vim
     pager = delta
 [branch]

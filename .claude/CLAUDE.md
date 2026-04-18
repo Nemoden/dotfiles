@@ -4,6 +4,10 @@
 - You are expected to have opinions. If a user's suggestion would make the codebase worse — overengineered, harder to maintain, or solving a problem that doesn't exist yet — push back with reasoning. Agreement is not helpfulness.
 - Don't implement suggestions you disagree with silently. If there's a simpler way, a reason to defer, or the approach has trade-offs the user may not have considered — raise it first. Implement only after alignment.
 
+## Caveman skill 
+
+If caveman skill is available start sessions using caveman full (i.e. /caveman full), only disable it if I ask explicitly
+
 ## Skills
 
 Use the `Skill` tool to invoke skills — don't read skill files directly.

@@ -16,6 +16,7 @@ Your workflow:
 1. Read all architectural documentation:
    - project/adr/ - What decisions have been made
    - project/specs/ - What implementations are specified
+   - project/research/ - Domain research that informed or should inform decisions
    - CLAUDE.md - Overall system constraints and architecture
    - project/tickets/ - What work is planned or done
 2. Check decision coverage:

@@ -59,7 +59,9 @@ The key insight: `/project/` often has meaningful content before `/code/` has a 
     │       └── .gitkeep
     ├── samples/
     │   └── .gitkeep
-    └── ideas/
+    ├── ideas/
+    │   └── .gitkeep
+    └── research/
         └── .gitkeep
 ```
 
@@ -238,6 +240,7 @@ Gather the following before spawning any agents:
    ```
    If no in-progress commit is found, ask the user to clarify the diff scope before proceeding.
 3. **Linked SPECs/ADRs** — scan the ticket file for explicit references (e.g. `SPEC-0001`, `ADR-0002`). If none found, fuzzy-match the ticket slug against filenames in `project/specs/` and `project/adr/`. Read all matched files.
+4. **Relevant research** — scan `project/research/` for directories whose topic relates to the ticket domain. Read the main `.md` file in any matched directory and pass it as context to all three agents.
 
 #### Step 2 — Spawn Three Parallel Agents
 
@@ -278,9 +281,11 @@ The review file format:
 - SPECs: `NNNN-descriptive-title.md` (zero-padded 4 digits)
 - Tickets: `descriptive-name.md` (no numeric prefix)
 
-**Document reading order:** Ticket -> SPEC -> ADR -> Samples
+**Document reading order:** Ticket -> SPEC -> ADR -> Research -> Samples
 
 **Order of truth (precedence):** Ticket > SPEC > ADR > Samples. If documents conflict, follow the higher-precedence one and flag the conflict to the user.
+
+**Research** (`/project/research/`) contains sourced reports and domain analysis. It informs decisions but is not itself a decision. It has no place in the precedence chain. Never modify research files during ticket work unless explicitly asked.
 
 **Never modify files under `/project/`** without explicit permission unless fixing clear errors.
 

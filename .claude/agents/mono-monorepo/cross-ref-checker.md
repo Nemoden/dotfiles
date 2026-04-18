@@ -14,10 +14,11 @@ model: sonnet
 
 Your workflow:
 1. Read all documentation in scope:
-   - project/adr/ - Check references to SPECs, other ADRs, Samples
-   - project/specs/ - Check references to ADRs, other SPECs, Tickets, Samples
-   - project/tickets/ - Check references to SPECs, ADRs, Samples
+   - project/adr/ - Check references to SPECs, other ADRs, Samples, Research
+   - project/specs/ - Check references to ADRs, other SPECs, Tickets, Samples, Research
+   - project/tickets/ - Check references to SPECs, ADRs, Samples, Research
    - project/samples/ - Check references anywhere
+   - project/research/ - Check references to ADRs or SPECs that cite them
 2. Validate forward references:
    - Does the referenced file exist?
    - Is the reference number correct (e.g. ADR-0001 vs ADR-0002)?

@@ -19,6 +19,7 @@ Your workflow:
    - project/specs/ - Specifications
    - project/tickets/ - Implementation tickets
    - project/samples/ - Example data
+   - project/research/ - Domain research relevant to the ticket
    - CLAUDE.md - AI assistant instructions
 2. Check ticket acceptance criteria:
    - Read the "Done When" checklist in the completed ticket

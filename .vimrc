@@ -159,6 +159,7 @@ autocmd FileType lisp setlocal expandtab shiftwidth=2 tabstop=2
 autocmd FileType rust nmap <leader>cb :!cargo build<Return>
 autocmd FileType rust nmap <leader>cr :!cargo run<Return>
 
+autocmd FileType markdown setlocal wrap
 autocmd FileType netrw autocmd BufLeave <buffer> if &filetype == 'netrw' | :bd | endif
 
 " vim jumps to the last position when reopening a file

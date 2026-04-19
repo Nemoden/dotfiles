@@ -310,6 +310,13 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "markdown" },
+  callback = function()
+    vim.wo.wrap = true
+  end
+})
+
+vim.api.nvim_create_autocmd("FileType", {
   pattern = "netrw",
   callback = function()
     vim.api.nvim_create_autocmd("BufLeave", {

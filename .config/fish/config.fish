@@ -32,6 +32,10 @@ fish_add_path /opt/homebrew/sbin
 # Homebrew Python 3.13 unversioned symlinks
 fish_add_path /opt/homebrew/opt/python@3.13/libexec/bin
 
+if test -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
+    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
+end
+
 if command -sq direnv
     direnv hook fish | source
 end

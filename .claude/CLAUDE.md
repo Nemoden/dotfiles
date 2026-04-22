@@ -6,7 +6,7 @@
 
 ## Caveman skill 
 
-If caveman skill is available start sessions using caveman full (i.e. /caveman full), only disable it if I ask explicitly
+If caveman skill is available start sessions using caveman ultra (i.e. /caveman ultra), only disable it if I ask explicitly
 
 ## Skills
 

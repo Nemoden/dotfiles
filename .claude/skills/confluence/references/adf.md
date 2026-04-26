@@ -101,6 +101,84 @@ Allowed children: `paragraph`, `bulletList`, `orderedList`, `heading` (without m
 }
 ```
 
+### Media (images / attachments)
+
+Display an attached image inline. Requires uploading the
+attachment first and using the returned attachment ID.
+
+```json
+{
+  "type": "mediaSingle",
+  "attrs": {
+    "layout": "center",
+    "width": 100,
+    "widthType": "percentage"
+  },
+  "content": [
+    {
+      "type": "media",
+      "attrs": {
+        "id": "<attachment-uuid>",
+        "type": "file",
+        "collection": "contentId-<page-id>",
+        "alt": "description",
+        "width": 800,
+        "height": 400
+      }
+    }
+  ]
+}
+```
+
+**mediaSingle attrs:**
+
+| Attr | Values | Notes |
+|------|--------|-------|
+| layout | `center`, `wide`, `full-width`, `wrap-left`, `wrap-right`, `align-start`, `align-end` | Controls image placement |
+| width | 1–100 | Percentage of content width |
+| widthType | `percentage` | Only supported value |
+
+**media attrs:**
+
+| Attr | Type | Notes |
+|------|------|-------|
+| id | string | Attachment UUID from upload API response |
+| type | `file` or `external` | `file` for attachments, `external` for URLs |
+| collection | string | `contentId-<pageId>` for Confluence pages |
+| alt | string | Alt text for accessibility |
+| width | int | Pixel width (required for rendering) |
+| height | int | Pixel height (required for rendering) |
+
+For `type: "external"`, use `url` attr instead of
+`id`/`collection`:
+
+```json
+{
+  "type": "media",
+  "attrs": {
+    "type": "external",
+    "url": "https://example.com/image.png",
+    "alt": "description",
+    "width": 800,
+    "height": 400
+  }
+}
+```
+
+**Inline image** (within text flow, not block-level):
+
+```json
+{"type": "mediaInline", "attrs": {"id": "<attachment-uuid>", "type": "file", "collection": "contentId-<page-id>"}}
+```
+
+### Attachment workflow (Confluence)
+
+1. Create/update page → get page ID
+2. Upload attachment: `POST /wiki/rest/api/content/<pageId>/child/attachment`
+3. Response includes attachment `id` (UUID)
+4. Update page ADF to include `mediaSingle` nodes referencing the `id`
+5. Update page again with the new ADF body
+
 ## Inline nodes
 
 - `text` — `{"type": "text", "text": "hello", "marks": [...]}`

@@ -91,6 +91,76 @@ Allowed children: `paragraph`, `bulletList`, `orderedList`, `heading` (without m
 }
 ```
 
+### Media (images / attachments)
+
+Display an attached image inline. Upload the attachment
+to the issue first, then reference by attachment ID.
+
+```json
+{
+  "type": "mediaSingle",
+  "attrs": {
+    "layout": "center",
+    "width": 100,
+    "widthType": "percentage"
+  },
+  "content": [
+    {
+      "type": "media",
+      "attrs": {
+        "id": "<attachment-uuid>",
+        "type": "file",
+        "collection": "jira-<issue-id>",
+        "alt": "description",
+        "width": 800,
+        "height": 400
+      }
+    }
+  ]
+}
+```
+
+**mediaSingle attrs:**
+
+| Attr | Values | Notes |
+|------|--------|-------|
+| layout | `center`, `wide`, `full-width`, `wrap-left`, `wrap-right`, `align-start`, `align-end` | Controls image placement |
+| width | 1–100 | Percentage of content width |
+| widthType | `percentage` | Only supported value |
+
+**media attrs:**
+
+| Attr | Type | Notes |
+|------|------|-------|
+| id | string | Attachment UUID from upload API response |
+| type | `file` or `external` | `file` for attachments, `external` for URLs |
+| collection | string | `jira-<issueId>` for Jira issues |
+| alt | string | Alt text for accessibility |
+| width | int | Pixel width (required for rendering) |
+| height | int | Pixel height (required for rendering) |
+
+For `type: "external"`, use `url` attr instead of
+`id`/`collection`:
+
+```json
+{
+  "type": "media",
+  "attrs": {
+    "type": "external",
+    "url": "https://example.com/image.png",
+    "alt": "description",
+    "width": 800,
+    "height": 400
+  }
+}
+```
+
+**Inline image** (within text flow, not block-level):
+
+```json
+{"type": "mediaInline", "attrs": {"id": "<attachment-uuid>", "type": "file", "collection": "jira-<issue-id>"}}
+```
+
 ## Inline nodes
 
 - `text` — `{"type": "text", "text": "hello", "marks": [...]}`

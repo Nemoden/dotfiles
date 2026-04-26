@@ -98,6 +98,11 @@ curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue" \
 
 Always include a green success panel for acceptance criteria when creating task tickets. See the "Common pattern: Acceptance Criteria" section in [references/adf.md](references/adf.md).
 
+### Content rules for ticket descriptions
+
+- **Never reference line numbers** in code references. Lines drift as code changes — by the time someone reads the ticket the line number is wrong and misleads both humans and LLMs. Reference function/method names alongside file paths instead.
+- **Do include file paths, function names, and all context** that helps the person working on the ticket. Tickets are internal — they should be as specific and helpful as possible.
+
 ## Editing issues
 
 ### Simple edits (CLI)

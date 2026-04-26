@@ -107,6 +107,13 @@ return {
       end,
     })
 
+    -- Let rust_analyzer use the binary from PATH (e.g. nix/direnv shell)
+    -- instead of mason's standalone binary which may mismatch the toolchain.
+    vim.lsp.config("rust_analyzer", {
+      cmd = { "rust-analyzer" },
+    })
+    vim.lsp.enable("rust_analyzer")
+
     -- Ensure these servers are installed by mason
     require("mason-lspconfig").setup({
       ensure_installed = {
@@ -115,7 +122,6 @@ return {
         "intelephense",
         "lua_ls",
         "pyright",
-        "rust_analyzer",
         "ts_ls",
       },
       automatic_enable = true,

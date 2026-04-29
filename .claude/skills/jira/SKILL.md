@@ -40,6 +40,8 @@ If a REST API call returns an error indicating the endpoint has been removed, ch
 
 ## Listing issues
 
+**Always include sprint info in ticket lists.** Show active sprint name per ticket, or `(backlog)` if not in any active sprint. Never present a ticket list without this column — the user needs to know what's committed vs. backlog at a glance.
+
 ### CLI
 
 ```bash
@@ -49,6 +51,8 @@ jira issue list -q"project = PROJ AND status = 'In Progress' AND assignee = curr
 jira issue list -q"parent = PROJ-361"
 ```
 
+**Sprint column caveat:** The CLI `--columns ...,SPRINT,...` flag often returns an empty value even when the ticket is in an active sprint (happens with multi-board projects). **Do not trust CLI for sprint info — use the REST API path below.**
+
 ### REST API
 
 **Endpoint:** `POST /rest/api/3/search/jql` (the old `GET /rest/api/3/search` has been removed).
@@ -56,6 +60,35 @@ jira issue list -q"parent = PROJ-361"
 Body: `{"jql": "...", "fields": [...], "maxResults": N, "nextPageToken": "..."}`
 
 See `SearchAndReconcileRequestBean` in [references/swagger-v3.json](references/swagger-v3.json) for full schema.
+
+**Sprint field id is tenant-specific.** Jira assigns custom field ids at install time — `customfield_10006` is *this tenant's* Sprint field, not a universal constant. For other Jira instances, discover the id:
+
+```bash
+curl -s -u "$CC_JIRA_USER:$CC_JIRA_TOKEN" "$CC_JIRA_SERVER/rest/api/3/field" \
+  | python3 -c "import json,sys; print([f['id'] for f in json.load(sys.stdin) if f['name']=='Sprint'][0])"
+```
+
+The Sprint field value is an **array** — a ticket may have been in multiple sprints over its lifetime. Filter `state == 'active'` to get the current one; absence of any active entry → `(backlog)`.
+
+**Listing with sprint (default pattern):**
+
+```bash
+JIRA_TOKEN="${CC_JIRA_TOKEN:?}"
+curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/search/jql" \
+  -H "Content-Type: application/json" \
+  -u "$CC_JIRA_USER:$JIRA_TOKEN" \
+  -d '{"jql":"<JQL>","fields":["summary","status","customfield_10006"],"maxResults":100}' \
+  | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for i in d.get('issues', []):
+    f = i['fields']
+    sprints = f.get('customfield_10006') or []
+    active = [s['name'] for s in sprints if s.get('state') == 'active']
+    sprint = active[0] if active else '(backlog)'
+    print(f\"{i['key']}\t{f['status']['name']}\t{sprint}\t{f['summary']}\")
+"
+```
 
 ## Viewing issues
 
@@ -153,6 +186,25 @@ curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue/PROJ-123/comment" \
 
 ```bash
 jira issue link PROJ-123 PROJ-456 "Blocks"
+```
+
+### Multi-ticket workflows with dependencies
+
+When creating **more than one** related ticket where execution order matters (one blocks another, one depends on another), do it in **two passes**, not one:
+
+1. **Pass 1 — create all tickets first.** Capture the returned issue keys.
+2. **Pass 2 — link them and, if needed, edit descriptions to reference each other by key.**
+
+Why: at creation time you don't yet know the keys of the other tickets, so descriptions cannot reference them concretely. Embedding the dependency only in prose (e.g. "do this after the other ticket lands") leaves no machine-readable signal — Jira boards, blocked-by filters, and assignees won't see the relationship. Use `jira issue link <blocker> <blocked> "Blocks"` so the dependency is structured.
+
+Example:
+```bash
+# Pass 1: create both
+A=$(jira issue create -p PROJ -t Task --no-input -s "Modernize service X" -b "..." | grep -oE 'PROJ-[0-9]+')
+B=$(jira issue create -p PROJ -t Task --no-input -s "Rotate secret in service X" -b "..." | grep -oE 'PROJ-[0-9]+')
+
+# Pass 2: link (A blocks B) and optionally edit B's description to reference A
+jira issue link "$A" "$B" "Blocks"
 ```
 
 ## Opening in browser

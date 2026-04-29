@@ -121,6 +121,16 @@ curl -s -X PUT "$CONFLUENCE_SERVER/wiki/api/v2/pages/<page-id>" \
 
 **You must increment the version number.** Fetch the page first to get the current version, then set `number` to current + 1.
 
+### Editing safely
+
+Always GET page right before PUT. Two reasons:
+- need current `version.number` (PUT rejects stale)
+- user may edit page in browser concurrently. Stale local copy → overwrite their edits.
+
+ADF is JSON tree. Edit in-place, don't rebuild whole doc from source. Find target node by heading, replace one subtree, keep rest verbatim.
+
+Pattern: GET → mutate one node → PUT (`version+1`). Never rebuild full ADF unless user explicitly says "rewrite page".
+
 ### Delete page
 
 ```bash

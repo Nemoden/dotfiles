@@ -113,6 +113,8 @@ jira issue create -p PROJ -t Task -P PROJ-361 --no-input \
 
 Use when the issue needs panels, code blocks, bullet lists, or inline code formatting. Read [references/adf.md](references/adf.md) for the full ADF node reference before constructing the JSON.
 
+**ADF is not markdown.** Backticks, asterisks, and `\n` inside a text node render literally. Inline code requires splitting the string into separate text nodes with a `code` mark on the code spans — see "ADF is not markdown" in the reference.
+
 ```bash
 JIRA_TOKEN="${CC_JIRA_TOKEN:?Set CC_JIRA_TOKEN env var}"
 curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue" \

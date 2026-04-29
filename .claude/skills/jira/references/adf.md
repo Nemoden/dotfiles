@@ -170,6 +170,33 @@ For `type: "external"`, use `url` attr instead of
 - `inlineCard` — `{"type": "inlineCard", "attrs": {"url": "https://..."}}`
 - `status` — `{"type": "status", "attrs": {"text": "IN PROGRESS", "color": "blue"}}`
 
+## ADF is not markdown
+
+ADF is a structural format. The renderer does **not** parse markdown inside text nodes. Backticks, asterisks, and `\n` characters render literally. To get formatted output, you must split the string into multiple text nodes and apply marks.
+
+**Wrong** — backticks render as literal characters, `\n` renders as a space:
+
+```json
+{"type": "paragraph", "content": [
+  {"type": "text", "text": "Add `shared/auth.py` with `resolve_caller_firm_id()`\n- and tests"}
+]}
+```
+
+**Right** — split into separate text nodes; use a new `paragraph` or `hardBreak` for line breaks:
+
+```json
+{"type": "paragraph", "content": [
+  {"type": "text", "text": "Add "},
+  {"type": "text", "text": "shared/auth.py", "marks": [{"type": "code"}]},
+  {"type": "text", "text": " with "},
+  {"type": "text", "text": "resolve_caller_firm_id()", "marks": [{"type": "code"}]},
+  {"type": "hardBreak"},
+  {"type": "text", "text": "and tests"}
+]}
+```
+
+When generating ADF programmatically from markdown-like input (release notes, bullet lists with code spans), write a small splitter that walks the string, emits a plain text node for non-backtick runs, and emits a code-marked text node for each `` `...` `` span. Never paste markdown straight into a `text` field.
+
 ## Marks (text formatting)
 
 Apply via `"marks"` array on text nodes:

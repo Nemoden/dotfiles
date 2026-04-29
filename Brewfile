@@ -4,6 +4,7 @@ tap "ankitpokhrel/jira-cli"
 
 brew "awscli"
 brew "bat"
+brew "btop"
 brew "claude-code"
 brew "cowsay"
 brew "curl"

@@ -3,12 +3,13 @@
 Add an app to an existing mono-monorepo.
 
 Usage:
-    add_app.py <app-name> --lang <python|node|go|other> --repo-root <path>
+    add_app.py <app-name> --lang <python|node|go|rust|other> --repo-root <path>
 
 Examples:
     add_app.py scraper --lang python --repo-root ~/Projects/my-saas
     add_app.py api --lang node --repo-root ~/Projects/my-saas
     add_app.py worker --lang go --repo-root ~/Projects/my-saas
+    add_app.py tool --lang rust --repo-root ~/Projects/my-saas
 """
 
 import argparse
@@ -102,6 +103,23 @@ func TestMain(t *testing.T) {{
     (app_dir / "main_test.go").write_text(main_test)
 
 
+def scaffold_rust(app_dir: Path, app_name: str) -> None:
+    cargo_toml = f"""\
+[package]
+name = "{app_name}"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+"""
+    (app_dir / "Cargo.toml").write_text(cargo_toml)
+
+    src = app_dir / "src"
+    src.mkdir()
+    (src / "main.rs").write_text('fn main() {\n    println!("hello");\n}\n')
+
+
 def scaffold_other(app_dir: Path, app_name: str) -> None:
     (app_dir / "tests").mkdir()
 
@@ -114,6 +132,7 @@ SCAFFOLDERS = {
     "python": scaffold_python,
     "node": scaffold_node,
     "go": scaffold_go,
+    "rust": scaffold_rust,
     "other": scaffold_other,
 }
 
@@ -155,7 +174,7 @@ def main():
     parser.add_argument(
         "--lang",
         required=True,
-        choices=["python", "node", "go", "other"],
+        choices=["python", "node", "go", "rust", "other"],
         help="Language/runtime for the app",
     )
     parser.add_argument("--repo-root", required=True, help="Path to the mono-monorepo root")

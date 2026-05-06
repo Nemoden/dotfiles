@@ -1,4 +1,12 @@
 function p --description "Navigates to a project" --argument-names 'project'
+    if test -n "$project"
+        set -l expanded (path resolve -- (string replace -r '^~' "$HOME" -- $project))
+        if test -d "$expanded"
+            cd $expanded
+            return
+        end
+    end
+
     if command -sq zoxide && test -n "$project"
         set zoxide_match
         for PROJECTS_DIR in $PROJECTS_DIRS

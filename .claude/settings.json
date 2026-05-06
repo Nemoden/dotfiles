@@ -5,7 +5,11 @@
   },
   "includeCoAuthoredBy": false,
   "permissions": {
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+     "allow": [
+       "Bash(:*/ralph-loop/:*)",
+       "Bash(*setup-ralph-loop.sh*)"
+     ]
   },
   "model": "opus[1m]",
   "statusLine": {
@@ -14,7 +18,8 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "oh-my-claudecode@omc": true
+    "oh-my-claudecode@omc": true,
+    "ralph-loop@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "superpowers-marketplace": {

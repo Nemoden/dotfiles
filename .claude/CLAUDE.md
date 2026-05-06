@@ -112,6 +112,10 @@ This matters because:
 1. whenever you give me any commands, give them in FISH, not BASH/ZSH.
 2. When I ask you to work with my dotfiles, you should use `dot` via `fish -c "dot ..."`
 
+# PRs on github
+
+The utter bare minimum for PR description is: WHAT changed and WHY
+
 
 <!-- OMC:IMPORT:START -->
 @CLAUDE-omc.md

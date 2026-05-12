@@ -348,6 +348,19 @@ TL;DR: <e.g. "1 system-killer, 1 blocker, 3 nits.">
 - ...
 ````
 
+## Parallelism: don't slice the PR
+
+proper-review is single-context by design. The phase gates (Phase 2 WHY → Phase 3 Fit → Phase 4 Issues) require one reviewer holding the whole diff. Parallel reviewers reviewing file-slices break the gates:
+
+- Each slice does its own mini-WHY or skips it → no locked premise
+- Entanglement audit (Phase 3) is impossible without seeing the whole diff
+- Verdict becomes N stapled mini-reviews, not one coherent call
+- Slice boundaries (infra/python/tests/frontend) are author-side concerns; review must judge them together, not in isolation
+
+**Rule:** when running this skill, do NOT spawn parallel agents that each review a subset of files. One reviewer, whole diff, phases in order.
+
+**If the user says "use teams" / "use parallel agents" / "split this review":** interpret as "dimension parallelism over whole diff," not "file slicing." Spawn dimension-agents (security/perf/tests/etc.) each seeing every changed file. Main agent runs Phases 1–3 + Verdict; dimension-agents feed Phase 4 only.
+
 ## When to skip this skill
 
 - Trivial diffs (typo, dependency bump with no behavior change, generated code).

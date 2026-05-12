@@ -24,6 +24,29 @@ Confluence uses Atlassian Document Format for rich page content. Read [reference
 
 When reading pages, use `?body-format=atlas_doc_format` to get ADF. When writing, set `"representation": "atlas_doc_format"` in the body object.
 
+## Page hygiene
+
+A wiki page is a reference, not an essay. Default to terse unless the user asks otherwise.
+
+- **Hide bulk in `expand` nodes.** Large tables, long code/config dumps, raw output — wrap in `{"type":"expand","attrs":{"title":"..."}}` so the page stays scannable. Reader sees a one-line caption + chevron; clicks to drill in.
+- **Avoid table sprawl.** Large tables (many rows or wide columns) belong inside `expand`. If a table is both wide and tall, consider whether some rows belong in source files, not the wiki.
+- **Headings are H2 (`level:2`)** for main sections; H3 only when nesting genuinely helps. The page title is already H1 implicitly — don't add another.
+- **Code blocks**: use `codeBlock` with `attrs.language` set. Don't paste code in paragraphs.
+- **Build ADF in a script, not hand-rolled JSON.** Long hand-typed ADF JSON breaks on a single typo. Use a small Python helper with `t()`, `p()`, `heading()`, `expand()`, `table()` functions and `json.dumps` at the end.
+- **One page per topic.** If you find yourself adding a fourth unrelated H2, it's probably two pages.
+
+### `expand` node — exact ADF shape
+
+```json
+{
+  "type": "expand",
+  "attrs": {"title": "Click to expand"},
+  "content": [ ...block nodes (paragraph, table, codeBlock, etc.)... ]
+}
+```
+
+The `content` array holds normal block nodes — paragraphs, tables, code blocks, lists. The `title` is what the reader sees collapsed.
+
 ---
 
 ## Spaces

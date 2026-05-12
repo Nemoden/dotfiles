@@ -116,6 +116,15 @@ This matters because:
 
 The utter bare minimum for PR description is: WHAT changed and WHY
 
+# Tickets (jira or filebased) MUST follow rules
+
+- No line numbers or file paths in tickets. Use function names instead.
+- Tickets must be self-contained — a cold reader 6 months from now must understand the ticket without knowing the conversation that produced it.
+- No "we just discussed", "this branch", "the load path that triggered this", or similar session-leak phrasing.
+- If using JIRA as backend -> No cross-refs to sibling tickets being drafted in the same session ("see Ticket 3"). Use Jira blocks/relates-to relations instead. Create tickets, once you know the ticket numbers, update accordingly.
+- Sections like "Acceptance criteria" and "Out of scope" are welcome when they add value for a cold reader. "Out of scope" should list things a reasonable reader would assume are
+in-scope — not recap of session history.
+- Bare minimum: WHAT and WHY.
 
 <!-- OMC:IMPORT:START -->
 @CLAUDE-omc.md

@@ -99,15 +99,36 @@ jira issue view PROJ-123 --raw  # Full JSON for programmatic use
 
 ## Creating issues
 
+### Hierarchy rules (verified empirically; tenant-specific)
+
+Jira projects enforce a parent-child hierarchy per issue type. In this tenant:
+
+| Child issuetype | Allowed parent | Notes |
+|---|---|---|
+| `Epic` | (none / org-level) | Top-level grouping |
+| `Task`, `Story`, `Bug` | `Epic` only | Cannot parent under another Task |
+| `Subtask` | `Task`, `Story`, `Bug` | The only issuetype that can sit under a non-Epic |
+
+**Trying to set `parent` to a Task on a new `Task` returns:**
+```
+{"errors":{"parentId":"Given parent work item does not belong to appropriate hierarchy."}}
+```
+
+**So:** if you want a child under an existing Task (e.g. splitting a too-broad ticket into pieces), use `issuetype: Subtask`. Use `Task` only when the parent is an Epic.
+
 ### Simple (plain text description)
 
 ```bash
+# Task under an Epic
 jira issue create -p PROJ -t Task -P PROJ-361 --no-input \
   -s "Issue summary" \
   -b "Plain text description"
+
+# Subtask under a Task (CLI does not always accept -t Subtask cleanly;
+# REST API is more reliable for subtasks — see below)
 ```
 
-`-P` sets parent (epic). `-t` is issue type: `Task`, `Bug`, `Story`, `Epic`.
+`-P` sets parent. `-t` is issue type: `Task`, `Bug`, `Story`, `Epic`, `Subtask`.
 
 ### Rich formatting (REST API with ADF)
 
@@ -136,6 +157,8 @@ Always include a green success panel for acceptance criteria when creating task 
 ### Content rules for ticket descriptions
 
 - **Never reference line numbers** in code references. Lines drift as code changes — by the time someone reads the ticket the line number is wrong and misleads both humans and LLMs. Reference function/method names alongside file paths instead.
+- **Never reference local-machine file paths** (e.g. `~/tmp/...`, `/Users/<you>/...`, `/private/tmp/...`). Tickets are read by other engineers and future LLMs who don't have your filesystem. If a local draft or scratch file contains context that matters, **embed the context into the ticket itself** — regurgitate the relevant facts in prose. Tickets may freely cross-reference other Jira tickets (Jira keys), Confluence pages, GitHub PRs/commits, repo paths (relative to repo root), and public URLs — but not anything that only exists on the author's workstation. A ticket must be readable cold without access to any local artifact.
+- **Self-contained.** No "we just discussed", "this branch", "the conversation that produced this." A cold reader 6 months from now must understand the ticket from its own text plus what it cross-references in shared systems (Jira / Confluence / git).
 - **Do include file paths, function names, and all context** that helps the person working on the ticket. Tickets are internal — they should be as specific and helpful as possible.
 
 ## Editing issues
@@ -189,6 +212,66 @@ curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue/PROJ-123/comment" \
 ```bash
 jira issue link PROJ-123 PROJ-456 "Blocks"
 ```
+
+## Breaking a plan into tickets (vertical slices)
+
+When converting a plan, PRD, Confluence doc, or epic into multiple implementation tickets, use **tracer-bullet vertical slices** — not horizontal layer slices.
+
+### Vertical vs horizontal — the rule
+
+- **Vertical slice (correct):** each ticket cuts through ALL integration layers end-to-end (schema + API + UI + tests). A completed slice is demoable on its own.
+- **Horizontal slice (wrong):** ticket 1 = all schema, ticket 2 = all API, ticket 3 = all UI. Nothing works until the last ticket lands. Don't do this.
+
+Prefer **many thin vertical slices** over few thick ones. Each slice must be independently demoable / verifiable.
+
+### HITL vs AFK tagging
+
+Tag each slice:
+- **AFK** — agent can implement and merge without human interaction. Default to AFK where possible.
+- **HITL** — needs human judgement (architectural decision, design review, manual testing, external access). Note WHY in the ticket.
+
+### Pre-publish quiz
+
+Before creating any tickets, present the proposed breakdown as a numbered list. For each slice, show:
+- Title (short, descriptive)
+- Type (HITL / AFK)
+- Blocked by (other slices that must complete first)
+- User stories covered (if source has them)
+
+Ask the user:
+- Does the granularity feel right? (too coarse / too fine)
+- Are dependency relationships correct?
+- Should any slices be merged or split further?
+- Are HITL/AFK tags correct?
+
+Iterate until the user approves. **Do not publish without approval.**
+
+### Publish in dependency order
+
+Create blockers first so you can reference real Jira keys in the `Blocked by` field of dependent tickets. See the two-pass pattern in **Multi-ticket workflows with dependencies** below.
+
+### Slice ticket body template
+
+```
+## What to build
+
+End-to-end behavior of this slice. Describe what the slice delivers, not layer-by-layer implementation.
+
+## Acceptance criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Blocked by
+
+PROJ-XXX (or "None — can start immediately")
+
+## Parent
+
+PROJ-YYY (parent epic / PRD ticket, if applicable)
+```
+
+Avoid file paths and code snippets — they go stale. Exception: small decision-encoding snippets (state machine, schema, type shape) inline if prose can't capture the decision precisely.
 
 ### Multi-ticket workflows with dependencies
 

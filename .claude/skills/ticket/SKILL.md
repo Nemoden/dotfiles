@@ -29,7 +29,7 @@ When pointed at an epic:
 2. Fetch all child tickets (JQL: `parent = {EPIC_KEY}`)
 3. For each child ticket, note: summary, status, assignee
 4. For completed tickets: find evidence in the codebase (`git log`, file changes). Do not trust Jira status alone
-5. Assess: are any tickets missing from the epic? If gaps exist, propose creating them
+5. Assess: are any tickets missing from the epic? If gaps exist, propose creating them — use the **vertical-slice rule** in the `jira` skill ("Breaking a plan into tickets") so proposed tickets cut through all layers end-to-end and carry HITL/AFK tags
 6. Identify the next actionable ticket — first unblocked, unassigned pending ticket
 7. Present to user: epic overview, what's done (with evidence), what's next, any gaps
 8. Wait for user to confirm which ticket to pick up

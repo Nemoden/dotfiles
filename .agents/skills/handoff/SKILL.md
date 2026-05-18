@@ -14,7 +14,8 @@ Generates a self-contained prompt for the next agent to pick up where the curren
 - Use absolute dates (2026-04-22), not relative ("this session", "recently", "just")
 - Anchor completed work to commits, ticket names, or file paths — not conversation events
 - Include only what a cold-start agent needs to act — not a session summary
-- Point to existing docs (CLAUDE.md, specs, ADRs) rather than restating their content
+- Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
+- If the user passed arguments, treat them as a description of what the next session will focus on and tailor the doc accordingly.
 
 ## What to Include
 
@@ -25,6 +26,7 @@ Generates a self-contained prompt for the next agent to pick up where the curren
 5. **Open questions** — unresolved decisions or uncertainties next agent should know about
 6. **What's next** — ordered by priority; enough for the agent to pick the first task
 7. **How to start** — exact first action (command, file to read, etc.)
+8. **Suggested skills** — skills the next session should invoke, if any
 
 ## Steps
 
@@ -38,7 +40,9 @@ Generates a self-contained prompt for the next agent to pick up where the curren
 4. **Persistence recommendations** — for each audited item, recommend where it should live (ticket, doc, CLAUDE.md, project memory, inline in handoff). Do NOT create artifacts — list recommendations for user approval. Check CLAUDE.md, memory, and git history to discover what systems the project uses (Jira, Linear, Confluence, in-repo docs, etc.) — use those, don't invent new ones.
 5. Identify remaining work from whatever tracking system is in use (tickets dir, TODO file, linear, etc.)
 6. Fill the template below — adapt structure to the project
-7. Output as a fenced code block the user can copy
+7. Output options (pick based on length / user preference):
+   - **Default:** fenced code block the user can copy
+   - **File mode:** save to path from `mktemp -t handoff-XXXXXX.md` when handoff is long or user asks for a file artifact
 
 ## Template
 
@@ -65,4 +69,6 @@ We're working on **[PROJECT NAME]** — [one-line description].
 2. [Task] — [one-line objective]
 
 **To start:** [Exact first action — e.g. read a file, run a command, open a ticket]
+
+**Suggested skills:** [comma-separated skill names, or "none"]
 ```

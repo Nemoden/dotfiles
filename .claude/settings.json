@@ -12,6 +12,81 @@
     "defaultMode": "auto"
   },
   "model": "opus[1m]",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-start.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-stop.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-end.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|elicitation_dialog",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-notification.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-subagent-start.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-subagent-stop.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "node ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hud/omc-hud.mjs"
@@ -37,80 +112,5 @@
   },
   "alwaysThinkingEnabled": false,
   "effortLevel": "high",
-  "skipAutoPermissionPrompt": true,
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-start.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-stop.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-end.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "permission_prompt|elicitation_dialog",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-notify-notification.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-subagent-start.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/tmux-subagent-stop.sh",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
+  "skipAutoPermissionPrompt": true
 }

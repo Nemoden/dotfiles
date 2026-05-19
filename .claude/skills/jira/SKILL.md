@@ -161,6 +161,77 @@ Always include a green success panel for acceptance criteria when creating task 
 - **Self-contained.** No "we just discussed", "this branch", "the conversation that produced this." A cold reader 6 months from now must understand the ticket from its own text plus what it cross-references in shared systems (Jira / Confluence / git).
 - **Do include file paths, function names, and all context** that helps the person working on the ticket. Tickets are internal — they should be as specific and helpful as possible.
 
+### Ticket calibration
+
+Tickets should be terse enough that agents aren't spoon-fed, detailed enough that load-bearing decisions aren't lost. Agents picking up a ticket are competent — they don't need to be told which directories to grep or which command flags to use. They DO need to be told the decisions you've already made and the conventions they couldn't infer.
+
+Before writing each section of a ticket, ask:
+
+- **"If I omit this, would a competent agent still arrive at the right answer?"** If yes → omit it.
+- **"Is this a decision that changes the outcome, or is it an implementation detail?"** Decisions stay; details go.
+- **"Am I picking the agent's tools, their file paths, or their directory layout?"** If yes → remove. Agents are not stupid.
+
+**Strong opinion IS warranted when:**
+
+- The pattern is a repo convention an agent wouldn't invent. Cite a canonical reference (file + symbol name), not a how-to walkthrough.
+- The wiring is easy to forget and fails late: config plumbing, IAM/permissions, packaging includes, env vars, build steps.
+- A default value links to other in-flight work (cross-ticket dependency that affects how this ticket should be left).
+- Phase ordering matters: discovery before fix, audit before delete, migrate before remove.
+- A scope boundary prevents scope creep. State "Out of scope" only when a reasonable reader would assume it's in scope.
+
+**Strong opinion is NOT warranted when:**
+
+- Telling agents which directories to grep or which CLI flags to use.
+- Prescribing the file path or filename of intermediate artifacts the agent will produce.
+- Spelling out matrix column shapes / report formats when the goal is clear.
+- Walking through obvious steps ("open the file, then find the function, then...").
+- Listing precedent links the agent would naturally find by following the canonical reference you already cited.
+
+### Title calibration
+
+Same heuristic for titles. A title that prescribes an outcome before discovery is done is wrong when the work itself starts with *"should we even do this?"*. Hedge with phrasing like "if warranted", or name the goal rather than the means.
+
+### Anti-patterns
+
+Generic before/after pairs. Domain placeholders only (`<module>`, `<feature>`, `<config-key>`, etc.) — no framework-specific vocabulary.
+
+**Body content — over-prescribing tools and paths:**
+
+- ❌ Before: "Grep `<frontend-dir>/` for references to `<symbol>`. Then grep `<backend-dir>/` for the matching handler."
+- ✅ After: "Find all callers of `<symbol>` across the codebase."
+
+**Body content — over-prescribing artifact format:**
+
+- ❌ Before: "Write findings to `notes/<feature>-audit.md` with columns: module, owner, usage count, verdict. Format as a markdown table."
+- ✅ After: "Produce a usage audit and record the decision with its rationale."
+
+**Body content — walking through obvious steps:**
+
+- ❌ Before: "Open `<config-file>`. Add the `<config-key>` block. Set `enabled: true`. Reference the credentials secret. Save."
+- ✅ After: "Wire `<feature>` into the standard config (see `<canonical-module>` for the reference shape)."
+
+**Body content — restating what the canonical reference already shows:**
+
+- ❌ Before: "Implement the retry wrapper: wrap each call in a try/except, sleep with exponential backoff, cap at 5 retries, log each attempt, raise the original error on final failure."
+- ✅ After: "Apply the project's standard retry pattern (see `<canonical-module>`)."
+
+**Title — prescribing outcome before discovery:**
+
+- ❌ Before: "Merge module X and module Y."
+- ✅ After: "X/Y: assess overlap, consolidate if warranted."
+
+**Title — naming means instead of goal:**
+
+- ❌ Before: "Grep codebase for `<symbol>` references and document findings."
+- ✅ After: "`<symbol>`: determine whether it's still in use."
+
+**Title — committing to a fix before the cause is known:**
+
+- ❌ Before: "Add caching layer to `<endpoint>`."
+- ✅ After: "`<endpoint>`: investigate latency, mitigate if root cause warrants."
+
+What stays in every ticket regardless of brevity: the *why* (1-2 sentences), the canonical pattern reference if any, the failure-prone wiring that links to sibling tickets, and the acceptance criteria. Everything else is negotiable based on how obvious the path is.
+
 ## Editing issues
 
 ### Simple edits (CLI)

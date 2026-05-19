@@ -1,1 +1,9 @@
 .omc
+ralph.yml
+ralph.bot.yml
+ralph.reviewer.yml
+ralph.qa.yml
+ralph.e2e.yml
+ralph.pi.yml
+ralph.roo.yml
+ralph.m.yml

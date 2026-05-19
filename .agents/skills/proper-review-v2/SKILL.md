@@ -1,9 +1,9 @@
 ---
-name: proper-review
+name: proper-review-v2
 description: Use when reviewing a PR, diff, branch, or any proposed code change. First gathers context autonomously (fetches PR/commits via gh, follows Jira keys via the jira skill, follows Confluence links via the confluence skill, reads referenced files/URLs), then gates the review behind a WHY interrogation so you assess whether the work should exist before assessing how it's written. Criticism is expressed as diffs (not prose walls), entanglement claims get first-principles cost/benefit, and every review opens with specific praise. Triggers on "review this PR", "proper review", "review the diff", "/proper-review", a GitHub PR URL, or any code review request.
 ---
 
-# Proper Review
+# Proper Review v2
 
 A code review that skips WHY is theatre. You can polish syntax on code that should never have been written. This skill forces you to interrogate the premise *before* you touch the implementation — and to express criticism as diffs, not prose.
 
@@ -102,12 +102,39 @@ Every concrete issue gets a `diff` block showing before → after. Prose explana
 - If the issue has no clean diff (e.g. "this PR should be three PRs," "this needs a follow-up RFC"), say so explicitly and skip the diff block — don't fake one.
 - For missing tests, show a stub `+` diff of the test to add, not just "needs a test."
 - Prose without a diff is permitted ONLY for: architectural verdicts (Phase 3 fit), the WHY chain (Phase 2), and the section TL;DRs.
+- **`No diff.` is a forbidden ending for any numbered Issue.** Every numbered finding in Phase 4 MUST end with a unified diff on real `file:line` (additions, deletions, or both). If you find yourself typing `No diff.`, the finding does not belong in Issues — move it to a one-line entry under **Acknowledged trade-offs** above What's good, or cut it entirely. Common cases that should NOT become Issues: "author already accepted the trade-off in PR comments," "out of scope per author," "follow-up ticket exists," "convention differs but both sides are correct." If the finding is real but the fix is "open a separate ticket," write the ticket title under Acknowledged trade-offs — don't dress it as an Issue.
+
+**Example — the firmness test:**
+
+BAD (vague, lets the finding survive without committing):
+
+````
+### 💭 Validator may reject some valid inputs
+The narrowing in the last commit fixed one case but other inputs
+matching similar patterns may still be rejected. Worth an audit.
+
+No diff.
+````
+
+GOOD (concrete, diff or fallout):
+
+````
+### ⚠️ `src/validators/foo.py:42` — pattern accepts strings the
+caller documents as invalid; narrow the alternation
+
+```diff
+-PATTERN = re.compile(r'\bfoo\b|\bbar\b')
++PATTERN = re.compile(r'\bfoo\s?bar\b')
+```
+````
+
+If the BAD version is what you'd write, either firm it up to the GOOD shape (with a concrete location + diff) or cut it. Both outcomes beat the BAD version surviving into the review.
 
 **Why this format:** the previous prose-heavy style made the reviewer the author's editor — the author had to translate "X is wrong because Y, consider Z" into a code change. Diffs collapse that step. The reviewer's judgment is encoded in the patch.
 
 ## Praise what works
 
-Every review includes a **"What's good"** section, placed **before** the critique. Rules:
+Every review includes a **"What's good"** section, placed **after the Verdict, not before**. Rules:
 
 1. **Be specific.** Not "good test coverage" — name the test, the invariant it locks, and the regression it prevents. Name the file, the function, the line, the decision.
 2. **Praise non-obvious decisions.** A choice that aligns with an existing codebase convention (naming scheme, error-tagging pattern, module boundary) is praise-worthy; conformance to a generic style guide is not. Praise the choices a less-careful author would have skipped.
@@ -133,6 +160,27 @@ Praise serves three purposes:
 - Future readers of the review see what "good" looks like in this codebase.
 
 If you cannot find anything specific to praise after honest reading, the PR is in serious trouble — make that the verdict, don't fake the praise. But the bar is "specific," not "absent" — most PRs have *something* worth naming.
+
+## Evidence beyond the diff
+
+Static diff reading misses three classes of defect. Before locking verdict, run the checks below when their trigger applies. Skip when not triggered — don't pad reviews with green checkmarks.
+
+**Build / type gate** — trigger: PR touches typed code (TS, Python with mypy, Rust, Go, etc.) and CI status is unknown or stale.
+- Run the project's typecheck/build command (`tsc --noEmit`, `mypy`, `cargo check`, `go build ./...`).
+- Reviewer is not a substitute for CI, but if CI is red or unreported, do not ship a verdict that ignores it.
+- If you can't run it locally, say so and require green CI before merge in the verdict.
+
+**Blast radius** — trigger: PR renames, removes, or changes signature of any exported symbol.
+- Use `lsp_find_references` if available, else `grep -rn "<symbol>" -- <repo>` to enumerate callers.
+- Count callers in PR vs callers outside PR. If outside > 0 and not updated, that's a 🔥 blocker with a diff stub of the missing updates.
+- For deletions: confirm no caller remains; cite the search command in the finding.
+
+**Runtime evidence** — trigger: PR claims perf win, fixes a reproducible bug, or changes test behavior.
+- Perf claim: demand the number (see "First-principles on every entanglement claim"). If author didn't provide, that's a ⚠️ — require a benchmark before SHIP.
+- Bug fix: confirm a test reproduces the bug pre-fix and passes post-fix. Missing → stub `+` diff of the test.
+- Don't fabricate numbers. "Should be faster" is not evidence.
+
+These checks feed Phase 4 findings, not Phase 2/3. WHY-gate runs first regardless.
 
 ## Workflow
 
@@ -222,6 +270,27 @@ Possible Phase 3 verdicts:
 - **Overbuilt** → call out specific lines/abstractions to trim, then proceed.
 - **Wrong shape** → recommend rethink before line review is useful.
 
+### Phase 3.5 — Adversarial probes (between Fit and Issues)
+
+Static diff reading misses bugs that need adversarial input thinking. Before Phase 4, probe every new behaviour the diff introduces with hostile inputs. This phase feeds Phase 4 findings — it does not stand alone in the output.
+
+**For every new regex / parser / validator / lexicon / state machine in the diff:**
+
+1. List 3 inputs that *look correct* but should match WRONG — false positives where a broad pattern fires on inputs the author didn't intend (e.g. a keyword used in unrelated contexts that share the same word). Pick inputs the author probably did not test.
+2. List 3 inputs that *look correct* but should match RIGHT — false negatives where the pattern misses cases the author intended (e.g. a token that survives the input-normaliser without the word-boundary the pattern still requires).
+3. Run them mentally. If uncertain, run them against the actual compiled pattern via `Bash` / `python3 -c` / language-equivalent. Don't guess.
+4. For each input where behaviour is wrong, that's a Phase 4 finding with a concrete diff.
+
+**For every hardcoded constant in the diff (log levels, timeouts, batch sizes, retry counts, concurrency limits, page sizes, cache TTLs):**
+
+- Ask: *what does this cost in prod at p99 traffic?* If you can't answer with a number or a named failure mode, that's a probe. Hardcoded literals that override the per-environment config the rest of the service uses (env vars, feature flags, deploy stage) are nearly always a finding. Surface them.
+
+**For every test file in the diff:**
+
+- Distinguish *call-shape assertions* from *behaviour assertions*. Mocking a dependency then asserting how the code-under-test called the mock proves call shape — it does NOT prove the real dependency does anything useful with those calls. If the change's whole point is the *real* dependency's behaviour (e.g. a logger migration whose value is structured-output emission, a serialiser swap whose value is wire format), a fully-mocked test cannot prove the change works. That's a coverage-illusion finding: stub a smoke test that exercises the real dependency and asserts the externally-observable output.
+
+Adversarial probes feed Phase 4 findings. They do not produce praise (praise is for what the author did, not for what the reviewer probed).
+
 ### Phase 4 — Standard review (diff-driven)
 
 Each issue uses the diff format from "Express criticism as diffs" above. Cover:
@@ -264,12 +333,14 @@ User CLAUDE.md / project memory overrides this section.
 - **Nitpicking before WHY.** Style, naming, formatting — banned until Phase 2 is locked. They legitimize work that may not warrant existing.
 - **"LGTM with minor suggestions"** without a verdict. Either commit or say what's missing.
 - **Treating consistency as bedrock.** "For consistency with X" only counts if you can name what concretely breaks.
+- **"Mirrors existing pattern" as praise.** An existing pattern in the codebase is not automatically good — it may be the same workaround copied twice. Before praising conformance, ask: is the underlying pattern *correct*, or does it paper over a deeper issue (missing packaging, ad-hoc imports, hand-rolled validation)? If the latter, downgrade praise to nit and flag the underlying debt.
 - **Vibe verdicts.** "Feels overengineered" → name the abstraction and the missing caller. "Needs more tests" → name the uncovered risk surface AND provide a test stub diff.
 - **Wall-of-text critique.** Prose without diffs is the failure mode this skill exists to prevent. If you find yourself writing 4+ sentences without a diff, stop and write the diff.
 - **Default-to-split on entanglement.** Always run the cost/benefit first; some bundles are load-bearing and splitting them produces unsafe interim deploys.
-- **Skipping praise.** Every review opens "What's good" first, with specific named items. Even tough verdicts.
+- **Skipping praise.** Every review ends with "What's good" after the Verdict, with specific named items. Even tough verdicts. (Earlier versions of this skill placed praise *before* Issues; that anchored the reviewer toward a positive verdict before Phase 4 had finished critiquing. Praise goes last so it doesn't soften the Issues pass.)
 - **Generic praise.** "Nice work" / "good tests" / "clean code" are worse than no praise — they signal the reviewer didn't read carefully.
 - **Importing bot-review consensus.** Treating prior automated review ✅s, ❌s, or "all addressed" claims as evidence. They are bot-to-bot conversation. Read the diff; derive findings yourself. See "Prior bot reviews are leads, not facts."
+- **Rubber-stamping unknown CI.** Issuing SHIP / SHIP-WITH-NITS without confirming CI green or running typecheck/build locally when CI is stale. If unknown, say so in the verdict.
 
 ## Output shape
 
@@ -302,22 +373,10 @@ TL;DR: <one of: "Great fit. No other solutions worth considering." | "Good fit. 
 - Actual diff vs minimum: [right-size | overbuilt | wrong-shape]
 - Entanglement audit: <which extras are load-bearing vs accidental, with cost/benefit reasoning>
 
-## What's good
-
-### 🌟 <path/file.ext:LINE> — <short label>
-<1–2 sentences naming the decision and why it's good.>
-```<lang>
-<actual snippet, 2–8 lines>
-```
-
-### ✨ <path/file.ext:LINE> — <short label>
-...
-
-### <path/file.ext:LINE> — <short label>
-<ordinary good — no emoji prefix>
-
 ## Issues (Phase 4)
 TL;DR: <e.g. "1 system-killer, 1 blocker, 3 nits.">
+
+> Findings that rely on external evidence (caller count, benchmark, CI run, type error) cite the command and result inline. "grep -rn foo src/ → 12 callers, 3 not updated" beats "this breaks callers."
 
 ### 💀 1. <Short problem statement>
 <1–3 sentences>
@@ -346,6 +405,23 @@ TL;DR: <e.g. "1 system-killer, 1 blocker, 3 nits.">
 **Nice-to-haves / follow-ups** (⚠️ and 💭):
 - ...
 - ...
+
+**Acknowledged trade-offs** (findings that don't belong in Issues — author already accepted, out-of-scope, or covered by follow-up ticket):
+- <one-line: trade-off — author's stated reason — follow-up ticket if any>
+
+## What's good
+
+### 🌟 <path/file.ext:LINE> — <short label>
+<1–2 sentences naming the decision and why it's good.>
+```<lang>
+<actual snippet, 2–8 lines>
+```
+
+### ✨ <path/file.ext:LINE> — <short label>
+...
+
+### <path/file.ext:LINE> — <short label>
+<ordinary good — no emoji prefix>
 ````
 
 ## Parallelism: don't slice the PR
@@ -359,7 +435,35 @@ proper-review is single-context by design. The phase gates (Phase 2 WHY → Phas
 
 **Rule:** when running this skill, do NOT spawn parallel agents that each review a subset of files. One reviewer, whole diff, phases in order.
 
-**If the user says "use teams" / "use parallel agents" / "split this review":** interpret as "dimension parallelism over whole diff," not "file slicing." Spawn dimension-agents (security/perf/tests/etc.) each seeing every changed file. Main agent runs Phases 1–3 + Verdict; dimension-agents feed Phase 4 only.
+**Dimension parallelism — auto-trigger thresholds.** After Phase 1 produces the context bundle (so the diff scope is known), evaluate the following. Spawn dimension-agents *each holding the whole diff* with a single lens when ANY of the following is true:
+
+- **Size:** changed-files ≥ 8 OR `additions + deletions` ≥ 400.
+- **Risk surface:** the diff touches ≥ 2 of {auth/authz, DB migrations, public API contract, infra/CI config, payment/PII handling}.
+- **User opt-in (always fires, regardless of size/risk):** ANY of the following — explicit phrases like "use teams" / "use parallel agents" / "use subagents" / "deploy agents" / "split this review" / "fan out" / "dimension agents"; depth phrases like "do a thorough review" / "deep review" / "exhaustive review" / "be paranoid" / "leave no stone unturned"; specialism callouts like "security review" / "perf review" / "test review" / "review for X and Y" (multiple lenses named). Interpret intent generously — if user signals "more than one pass" or "more eyes," that's opt-in.
+
+Below those thresholds, default to single reviewer. Don't burn tokens on a 5-file logging PR.
+
+When auto-triggered, log the trigger reason in the Context TL;DR (e.g. `Dimension parallelism: 14 files / 612 lines → triggered.`) so the reader knows why the review used more agents.
+
+| Dimension | Agent / lens | Spawn when |
+|---|---|---|
+| Security | OWASP, secrets, authz, input handling | diff touches auth/authz, input parsing, or any user-facing endpoint |
+| Performance | hot paths, N+1, allocations, complexity | diff has perf claim OR touches request-path / loop-heavy code |
+| Tests | coverage of WHY-relevant risk, flakiness, over-mocking | always, when parallelism triggers |
+| Migration / data | schema/migration safety, backfill, lock behaviour | diff contains `migrations/`, `*.sql`, or ORM schema changes |
+| API / contract | callers outside the diff, breaking changes | diff renames/removes exported symbols, changes signatures, or modifies OpenAPI/protobuf |
+
+Spawn only the dimensions whose "Spawn when" condition matches — don't fan out to all five reflexively.
+
+Rules:
+- Main agent runs Phases 1–3 and writes the final Verdict. Dimension-agents feed Phase 4 issues only.
+- Each dimension-agent reads the whole diff, not a slice.
+- Main agent dedupes findings (same defect from multiple lenses = one issue, highest severity wins).
+- Dimension-agents do NOT write their own verdicts. They report findings in the same emoji/diff format and stop.
+
+**Cross-model check (optional):** for high-stakes PRs (size ≥ 1000 lines OR touching payments/auth/PII), route the same diff through a second model (e.g. `/ccg`) and treat divergence as a flag — findings only one model raised get extra scrutiny. Convergence is weak signal (same blind spots); divergence is the value.
+
+**Override:** user can downgrade ("just a quick review, no agents") or upgrade ("spawn all dimensions even though it's small") — user instruction wins over thresholds.
 
 ## When to skip this skill
 

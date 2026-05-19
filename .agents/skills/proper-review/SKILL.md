@@ -262,7 +262,8 @@ Static diff reading misses bugs that need adversarial input thinking. Before Pha
 
 **For every hardcoded constant in the diff (log levels, timeouts, batch sizes, retry counts, concurrency limits, page sizes, cache TTLs):**
 
-- Ask: *what does this cost in prod at p99 traffic?* If you can't answer with a number or a named failure mode, that's a probe. Hardcoded literals that override the per-environment config the rest of the service uses (env vars, feature flags, deploy stage) are nearly always a finding. Surface them.
+- Ask: *what does this cost in prod at p99 traffic?* If you can't answer with a number or a named failure mode, that's a probe.
+- **Short-circuit probe.** For each literal, ask: *is this value normally chosen per environment in this codebase?* If yes — the literal short-circuits that mechanism and ships one environment's value (usually dev's) to all of them. Finding by default. The fix is to remove the literal and let the existing per-environment mechanism decide; if no such mechanism exists yet, the finding is that one should.
 
 **For every test file in the diff:**
 

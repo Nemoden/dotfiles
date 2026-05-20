@@ -112,6 +112,14 @@ This matters because:
 1. whenever you give me any commands, give them in FISH, not BASH/ZSH.
 2. When I ask you to work with my dotfiles, you should use `dot` via `fish -c "dot ..."`
 
+### Dotfiles gotchas (learned the hard way)
+
+- **`.gitignore` is `*`** — every file looks "untracked" to standard checks. Do NOT infer "not tracked" from `git status`, `git ls-files | grep ...` returning empty for a relative path, or similar. Always verify with `dot log <path>` or `dot ls-files <path>` run **from `~`** (the dotfiles work-tree root).
+- **Paths in `dot` output are relative to current cwd**, not to `~`. If you run `dot ls-files` from `~/.claude/skills/`, you get paths like `caveman/SKILL.md`, not `.agents/skills/caveman/SKILL.md`. `cd ~` before greppings paths, or pass explicit paths.
+- **I push individual subdirs**, not whole trees. Don't `dot add -A`. Use `dot add -f <specific-path>`.
+- **Workflow for any dotfile change:** `dot add -f <path>` → `dot commit -m "..."` → `dot pull --rebase` → `dot push`. Never `pull` before `commit` (rebase refuses with unstaged changes).
+- **Skills live at `~/.agents/skills/<name>/` and are symlinked into `~/.claude/skills/<name>` with RELATIVE symlinks** (`../../.agents/skills/<name>`). Absolute symlinks break across machines (home dir differs).
+
 # PRs on github
 
 The utter bare minimum for PR description is: WHAT changed and WHY

@@ -197,6 +197,32 @@ ADF is a structural format. The renderer does **not** parse markdown inside text
 
 When generating ADF programmatically from markdown-like input (release notes, bullet lists with code spans), write a small splitter that walks the string, emits a plain text node for non-backtick runs, and emits a code-marked text node for each `` `...` `` span. Never paste markdown straight into a `text` field.
 
+## Cross-referencing JIRA tickets — always use `inlineCard`
+
+**Never embed a JIRA key as a plain `text` node.** `{"type":"text","text":"PROJ-123"}` renders as literal text — readers cannot click through, hover previews don't appear, and downstream consumers must expand each key by hand. Use `inlineCard` instead. JIRA's smart-link service renders the lightning icon, key, summary, and live status pill from the URL alone — you do not supply any of that data.
+
+**Right** — clickable, hover-previewable, status-aware reference:
+
+```json
+{"type": "inlineCard", "attrs": {"url": "$CC_JIRA_SERVER/browse/PROJ-123"}}
+```
+
+The full ticket URL is required; the bare key alone does not work. JIRA assigns `localId` on save — don't supply it.
+
+When mixing with prose, split the surrounding paragraph into multiple inline children:
+
+```json
+{"type": "paragraph", "content": [
+  {"type": "text", "text": "See "},
+  {"type": "inlineCard", "attrs": {"url": "$CC_JIRA_SERVER/browse/PROJ-123"}},
+  {"type": "text", "text": " for prior art."}
+]}
+```
+
+This applies to JIRA keys and Confluence page URLs. For arbitrary non-Atlassian URLs prefer a `link` mark on a text node — `inlineCard` renders blank or oddly for targets the smart-link service doesn't recognise.
+
+**The same rule applies when editing.** If you fetch an existing description that has plain-text keys (legacy content, hand-written tickets, prior agent output), upgrade them to `inlineCard` nodes as part of the edit.
+
 ## Marks (text formatting)
 
 Apply via `"marks"` array on text nodes:

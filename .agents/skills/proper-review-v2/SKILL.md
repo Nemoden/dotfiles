@@ -73,6 +73,8 @@ Each praise item in **What's good** and each issue in **Issues** carries a sever
 
 Place the emoji at the start of the header (`### 💀 1. Title`). The verdict's blockers list MUST match every 💀 and 🔥 item — they cannot become nice-to-haves.
 
+**Second header marker — bot-overlap signal.** Every Issue header carries a second emoji *immediately after* the severity, *before* the number: `🤖` if a bot already flagged this finding, `✨` if this is an independent catch. Full shape: `### <severity> <bot-marker> N. <Title>`. Examples: `### 💀 🤖 1. Title` / `### 🔥 ✨ 2. Title` / `### ⚠️ 🤖 3. Title`. This is the at-a-glance signal — reader scans the Issues section and sees instantly which findings overlap with bot review and which are independent, without having to read the `Prior bot:` line under each diff. The under-diff `Prior bot:` line is still mandatory because it carries the deep-link, the reason for reinforcement, and the partial/multiple-bot nuance — the header marker is the summary, the line is the detail.
+
 ## Express criticism as diffs
 
 Every concrete issue gets a `diff` block showing before → after. Prose explanations sit *above* the diff, not in place of it. Reasoning: a wall of "this is wrong because…" without a diff makes the reviewer the author's editor. A diff makes the change actionable in one paste.
@@ -80,7 +82,7 @@ Every concrete issue gets a `diff` block showing before → after. Prose explana
 **Format per issue:**
 
 ````
-### <emoji> N. <Short problem statement>
+### <severity-emoji> <bot-marker> N. <Short problem statement>
 
 <1–3 sentences: what's wrong, why it matters, what the fix is.>
 
@@ -92,8 +94,12 @@ Every concrete issue gets a `diff` block showing before → after. Prose explana
 + new line
 ```
 
+**Prior bot:** <see "Prior bot crediting" below — MANDATORY on every finding>
+
 <Optional 1-line caveat or follow-up note.>
 ````
+
+`<severity-emoji>` = 💀 / 🔥 / ⚠️ / 💭. `<bot-marker>` = 🤖 (bot already flagged) / ✨ (independent catch). Both are required on every Issue header.
 
 **Rules:**
 - Diff must be minimal — only the lines that change, with enough context to locate them.
@@ -131,6 +137,39 @@ caller documents as invalid; narrow the alternation
 If the BAD version is what you'd write, either firm it up to the GOOD shape (with a concrete location + diff) or cut it. Both outcomes beat the BAD version surviving into the review.
 
 **Why this format:** the previous prose-heavy style made the reviewer the author's editor — the author had to translate "X is wrong because Y, consider Z" into a code change. Diffs collapse that step. The reviewer's judgment is encoded in the patch.
+
+## Prior bot crediting (mandatory per finding)
+
+Every numbered Issue carries the bot-overlap signal in TWO places:
+
+1. **In the header — a second emoji** between the severity emoji and the number: `🤖` (bot already flagged this finding) or `✨` (independent catch). Full header shape: `### <severity> <bot-marker> N. <Title>`. This is the scan-speed signal so the reader sees overlap-vs-independent without descending into each finding.
+2. **Under the diff — the `**Prior bot:**` line** carrying the deep-link, the reason for reinforcement, and any partial/multiple-bot nuance.
+
+Both are mandatory on every Issue. The header marker and the under-diff line MUST agree: 🤖 in the header → the line must name a bot + URL; ✨ in the header → the line must say `not raised by any bot review`.
+
+Cross-reference each finding against the bot reviews enumerated in Phase 1 and pick exactly one of the `Prior bot:` line shapes:
+
+- `**Prior bot:** 🤖 already flagged by <bot-login> ([inline](url)). Reinforced here because <reason: prod-safety / blocker / bot's diff insufficient / etc.>.`
+- `**Prior bot:** 🤖 partially flagged by <bot-login> ([inline](url)) — bot caught <X>, missed <Y> (this review adds <Y>).`
+- `**Prior bot:** 🤖 flagged by multiple bots (<bot-a>, <bot-b>) ([<bot-a>](url-a), [<bot-b>](url-b)).`
+- `**Prior bot:** ✨ not raised by any bot review.`
+
+`<bot-login>` = the exact login captured in Phase 1's `Prior bot reviews` sub-bundle. Don't hardcode "claude-bot" / "coderabbit" — use whatever the PR actually has. Prefer login over display name for greppability.
+
+**Why this is mandatory:**
+- 🤖 → reader sees this finding overlaps with a bot. Their decision to add their own comment / reinforce / extend is one glance, not a re-read of the PR thread.
+- ✨ → reader sees this is an independent catch. Worth elevating.
+- Silence on this line → reader can't tell if you read the bot comments. Looks like you missed them, even when you didn't.
+
+**Bot findings not promoted to Issues.** Between the Issues section and the Verdict, add a `Bot findings not promoted to Issues` sub-section listing every bot lead you chose not to elevate to a numbered Issue (only when ≥1 bot finding was dropped). One line each:
+
+```
+- 🤖 <bot-login> on <file:line> — "<bot's summary, ≤80 chars>" — Dropped because: <reason>.
+```
+
+Reasons: `already covered by Acknowledged trade-offs`, `verified against code, bot is wrong`, `out of scope per author / WHY-locked`, `duplicate of Issue N`, `bot misread the diff`. Forces an explicit decision on every bot lead — no silent drops, no "I didn't notice."
+
+**Bot overlap on the verdict.** Add a `Bot overlap:` line immediately after the verdict reason: `Bot overlap: N of M issues already flagged by bots (🤖); K issues are independent (✨).` Reader sees the ratio at a glance. If overlap = 100%, the human review added nothing — the verdict text MUST acknowledge that ("this review confirms <bot>'s findings; no independent catches").
 
 ## Praise what works
 
@@ -220,7 +259,28 @@ You cannot interrogate a WHY you haven't read. Gather all reasonably-reachable c
 
 **4. Handle empty context:** if PR body + commit messages + linked ticket + branch name are all uninformative → STOP, ask user for the WHY before proceeding.
 
-**5. Produce a context bundle:**
+**5. Enumerate prior bot reviews (mandatory).** Before producing the context bundle, fetch every inline + summary review comment on the PR and identify which were posted by bots. This becomes a Phase 4 cross-reference (see "Prior bot crediting" below) — skipping it produces silent overlap with bot findings, which makes the reviewer look like they didn't read the PR.
+
+Fetch:
+```bash
+gh api repos/{owner}/{repo}/pulls/{n}/comments --paginate
+gh api repos/{owner}/{repo}/issues/{n}/comments --paginate
+gh pr view <url> --json reviews,comments
+```
+Capture each comment's `html_url` (or `url` for issue comments) so the Phase 4 `Prior bot:` line can deep-link.
+
+**Bot detection — generic, not an allowlist.** Tag a comment as bot-authored if ANY of these hold:
+- `author.is_bot == true` in `gh pr view --json` output
+- GitHub `User.type == "Bot"` in REST `/comments` response
+- Login matches `*[-]bot`, `*bot`, `*-ai`, `*-reviewer`, `*-pull-request-reviewer` (case-insensitive)
+- Login is in the well-known set: `claude`, `coderabbitai`, `copilot-pull-request-reviewer`, `bito-bot`, `codium-ai`, `sourcery-ai`, `qodo-merge-pro`, `github-actions`
+- `authorAssociation == "NONE"` combined with structured review-shaped output (checklists, "Summary"/"Issues"/"Review" section headings, repeated emoji-prefixed findings)
+
+Err on the side of tagging. A human flagged as bot just gets an unused `Prior bot:` cross-reference; a bot missed as human defeats the whole point of this enumeration.
+
+For each detected bot, record: login, count of inline comments, count of summary comments, posted-at (latest), and how many `html_url` values you successfully captured.
+
+**6. Produce a context bundle:**
 
 ```
 ## Context (Phase 1)
@@ -233,6 +293,10 @@ TL;DR: <sources in importance order, e.g. "PR description, JIRA PROJ-123, code, 
 - Linked ticket(s): <KEY-123: title — 1-line summary>  OR  none
 - Linked docs: <Confluence/RFC/etc — 1-line summary>  OR  none
 - Referenced files/URLs: <fetched or noted>
+- Prior bot reviews:
+    - <bot-login>: <N inline> + <M summary> comments, latest <YYYY-MM-DD>, <K> deep-links captured
+    - <bot-login>: ...
+    - OR  none detected
 - Unreachable / asked user about: <list>
 ```
 
@@ -326,6 +390,8 @@ Bot reviews (Claude, CodeRabbit, Copilot, Bito, etc.) are *leads* — never grou
 
 Allowed: mine bot comments for *leads to investigate*; disagree explicitly when warranted.
 
+**Visibility ≠ deference.** The mandatory `Prior bot:` line on every finding (see "Prior bot crediting") is a *visibility* mechanism, not a deference mechanism. Crediting a bot for raising something first does not make the bot's claim correct, and does not relieve you from independently verifying the underlying defect. The line tells the reader where the lead came from; the diff and the reasoning are still yours. A finding tagged 🤖 still needs you to have read the code and decided independently — overlap with a bot is not the same as derivation from a bot.
+
 User CLAUDE.md / project memory overrides this section.
 
 ## Anti-patterns to refuse
@@ -341,6 +407,8 @@ User CLAUDE.md / project memory overrides this section.
 - **Skipping praise.** Every review ends with "What's good" after the Verdict, with specific named items. Even tough verdicts. (Earlier versions of this skill placed praise *before* Issues; that anchored the reviewer toward a positive verdict before Phase 4 had finished critiquing. Praise goes last so it doesn't soften the Issues pass.)
 - **Generic praise.** "Nice work" / "good tests" / "clean code" are worse than no praise — they signal the reviewer didn't read carefully.
 - **Importing bot-review consensus.** Treating prior automated review ✅s, ❌s, or "all addressed" claims as evidence. They are bot-to-bot conversation. Read the diff; derive findings yourself. See "Prior bot reviews are leads, not facts."
+- **Silent bot overlap.** Raising an issue a bot already raised without a `Prior bot:` line crediting the bot. Reader can't tell whether you read the bot comments — looks like you missed them. The `Prior bot:` line is mandatory on every numbered Issue; ✨ when the catch is independent, 🤖 with deep-link when it overlaps.
+- **Pretending originality.** Issue prose that paraphrases a bot's wording without crediting. If your diff matches a bot's suggested diff line-for-line, say so on the `Prior bot:` line — `🤖 already flagged by <bot>, this review adopts the bot's diff verbatim` is honest; pretending it's your own catch is not.
 - **Rubber-stamping unknown CI.** Issuing SHIP / SHIP-WITH-NITS without confirming CI green or running typecheck/build locally when CI is stale. If unknown, say so in the verdict.
 
 ## Output shape
@@ -379,25 +447,37 @@ TL;DR: <e.g. "1 system-killer, 1 blocker, 3 nits.">
 
 > Findings that rely on external evidence (caller count, benchmark, CI run, type error) cite the command and result inline. "grep -rn foo src/ → 12 callers, 3 not updated" beats "this breaks callers."
 
-### 💀 1. <Short problem statement>
+### 💀 🤖 1. <Short problem statement>
 <1–3 sentences>
 ```diff
 - ...
 + ...
 ```
+**Prior bot:** 🤖 already flagged by <bot-login> ([inline](url)). Reinforced here because <reason>.
 <optional caveat>
 
-### 🔥 2. <Short problem statement>
+### 🔥 ✨ 2. <Short problem statement>
 ...
+**Prior bot:** ✨ not raised by any bot review.
 
-### ⚠️ 3. <Short problem statement>
+### ⚠️ 🤖 3. <Short problem statement>
 ...
+**Prior bot:** 🤖 partially flagged by <bot-login> ([inline](url)) — bot caught <X>, missed <Y>.
 
-### 💭 4. <Short problem statement>
+### 💭 ✨ 4. <Short problem statement>
 ...
+**Prior bot:** ✨ not raised by any bot review.
+
+## Bot findings not promoted to Issues
+<Only when ≥1 bot finding was dropped. One line per dropped lead — forces an explicit decision, no silent drops.>
+
+- 🤖 <bot-login> on <file:line> — "<bot's summary, ≤80 chars>" — Dropped because: <already covered by Acknowledged trade-offs | verified against code, bot is wrong | out of scope per author / WHY-locked | duplicate of Issue N | bot misread the diff>.
+- 🤖 <bot-login> on <file:line> — "<...>" — Dropped because: <...>.
 
 ## Verdict
 [KILL | RESCOPE | TRIM | SHIP-WITH-NITS | SHIP] — <one-line reason>
+
+**Bot overlap:** N of M issues already flagged by bots (🤖); K issues are independent (✨). <If overlap = 100%, the verdict text MUST acknowledge that this review confirms existing bot findings and adds no independent catches.>
 
 **Blockers before merge** (must include every 💀 and 🔥):
 1. ...

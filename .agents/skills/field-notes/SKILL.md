@@ -17,7 +17,7 @@ Use the **session's logical cwd** (the directory where Claude was launched), NOT
 
 Source of truth: `.cwd` field in `~/.claude/sessions/{pid}.json` (same file used for session_id lookup).
 
-1. If session cwd is inside a git repo → `<git-root>/.claude/field-notes/` (run `git -C "$session_cwd" rev-parse --show-toplevel`)
+1. If session cwd is inside a git repo → `<primary-repo-root>/.claude/field-notes/`. Resolve via `dirname $(git -C "$session_cwd" rev-parse --path-format=absolute --git-common-dir)`. **Do not** use `--show-toplevel` — that returns the worktree top, which means notes land in `<repo>/.worktrees/<branch>/.claude/field-notes/` and are invisible from the primary checkout. `--git-common-dir` always points at the shared `.git` (the primary repo's), so its parent is the canonical root.
 2. Else → `~/.claude/field-notes/`
 
 **Filename:** `{YYYY-MM-DD-HHMMSS}-{slug}-{sid8}.md`
@@ -44,10 +44,14 @@ session_id=$(jq -r .sessionId "$session_file")
 session_cwd=$(jq -r .cwd "$session_file")
 short_sid="${session_id:0:8}"
 
-# Resolve notes dir from session_cwd, NOT $PWD
-git_root=$(git -C "$session_cwd" rev-parse --show-toplevel 2>/dev/null)
-if [ -n "$git_root" ]; then
-    notes_dir="$git_root/.claude/field-notes"
+# Resolve notes dir from session_cwd, NOT $PWD.
+# Use --git-common-dir (shared across worktrees), NOT --show-toplevel
+# (which would resolve to the worktree dir and stash notes inside
+# .worktrees/<branch>/, invisible from the primary checkout).
+git_common=$(git -C "$session_cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+if [ -n "$git_common" ]; then
+    repo_root=$(dirname "$git_common")
+    notes_dir="$repo_root/.claude/field-notes"
 else
     notes_dir="$HOME/.claude/field-notes"
 fi

@@ -1,27 +1,11 @@
 ---
 name: field-notes
-description: Capture mid-session observations to revisit later — defer decisions without losing context. Triggers on "take a note", "note this for later", "set aside", "park this", "field note", "side note", "remember to revisit", "make a note about this", or `/field-notes`. Also use when user asks for the path to current session notes or for a digest of field notes.
+description: Capture mid-session observations to revisit later — defer decisions without losing context. One file per session, appended over lifetime, survives `claude --resume`. Triggers on "take a note", "note this for later", "set aside", "park this", "field note", "side note", "remember to revisit", "make a note about this", `/field-notes [body]`, "where are my notes" / "path to field notes" (returns current session file path), "digest of field notes" / "summarise field notes" (produces digest — see Digest section).
 ---
 
 # field-notes
 
 Capture observations during a session that the user wants to set aside without acting on. Each session = one file. Append entries over the session lifetime. Survives `claude --resume` (keyed on session_id, not PID).
-
-## When to invoke
-
-User says any of:
-- "take a note"
-- "note this for later"
-- "set aside"
-- "park this"
-- "field note" / "side note"
-- "remember to revisit"
-- "make a note about this"
-- `/field-notes <optional body>`
-
-Also when user asks:
-- "where are my notes" / "path to field notes" → return current session file path
-- "digest of field notes" / "summarise field notes" → produce digest (see Digest below)
 
 ## Storage
 
@@ -190,13 +174,6 @@ Examples:
 - **Session ID file missing or unreadable:** fall back to `pid{PPID}` as session id (degraded but functional). Log nothing — silent fallback.
 - **Two notes within same second on first invoke:** filename includes seconds → still distinct unless literal same second AND same slug. Practically zero.
 - **User says "scratch that" right after a note:** out of scope v1. Tell user to edit file manually.
-
-## Out of scope (v1)
-
-- Auto-trigger (Claude noticing dropped threads and offering to note them)
-- Editing or deleting notes via skill
-- Listing command (use `ls` on the dir)
-- Cross-session digest at session start
 
 ## Implementation notes (for me, Claude)
 

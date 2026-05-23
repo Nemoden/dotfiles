@@ -251,3 +251,4 @@ Target URL(s): ...
 - **Check the source before the DOM.** Many frameworks embed complete data in the HTML source as JSON. Parsing a JSON blob is always better than scraping rendered HTML.
 - **Every site is different.** No templates. Investigate each target fresh.
 - **Document as you go.** Network findings, cookie structures, API shapes — capture them during investigation, not after.
+- **Never assume — verify.** Scraping is deterministic: make a request, observe the response, draw conclusions from what you actually see. Do not infer behaviour from field names, response shapes, or analogies with other sites. If you haven't tested it, you don't know it. You CAN make an educated guess regarding anything in the process, but it is always worth checking if your aducated guess is true.

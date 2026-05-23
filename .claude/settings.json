@@ -11,7 +11,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -51,7 +50,6 @@
     ],
     "Notification": [
       {
-        "matcher": "permission_prompt|elicitation_dialog",
         "hooks": [
           {
             "type": "command",
@@ -89,11 +87,12 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hud/omc-hud.mjs"
+    "command": "npx -y ccstatusline@latest",
+    "padding": 0,
+    "refreshInterval": 10
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "oh-my-claudecode@omc": true,
     "ralph-loop@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {

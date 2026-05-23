@@ -133,7 +133,3 @@ The utter bare minimum for PR description is: WHAT changed and WHY
 - Sections like "Acceptance criteria" and "Out of scope" are welcome when they add value for a cold reader. "Out of scope" should list things a reasonable reader would assume are
 in-scope — not recap of session history.
 - Bare minimum: WHAT and WHY.
-
-<!-- OMC:IMPORT:START -->
-@CLAUDE-omc.md
-<!-- OMC:IMPORT:END -->

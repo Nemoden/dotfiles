@@ -49,7 +49,7 @@ Do NOT delete useful content unless it is ambiguous, conflicting, confusing, or 
 
 ### Reading Order
 
-When starting a task: **Ticket -> SPEC -> ADR -> Samples**
+When starting a task: **Ticket -> SPEC -> ADR -> Research -> Samples**
 
 ### Order of Truth
 
@@ -97,7 +97,8 @@ def readme_md(project_name: str, description: str) -> str:
     ├── specs/      # Feature specifications
     ├── tickets/    # Implementation tickets (todo/in-progress/blocked/done)
     ├── samples/    # Reference examples
-    └── ideas/      # Future considerations
+    ├── ideas/      # Future considerations
+    └── research/   # Domain research and analysis
 ```
 
 ## Setup
@@ -190,6 +191,14 @@ Concrete examples referenced by tickets, SPECs, or ADRs. Any format (JSON, HTML,
 
 Design thoughts and potential features for future consideration. Not commitments.
 
+### Research
+
+**Location:** `research/`
+
+Sourced reports and domain analysis that inform decisions. One directory per topic; main file named after the topic (kebab-case `.md`).
+
+Not decisions — no precedence in the order of truth. Never modify during ticket work unless explicitly asked. Never deleted if any ADR or SPEC references it.
+
 ## Cross-Referencing
 
 Documents are expected to reference each other — this is encouraged, not optional. A well-connected project knowledge base is easier to navigate and harder to contradict.
@@ -224,7 +233,8 @@ Following the chain from ticket to sample gives full context: what to build, how
 1. **Ticket** — What am I supposed to do?
 2. **SPEC** — What is the design?
 3. **ADR** — Why was it designed this way?
-4. **Samples** — What do examples look like?
+4. **Research** — What do we know about this domain?
+5. **Samples** — What do examples look like?
 
 ## Order of Truth
 
@@ -503,6 +513,7 @@ def scaffold(
     gitkeep(root / "project" / "specs")
     gitkeep(root / "project" / "samples")
     gitkeep(root / "project" / "ideas")
+    gitkeep(root / "project" / "research")
 
     # project/tickets/
     tickets = root / "project" / "tickets"

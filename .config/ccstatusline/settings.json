@@ -3,18 +3,8 @@
   "lines": [
     [
       {
-        "id": "1",
-        "type": "model",
-        "color": "cyan"
-      },
-      {
-        "id": "2",
-        "type": "separator"
-      },
-      {
-        "id": "39a57f76-1ef2-4fa6-b274-4789df62b374",
-        "type": "context-bar",
-        "color": "white"
+        "id": "b7ff1896-2c06-4bfd-93be-3622bc0497c2",
+        "type": "current-working-dir"
       },
       {
         "id": "7c7c5f88-1d38-435a-87ed-575a49eb19d5",
@@ -34,6 +24,22 @@
         "id": "7",
         "type": "git-changes",
         "color": "yellow"
+      }
+    ],
+    [
+      {
+        "id": "1",
+        "type": "model",
+        "color": "cyan"
+      },
+      {
+        "id": "2",
+        "type": "separator"
+      },
+      {
+        "id": "39a57f76-1ef2-4fa6-b274-4789df62b374",
+        "type": "context-bar",
+        "color": "white"
       }
     ],
     [

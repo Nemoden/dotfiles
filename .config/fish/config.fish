@@ -75,9 +75,9 @@ function echo_np
     # I don't want typing vi and get suggested
     # to edit a tmp notepad file
     if command -q nvim
-        echo " "(command -s nvim)" $name"
+        echo " "(command -s nvim)" +'set wrap' $name"
     else
-        echo " "(command -s vim)" $name"
+        echo " "(command -s vim)" +'set wrap' $name"
     end
 end
 

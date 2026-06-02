@@ -34,6 +34,12 @@ A wiki page is a reference, not an essay. Default to terse unless the user asks 
 - **Code blocks**: use `codeBlock` with `attrs.language` set. Don't paste code in paragraphs.
 - **Build ADF in a script, not hand-rolled JSON.** Long hand-typed ADF JSON breaks on a single typo. Use a small Python helper with `t()`, `p()`, `heading()`, `expand()`, `table()` functions and `json.dumps` at the end.
 - **One page per topic.** If you find yourself adding a fourth unrelated H2, it's probably two pages.
+- **Use interactive nodes when intent is actionable, not decorative.** If the value is meant to be checked/unchecked, picked, or otherwise manipulated in the UI, reach for the real ADF node — not plain text that looks similar:
+  - **Checkbox / done state** → `taskList` + `taskItem` with `state: "TODO"` or `"DONE"`. NOT `"✅"` / `"☑"` / `"[x]"` text. The emoji is dead pixels; the taskItem is clickable, filterable, and surfaces in Confluence task views. See `references/adf.md` § Task list.
+  - **Date** → inline `date` node with millisecond unix `timestamp`. NOT `"2026-06-02"` text. The date node renders as a pill, is sortable in tables, and respects the reader's locale. See `references/adf.md` § Inline nodes → `date`.
+  - **Mention / user** → `mention` node with `attrs.id`. NOT `"@alice"` text.
+  - **Status pill** → `status` node. NOT bold coloured text.
+  - Rule of thumb: if the rendered cell needs to convey *state* (done, pending, dated, assigned, status), the underlying node is structured. Plain text is for prose.
 
 ### `expand` node — exact ADF shape
 

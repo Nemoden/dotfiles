@@ -91,6 +91,33 @@ Allowed children: `paragraph`, `bulletList`, `orderedList`, `heading` (without m
 }
 ```
 
+### Task list (interactive checkboxes)
+
+```json
+{
+  "type": "taskList",
+  "attrs": {"localId": "<uuid>"},
+  "content": [
+    {
+      "type": "taskItem",
+      "attrs": {"state": "TODO", "localId": "<uuid>"},
+      "content": [{"type": "text", "text": "label"}]
+    }
+  ]
+}
+```
+
+- `state`: `"TODO"` (unchecked) or `"DONE"` (checked).
+- `localId`: any valid UUID string. Confluence UI generates these; API callers can supply their own (e.g. `uuid.uuid4()`).
+- Nesting mirrors `bulletList`/`listItem` — `taskList` is the container, `taskItem` is each row.
+- `taskItem.content` is optional inline content (text nodes) used as the checkbox label. Omit/empty for a pure boolean cell (e.g. a checkbox alone inside a `tableCell` in a tracker table).
+- Inside a `tableCell`, wrap the `taskList` directly as the cell content (no enclosing `paragraph`).
+
+**Anti-patterns** — these render as literal characters, NOT interactive checkboxes:
+
+- Text node `"✅"` / `"☐"` / `"[x]"` to fake a checkbox.
+- `bulletList` + text when intent is a checkable item — use `taskList`/`taskItem`.
+
 ### Expand (collapsible section)
 
 ```json
@@ -187,6 +214,7 @@ For `type: "external"`, use `url` attr instead of
 - `emoji` — `{"type": "emoji", "attrs": {"shortName": ":thumbsup:"}}`
 - `inlineCard` — `{"type": "inlineCard", "attrs": {"url": "https://..."}}`
 - `status` — `{"type": "status", "attrs": {"text": "IN PROGRESS", "color": "blue"}}`
+- `date` — `{"type": "date", "attrs": {"timestamp": "1748736000000"}}` — `timestamp` is unix epoch in **milliseconds as a string**. Renders as an inline date pill (e.g. "Jun 1, 2026"). Inline only — must sit inside a `paragraph` `content` array (or other inline-accepting container), never at the block level.
 
 ## Marks (text formatting)
 

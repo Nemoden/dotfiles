@@ -112,6 +112,13 @@ This matters because:
 1. whenever you give me any commands, give them in FISH, not BASH/ZSH.
 2. When I ask you to work with my dotfiles, you should use `dot` via `fish -c "dot ..."`
 
+### Fish gotchas (learned the hard way)
+
+- **`status` is a fish builtin and a read-only variable.** `status=$(...)` fails with `read-only variable: status`. Same applies to other fish builtins/reserved names (`fish_pid`, `pipestatus`, `argv`, `version`). Rename your loop var to `s`, `state`, `st`, anything else. This bites every time bash-style `until status=$(...); ...; done` loops get pasted into fish.
+- **Inline env vars don't work the same way.** `FOO=bar cmd` in fish needs `env FOO=bar cmd` or `set -x FOO bar; cmd; set -e FOO`. For one-shot commands prefer `env`. For session-scoped, use `set -x` and remember to `set -e` after.
+- **No `&&`/`||` short-circuit in fish 2.x; modern fish (3+) supports them but they're still parsed slightly differently than bash.** When chaining matters, prefer `; and` / `; or` explicitly in fish-native scripts. When pasting bash snippets, run them inside `bash -c '...'` rather than translating.
+- **Command substitution doesn't strip trailing newlines the same way.** `set -l x (cmd)` in fish captures a list split by newlines. If you want a single string, `string join \n (cmd)` or `string trim (cmd)`.
+
 ### Dotfiles gotchas (learned the hard way)
 
 - **`.gitignore` is `*`** — every file looks "untracked" to standard checks. Do NOT infer "not tracked" from `git status`, `git ls-files | grep ...` returning empty for a relative path, or similar. Always verify with `dot log <path>` or `dot ls-files <path>` run **from `~`** (the dotfiles work-tree root).

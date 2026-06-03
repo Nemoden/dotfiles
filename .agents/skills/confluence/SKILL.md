@@ -40,7 +40,7 @@ A wiki page is a reference, not an essay. Default to terse unless the user asks 
   - **Mention / user** → `mention` node with `attrs.id`. NOT `"@alice"` text.
   - **Status pill** → `status` node. NOT bold coloured text.
   - Rule of thumb: if the rendered cell needs to convey *state* (done, pending, dated, assigned, status), the underlying node is structured. Plain text is for prose.
-- **Surface attachments inline.** Confluence Cloud's new UI no longer shows page attachments in the `•••` menu — uploaded files exist on the page (queryable via `GET /pages/{id}/attachments`) but readers can't see or click them unless they land directly on `/wiki/pages/viewpageattachments.action?pageId=<id>`. If a page has attachments that matter to the reader (run logs, screenshots, exports, etc.), add a "Run artefacts" / "Attachments" H2 section with a bulleted list of link-marked text nodes — one per attachment, `href` pointing at `<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>`. See **Linking attachments inline** below for the exact pattern.
+- **Attachments aren't discoverable from the page itself.** Confluence Cloud's current UI doesn't surface page attachments in the page chrome (no "Attachments" entry in the overflow menu / `•••`). Uploaded files exist server-side and the REST API can list them, but a reader looking at the rendered page has no way to know they're there unless the page body references them. If attachments matter to the reader, decide how to surface them in the body — link, table cell, image (`mediaSingle`), expand block, prose, or skip surfacing entirely if they're audit-only. See `## Attachments` for API + URL shapes.
 
 ### `expand` node — exact ADF shape
 
@@ -250,61 +250,22 @@ Response: `results[0].id`, `.title`.
 
 `<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>`
 
-Stable, server-side — works without going through the page UI. Use this URL as the `href` when linking an attachment from inline ADF (see below).
+Stable, server-side. Use as `href` when referencing an attachment from page body ADF. URL-encode the filename — spaces, parentheses, unicode break unencoded links.
 
-### Linking attachments inline (new Confluence UI gotcha)
+### Surfacing attachments in the page body
 
-**The new Confluence Cloud UI removed the Attachments tab from the page `•••` menu.** Uploaded files still exist server-side and the API can list them, but readers will not see them unless one of these is true:
+Attachments uploaded via the API exist server-side but are not auto-rendered anywhere on the page (see Page hygiene → "Attachments aren't discoverable"). If readers should see them, put something in the body that points at them. The right shape depends on the page:
 
-- They navigate to `<server>/wiki/pages/viewpageattachments.action?pageId=<id>` directly.
-- Your page body contains links to the attachments.
-- Your page body uses the Attachments macro (extension node — harder to construct from ADF than a plain bulleted list).
+- **Single file referenced from prose** → inline `link`-marked text.
+- **Image / screenshot** → `mediaSingle` + `media` node (see ADF reference).
+- **Several files of equal weight** → list, table column, or `expand` block — pick what fits the surrounding content.
+- **Audit-only logs nobody needs to click** → no body reference needed; the API listing is the audit trail.
 
-For programmatically-uploaded artefacts (run logs, exports, etc.), the simplest readable surface is a "Run artefacts" / "Attachments" H2 at the bottom of the page with a bulleted list of link-marked text nodes:
+Whichever surface you pick, use the direct download URL above as the `href`.
 
-```json
-{
-  "type": "bulletList",
-  "content": [
-    {
-      "type": "listItem",
-      "content": [{
-        "type": "paragraph",
-        "content": [{
-          "type": "text",
-          "text": "<filename>",
-          "marks": [{
-            "type": "link",
-            "attrs": {"href": "<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>"}
-          }]
-        }]
-      }]
-    }
-  ]
-}
-```
+### Re-running an updater that surfaces attachments
 
-**Idempotent regeneration pattern.** When re-running an updater (e.g. after uploading more attachments), scan the ADF for the existing "Run artefacts" heading + its following `bulletList`, drop them, then append a fresh section built from the current `GET /pages/{id}/attachments` result. Don't blindly append on each run or the list duplicates.
-
-```python
-# Sketch — drop existing "Run artefacts" heading + the bulletList that follows it
-new_content = []
-skip_next_list = False
-for node in doc["content"]:
-    if (node.get("type") == "heading"
-            and any(t.get("text", "").strip().lower() == "run artefacts"
-                    for t in node.get("content", []))):
-        skip_next_list = True
-        continue
-    if skip_next_list and node.get("type") == "bulletList":
-        skip_next_list = False
-        continue
-    skip_next_list = False
-    new_content.append(node)
-doc["content"] = new_content
-```
-
-URL-encode the filename when building the `href` — spaces, parentheses, and unicode in attachment names break unencoded links.
+If your code regenerates the body section that links attachments (e.g. after each new upload), make the regeneration idempotent: locate the section by a stable marker you control (heading text, anchor, an HTML comment node), drop the prior version, then re-emit. Appending without dropping duplicates the section every run.
 
 ### Delete an attachment
 

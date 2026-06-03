@@ -40,6 +40,7 @@ A wiki page is a reference, not an essay. Default to terse unless the user asks 
   - **Mention / user** → `mention` node with `attrs.id`. NOT `"@alice"` text.
   - **Status pill** → `status` node. NOT bold coloured text.
   - Rule of thumb: if the rendered cell needs to convey *state* (done, pending, dated, assigned, status), the underlying node is structured. Plain text is for prose.
+- **Surface attachments inline.** Confluence Cloud's new UI no longer shows page attachments in the `•••` menu — uploaded files exist on the page (queryable via `GET /pages/{id}/attachments`) but readers can't see or click them unless they land directly on `/wiki/pages/viewpageattachments.action?pageId=<id>`. If a page has attachments that matter to the reader (run logs, screenshots, exports, etc.), add a "Run artefacts" / "Attachments" H2 section with a bulleted list of link-marked text nodes — one per attachment, `href` pointing at `<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>`. See **Linking attachments inline** below for the exact pattern.
 
 ### `expand` node — exact ADF shape
 
@@ -216,6 +217,100 @@ curl -s -X POST "$CONFLUENCE_SERVER/wiki/api/v2/pages/<page-id>/footer-comments"
       "value": "{\"type\":\"doc\",\"version\":1,\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"My comment\"}]}]}"
     }
   }'
+```
+
+---
+
+## Attachments
+
+### List page attachments
+
+```bash
+curl -s -u "$CONFLUENCE_USER:$CONFLUENCE_TOKEN" \
+  "$CONFLUENCE_SERVER/wiki/api/v2/pages/<page-id>/attachments?limit=50"
+```
+
+Returns `results[]` with `id` (`attXXXXX`), `title` (filename), `createdAt`, `mediaType`, `fileSize`, `webuiLink`, `downloadLink`.
+
+### Upload an attachment
+
+Use v1 API. Requires multipart form + the `X-Atlassian-Token: nocheck` header (XSRF bypass for API uploads).
+
+```bash
+curl -s -X POST "$CONFLUENCE_SERVER/wiki/rest/api/content/<page-id>/child/attachment" \
+  -H "X-Atlassian-Token: nocheck" \
+  -u "$CONFLUENCE_USER:$CONFLUENCE_TOKEN" \
+  -F "file=@/path/to/file.txt" \
+  -F "comment=Optional comment describing this file"
+```
+
+Response: `results[0].id`, `.title`.
+
+### Direct download URL
+
+`<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>`
+
+Stable, server-side — works without going through the page UI. Use this URL as the `href` when linking an attachment from inline ADF (see below).
+
+### Linking attachments inline (new Confluence UI gotcha)
+
+**The new Confluence Cloud UI removed the Attachments tab from the page `•••` menu.** Uploaded files still exist server-side and the API can list them, but readers will not see them unless one of these is true:
+
+- They navigate to `<server>/wiki/pages/viewpageattachments.action?pageId=<id>` directly.
+- Your page body contains links to the attachments.
+- Your page body uses the Attachments macro (extension node — harder to construct from ADF than a plain bulleted list).
+
+For programmatically-uploaded artefacts (run logs, exports, etc.), the simplest readable surface is a "Run artefacts" / "Attachments" H2 at the bottom of the page with a bulleted list of link-marked text nodes:
+
+```json
+{
+  "type": "bulletList",
+  "content": [
+    {
+      "type": "listItem",
+      "content": [{
+        "type": "paragraph",
+        "content": [{
+          "type": "text",
+          "text": "<filename>",
+          "marks": [{
+            "type": "link",
+            "attrs": {"href": "<server>/wiki/download/attachments/<page-id>/<url-encoded-filename>"}
+          }]
+        }]
+      }]
+    }
+  ]
+}
+```
+
+**Idempotent regeneration pattern.** When re-running an updater (e.g. after uploading more attachments), scan the ADF for the existing "Run artefacts" heading + its following `bulletList`, drop them, then append a fresh section built from the current `GET /pages/{id}/attachments` result. Don't blindly append on each run or the list duplicates.
+
+```python
+# Sketch — drop existing "Run artefacts" heading + the bulletList that follows it
+new_content = []
+skip_next_list = False
+for node in doc["content"]:
+    if (node.get("type") == "heading"
+            and any(t.get("text", "").strip().lower() == "run artefacts"
+                    for t in node.get("content", []))):
+        skip_next_list = True
+        continue
+    if skip_next_list and node.get("type") == "bulletList":
+        skip_next_list = False
+        continue
+    skip_next_list = False
+    new_content.append(node)
+doc["content"] = new_content
+```
+
+URL-encode the filename when building the `href` — spaces, parentheses, and unicode in attachment names break unencoded links.
+
+### Delete an attachment
+
+```bash
+curl -s -X DELETE "$CONFLUENCE_SERVER/wiki/api/v2/attachments/<attachment-id>" \
+  -u "$CONFLUENCE_USER:$CONFLUENCE_TOKEN"
 ```
 
 ---

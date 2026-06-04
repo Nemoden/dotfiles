@@ -158,8 +158,38 @@ Always include a green success panel for acceptance criteria when creating task 
 
 - **Never reference line numbers** in code references. Lines drift as code changes — by the time someone reads the ticket the line number is wrong and misleads both humans and LLMs. Reference function/method names alongside file paths instead.
 - **Never reference local-machine file paths** (e.g. `~/tmp/...`, `/Users/<you>/...`, `/private/tmp/...`). Tickets are read by other engineers and future LLMs who don't have your filesystem. If a local draft or scratch file contains context that matters, **embed the context into the ticket itself** — regurgitate the relevant facts in prose. Tickets may freely cross-reference other Jira tickets (Jira keys), Confluence pages, GitHub PRs/commits, repo paths (relative to repo root), and public URLs — but not anything that only exists on the author's workstation. A ticket must be readable cold without access to any local artifact.
-- **Self-contained.** No "we just discussed", "this branch", "the conversation that produced this." A cold reader 6 months from now must understand the ticket from its own text plus what it cross-references in shared systems (Jira / Confluence / git).
-- **Do include file paths, function names, and all context** that helps the person working on the ticket. Tickets are internal — they should be as specific and helpful as possible.
+- **Self-contained ≠ no refs.** Self-contained = *ticket + refs = complete*. Cite refs as original inputs; synthesise load-bearing facts inline so the body alone conveys the issue. Refs serve as evidence, not the missing half.
+- **No conversation leakage.** Ban "we discussed", "this chat", "as agreed earlier". Ticket must read cold.
+- **Include** file paths, function names, identifiers — anything the assignee actually needs.
+
+### Refs / Sources section
+
+Dedicated **Sources** section (bottom of description). One ref per line, each with a one-line description of *what it shows*.
+
+First-class ref types (alongside Jira/Confluence/git):
+
+- Observability — link the exact view (trace, span, log query). Include timestamp + request id in cite text so it's reproducible if the URL rots.
+- Chat permalinks — link the thread, not the channel.
+- Dashboards, vendor API docs.
+
+Rule: load-bearing fact → synthesise inline, ref = evidence. Supporting detail (full trace tree, full chat) → leave in ref.
+
+Capture in prose anything that ages out: log retention, dashboard rolling windows, thread scroll-off.
+
+### Code excerpts
+
+Paste real code whenever it's more useful than prose. Examples: the offending lines (bug evidence), entry-point signature so the assignee knows where to start, call-chain hop that's non-obvious, data shape the ticket depends on, comment that itself reveals a misconception.
+
+- Real code, never pseudocode.
+- Preserve original comments — author's wrong comment IS evidence.
+- Cite by function name + repo-relative path. No line numbers.
+- Small. One function/block/signature. Hundreds of lines = prose belongs there instead.
+- ADF `codeBlock` node for multi-line.
+- Excerpts illustrate; they don't prescribe the fix.
+
+### Parent linkage
+
+User names parent up-front → set at create-time (`"parent": {"key": "PROJ-NNN"}`). Not after — orphans the ticket on boards for a window. No parent named + plausibly belongs under epic → ask, don't pick.
 
 ### Ticket calibration
 

@@ -99,27 +99,16 @@ jira issue view PROJ-123 --raw  # Full JSON for programmatic use
 
 ## Creating issues
 
-### Pre-flight: ALWAYS ask about sprint placement
+### Pre-flight: ask sprint placement
 
-Before creating any ticket, ask the user which sprint to add it to (or backlog). Do not create a ticket and only afterwards ask "want me to move it into sprint X?" — the prompt belongs before the API call.
-
-Default options to offer:
-- Current active sprint (look it up with `jira sprint list --state active`, show name + number)
-- Next sprint, if one exists in `--state future`
-- Backlog (no sprint)
-
-Skip the question only if the user explicitly said "create in backlog" / "add to sprint N" in their request. If they said "create a ticket" with no sprint hint, ask.
-
-To set sprint at create time, use REST API with `customfield_10006` (this tenant's Sprint id — see "Listing issues" for discovery on other tenants):
+Before any create call, ask: active sprint / next sprint / backlog. Skip only if user stated placement.
 
 ```bash
-curl -s -X POST -u "$CC_JIRA_USER:$CC_JIRA_TOKEN" \
-  -H "Content-Type: application/json" \
-  "$CC_JIRA_SERVER/rest/api/3/issue" \
-  -d '{"fields": {"project": {"key": "PROJ"}, "issuetype": {"name": "Task"}, "summary": "...", "customfield_10006": <sprint_id>, ...}}'
+jira sprint list --state active     # current
+jira sprint list --state future     # next
 ```
 
-To add an existing ticket to a sprint:
+Set at create via `customfield_10006` (tenant Sprint id), or add existing:
 
 ```bash
 curl -s -X POST -u "$CC_JIRA_USER:$CC_JIRA_TOKEN" \

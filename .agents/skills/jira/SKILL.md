@@ -108,7 +108,7 @@ jira sprint list --state active     # current
 jira sprint list --state future     # next
 ```
 
-Set at create via `customfield_10006` (tenant Sprint id), or add existing:
+Set at create via the tenant's Sprint custom field (see "Sprint field id is tenant-specific" under Listing issues for discovery), or add existing:
 
 ```bash
 curl -s -X POST -u "$CC_JIRA_USER:$CC_JIRA_TOKEN" \

@@ -62,7 +62,7 @@ Follow the higher-precedence document and flag the conflict.
 This is a mono-monorepo:
 
 - `/code/` — all implementation (apps, shared libs, migrations, tooling)
-- `/project/` — all knowledge (ADRs, SPECs, tickets, samples, ideas)
+- `/project/` — all knowledge (ADRs, SPECs, tickets, runbooks, samples, ideas, research)
 
 **Never modify files under `/project/`** unless explicitly asked or fixing clear errors.
 
@@ -96,6 +96,7 @@ def readme_md(project_name: str, description: str) -> str:
     ├── adr/        # Architecture Decision Records
     ├── specs/      # Feature specifications
     ├── tickets/    # Implementation tickets (todo/in-progress/blocked/done)
+    ├── runbooks/   # Repeatable operational procedures
     ├── samples/    # Reference examples
     ├── ideas/      # Future considerations
     └── research/   # Domain research and analysis
@@ -178,6 +179,16 @@ tickets/
 ```
 
 State transitions via `git mv`. See `tickets/README.md` for details.
+
+### Runbooks
+
+**Location:** `runbooks/`
+
+Repeatable operational procedures: local acceptance passes, deploys, manual
+migrations, incident procedures, and verification workflows.
+
+Runbooks are executable project knowledge. They are not tickets and do not
+represent product scope by themselves.
 
 ### Samples
 
@@ -511,6 +522,7 @@ def scaffold(
     write_file(root / "project" / "README.md", PROJECT_README)
     gitkeep(root / "project" / "adr")
     gitkeep(root / "project" / "specs")
+    gitkeep(root / "project" / "runbooks")
     gitkeep(root / "project" / "samples")
     gitkeep(root / "project" / "ideas")
     gitkeep(root / "project" / "research")

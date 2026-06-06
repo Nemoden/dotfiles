@@ -1,6 +1,6 @@
 ---
 name: mono-monorepo
-description: "Scaffold and manage mono-monorepo projects — a single repo with two internal structures: /code/ for all implementation (apps, libs, migrations) and /project/ for all knowledge (ADRs, SPECs, tickets, samples, ideas). Use when: user says 'mono-monorepo', or 'monomonorepo', 'scaffold a project', 'new project', 'create a monorepo', 'add an app', 'add app', 'new app', 'add adr', 'add spec', 'add ticket', 'new ticket', 'start ticket', 'done ticket', 'block ticket', 'unblock ticket', or asks about mono-monorepo structure. Also use when user wants to bootstrap a new project with structured documentation and filesystem-based ticket tracking."
+description: "Scaffold and manage mono-monorepo projects — a single repo with two internal structures: /code/ for all implementation (apps, libs, migrations) and /project/ for all knowledge (ADRs, SPECs, tickets, runbooks, samples, ideas, research). Use when: user says 'mono-monorepo', or 'monomonorepo', 'scaffold a project', 'new project', 'create a monorepo', 'add an app', 'add app', 'new app', 'add adr', 'add spec', 'add ticket', 'add runbook', 'new runbook', 'start ticket', 'done ticket', 'block ticket', 'unblock ticket', or asks about mono-monorepo structure. Also use when user wants to bootstrap a new project with structured documentation and filesystem-based ticket tracking."
 ---
 
 # Mono-Monorepo
@@ -8,7 +8,7 @@ description: "Scaffold and manage mono-monorepo projects — a single repo with 
 A mono-monorepo is a single repository containing two parallel structures:
 
 - **`/code/`** — all implementation: apps, shared libs, migrations, tooling
-- **`/project/`** — all knowledge: ADRs, SPECs, tickets, samples, ideas
+- **`/project/`** — all knowledge: ADRs, SPECs, tickets, runbooks, samples, ideas, research
 
 The key insight: `/project/` often has meaningful content before `/code/` has a single line. Design decisions, specs, and tickets come first. Code follows.
 
@@ -57,6 +57,8 @@ The key insight: `/project/` often has meaningful content before `/code/` has a 
     │   │   └── .gitkeep
     │   └── done/
     │       └── .gitkeep
+    ├── runbooks/
+    │   └── .gitkeep
     ├── samples/
     │   └── .gitkeep
     ├── ideas/
@@ -202,7 +204,39 @@ Brief description.
 
 ```
 
-### 6. Ticket Lifecycle
+### 6. add-runbook — Create a New Runbook
+
+**Trigger:** "add runbook", "new runbook", "create runbook", or when a repeatable local/ops/manual acceptance procedure is needed.
+
+**Procedure:** Create `project/runbooks/<descriptive-name>.md` with:
+
+```markdown
+# <Runbook Title>
+
+Purpose and when to use this runbook.
+
+## Preconditions
+
+-
+
+## Steps
+
+1.
+
+## Expected Results
+
+-
+
+## Cleanup
+
+-
+```
+
+Runbooks are executable operational knowledge: local acceptance passes, deploys,
+manual migrations, incident procedures, and repeatable verification workflows.
+They are not tickets and do not represent product scope by themselves.
+
+### 7. Ticket Lifecycle
 
 **Trigger:** "start ticket", "done ticket", "block ticket", "unblock ticket", or contextually when finishing implementation work.
 
@@ -219,7 +253,7 @@ After each transition, commit: `git commit -m "<action>: <ticket-name>"` where a
 
 **Contextual use:** When you finish implementing a ticket's acceptance criteria, proactively suggest moving it to done.
 
-### 7. Post-Completion Review
+### 8. Post-Completion Review
 
 **Trigger:** Automatically after every "Complete" ticket transition.
 

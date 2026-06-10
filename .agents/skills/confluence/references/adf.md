@@ -31,9 +31,29 @@ ADF is the native rich content format for Confluence Cloud REST API v2. Use `bod
 }
 ```
 
+**Gotcha — listItem must contain exactly one block per "bullet line".** A `listItem` whose `content` is a list of *inline* nodes (text/strong/code/link) renders broken: the bullet marker shows on an empty line, and the actual content drops below it unbulleted. Wrap inline nodes in a single `paragraph` first:
+
+```json
+// WRONG — bullet marker floats, content appears below unbulleted
+{"type": "listItem", "content": [
+  {"type": "text", "text": "Pros: ", "marks": [{"type": "strong"}]},
+  {"type": "text", "text": "zero infra"}
+]}
+
+// RIGHT — inline nodes wrapped in a paragraph
+{"type": "listItem", "content": [
+  {"type": "paragraph", "content": [
+    {"type": "text", "text": "Pros: ", "marks": [{"type": "strong"}]},
+    {"type": "text", "text": "zero infra"}
+  ]}
+]}
+```
+
+If a Python helper accepts inline nodes for `listItem`, normalise them into a single paragraph inside the helper. Multiple paragraphs inside one `listItem` are allowed and stack vertically under one bullet marker, but mixing raw inline nodes with paragraphs in the same `content` array is the bug.
+
 ### Ordered list
 
-Same structure as bulletList but `"type": "orderedList"`.
+Same structure as bulletList but `"type": "orderedList"`. Same gotcha applies.
 
 ### Heading
 

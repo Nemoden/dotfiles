@@ -111,8 +111,9 @@
     }
   },
   "alwaysThinkingEnabled": false,
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "skipWorkflowUsageWarning": true,
   "skipAutoPermissionPrompt": true,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "model": "opus"
 }

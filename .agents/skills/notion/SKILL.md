@@ -107,7 +107,7 @@ Reply to a thread uses `discussion_id` instead of `parent`.
 ## Gotchas
 
 - **Pagination everywhere.** Search/query/blocks return `has_more` + `next_cursor`; loop with `start_cursor`. Max 100/page.
-- **Build block/property JSON in a Python helper + `json.dumps`**, not by hand — one brace breaks the request.
+- **Build block/property JSON in a Python helper + `json.dumps`**, not by hand — one brace breaks the request. **POST from inside that same Python process** (`urllib`/`requests`), not via a temp file piped to curl. Writing the payload to a file while also redirecting the script's stdout to that file (`python … > /tmp/p.json`) truncates/clobbers it — you POST an empty body and get `invalid_json`.
 - **Property names/types must match the DB schema exactly.** Rejected write → re-fetch schema.
 - Writing a page/doc: terse, headings, code in `code` blocks, bulk inside toggles.
 - No OpenAPI spec. On unexpected failure check https://developers.notion.com/reference/intro, then update this skill if a shape is wrong.

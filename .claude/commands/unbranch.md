@@ -9,62 +9,34 @@ Output exactly two parts.
 
 ## Part 1 — What changed in this branch
 
-Bullet list, terse. Group by artifact (PRs, commits, deploys, files, tickets, docs). For each item give the concrete identifier (PR number, commit sha, branch name, run id, file path, jira key) — never a vague "fixed the thing". $ARGUMENTS may name the branch/session; fold it in if given.
+Bullet list, terse. Group by artifact (code changes, PRs/MRs, commits, deploys, files, tickets, docs — whatever this work produced). For each item give the concrete identifier (PR/MR id, commit sha, branch name, run id, file path, ticket key, container/service name) — never a vague "fixed the thing". $ARGUMENTS may name the branch/session; fold it in if given.
 
 ## Part 2 — Validation recipe (the important half)
 
-For EVERY claim in Part 1 that is verifiable, emit a copy-pasteable check the resumed agent can run to re-derive ground truth WITHOUT trusting this summary. Split claims into:
+For EVERY claim in Part 1 that is verifiable, emit a copy-pasteable check that re-derives ground truth WITHOUT trusting this summary.
 
-- **VERIFIABLE NOW** — has a command that proves it. Give the command + what output confirms it.
-- **NOT INDEPENDENTLY VERIFIABLE** — flag explicitly (e.g. "a reviewer's intent", "a design choice"). Don't pretend a check exists.
+**Do NOT assume a toolchain.** This repo may use gh, gitlab, aws, gcloud, kubectl, local docker, make, a bespoke script, or none of these. Before writing checks, look at how THIS project actually does things (its README/CLAUDE.md, the commands already run in this conversation, its CI config, its task runner) and phrase each check in THAT vocabulary. The examples below are illustrations of the THINKING, not a required tool list — translate them to whatever the project uses.
 
-Use these check patterns (adapt to the actual claims; only emit checks for claims that were actually made):
+Build each check from the principle, not a fixed command:
 
-**Commits / branch state**
-```bash
-git fetch origin -q
-git log --oneline origin/<branch> -15          # commits claimed present
-git show --stat <sha>                            # a specific change landed
-git diff origin/main...origin/<branch> --stat    # net branch effect
-```
+- **A claim is verifiable when ground truth lives somewhere queryable** — version control, a registry, a running process, a deployed artifact, an API, a file on disk. Point the check at the ground-truth source, not at the thing that *reported* success.
+- **Prefer the strongest signal.** "The deploy job went green" is weak (a step can pass while the result is wrong). "The deployed artifact carries commit X" / "the running thing answers correctly" is strong. Always reach for the artifact/runtime over the job log.
+- **Re-derive, don't echo.** A good check would catch the summary being WRONG. If the check just restates the claim, it proves nothing.
+- **Name the expected output.** Say what result confirms the claim vs refutes it.
 
-**PR state / merge / review**
-```bash
-gh pr view <N> --repo <owner/repo> --json state,mergedAt,reviewDecision,mergeStateStatus
-gh pr list --repo <owner/repo> --state all --search "<query>" --json number,state,mergedAt
-```
+Split Part 1's claims into:
 
-**Deploy actually happened (ground truth = deployed code, NOT run-success)**
-```bash
-# live deployed commit per function — compare to claimed sha
-aws lambda get-function-configuration --profile <prod-read|test-write> --region ap-southeast-2 \
-  --function-name <fn> --query 'Environment.Variables.GIT_COMMIT_SHA' --output text
-git merge-base --is-ancestor <claimed-sha> <deployed-sha> && echo included || echo NOT
-# workflow run conclusion (weaker signal — deploy step can pass while tests fail)
-gh run view <run-id> --repo <owner/repo> --json status,conclusion,displayTitle
-```
+- **VERIFIABLE NOW** — has a concrete check in this project's tooling. Give the command + the output that confirms.
+- **NOT INDEPENDENTLY VERIFIABLE** — flag explicitly (a reviewer's intent, a subjective design choice, an external state you can't reach). Don't invent a check that doesn't really prove it.
 
-**Runtime/import sanity (layer, packaging, module-load claims)**
-```bash
-# invoke with junk payload; business error = code ran past imports, import error = broken
-aws lambda invoke --profile test-write --region ap-southeast-2 \
-  --function-name <fn> --payload "$(printf '{}' | base64)" /tmp/out.json \
-  --query 'FunctionError' --output text
-head -c 300 /tmp/out.json   # ModuleNotFoundError/ImportModuleError = FAIL; KeyError/business = PASS
-```
-NOTE: prod-read CANNOT invoke (ReadOnly) — for prod, read post-deploy logs for import errors instead of invoking.
-
-**File edits / removals**
-```bash
-git show origin/<branch>:<path>            # content is as claimed (or: fatal = removed)
-git log --oneline -3 origin/<branch> -- <path>
-```
-
-**Jira**
-```bash
-jira issue view <KEY>                       # state/sprint/parent/label as claimed
-```
+Illustrative thinking (translate to the actual stack — these specific tools may not apply here):
+- *code/commit landed* → ask version control what's on the branch and what a given change touched (e.g. `git log`/`git show`/`git diff` — near-universal).
+- *PR/MR merged or reviewed* → query the forge's API/CLI for state, not your memory.
+- *something deployed* → read the commit/version baked into the live artifact and compare to the claimed one; weaker fallback is the deploy job's conclusion.
+- *code runs / imports resolve / no startup break* → exercise it with a harmless/malformed input; "it failed on business logic" proves it loaded, "it failed to start/import" proves it's broken. Use whatever invocation path the project supports (local run, container exec, test harness, remote invoke).
+- *file added/removed/edited* → read it back from version control at the branch ref.
+- *ticket/doc updated* → query the tracker/doc system for the field as claimed.
 
 End Part 2 with a one-line **"Trust boundary"**: which Part-1 claims the resumed agent must take on faith because nothing reproducibly proves them.
 
-Keep it tight. The resumed agent should be able to paste the checks and confirm the branch's work in under a minute.
+Keep it tight. The resumed agent should be able to run the checks and confirm the branch's work quickly, using tools that actually exist in its environment.

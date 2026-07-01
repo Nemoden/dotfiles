@@ -60,3 +60,8 @@ keybind = global:ctrl+grave_accent=toggle_quick_terminal
 quick-terminal-position = top
 quick-terminal-screen = main
 quick-terminal-animation-duration = 0.1
+quick-terminal-size = 70%
+
+# Transparency (30% opaque / 70% see-through)
+background-opacity = 0.3
+background-blur = true

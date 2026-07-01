@@ -1,0 +1,62 @@
+# Ghostty config — matched to kitty + wezterm setups
+# Source of truth: ~/.config/wezterm/wezterm.lua and ~/.config/kitty/kitty.conf
+
+# Font
+font-family = Monoid
+font-size = 12
+# kitty adjust_line_height 130% / wezterm line_height 1.3
+adjust-cell-height = 30%
+
+# Tomorrow Night color scheme
+background = 1d1f21
+foreground = c4c8c5
+cursor-color = c4c8c5
+cursor-text = 1d1f21
+selection-background = 363a41
+selection-foreground = 1d1f21
+
+# 16-color palette (Tomorrow Night)
+palette = 0=#000000
+palette = 1=#cc6666
+palette = 2=#b5bd68
+palette = 3=#f0c574
+palette = 4=#80a1bd
+palette = 5=#b294ba
+palette = 6=#8abdb6
+palette = 7=#fffefe
+palette = 8=#000000
+palette = 9=#cc6666
+palette = 10=#b5bd68
+palette = 11=#f0c574
+palette = 12=#80a1bd
+palette = 13=#b294ba
+palette = 14=#8abdb6
+palette = 15=#fffefe
+
+# Cursor: blinking bar (wezterm BlinkingBar)
+cursor-style = bar
+cursor-style-blink = true
+
+# Window
+window-padding-x = 8
+window-padding-y = 8
+window-decoration = true
+macos-titlebar-style = hidden
+
+# Copy on select (kitty copy_on_select yes)
+copy-on-select = true
+
+# Bell off (kitty/wezterm both disabled)
+# ghostty has no audible bell; nothing to disable
+
+# macOS: left option = alt, right option = native (matches kitty/wezterm)
+macos-option-as-alt = left
+
+# Fullscreen toggle ctrl+cmd+f (matches wezterm)
+keybind = ctrl+cmd+f=toggle_fullscreen
+
+# Guake-style drop-down quick terminal (ctrl+` toggles, works app-unfocused)
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
+quick-terminal-position = top
+quick-terminal-screen = main
+quick-terminal-animation-duration = 0.1

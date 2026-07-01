@@ -63,5 +63,5 @@ quick-terminal-animation-duration = 0.1
 quick-terminal-size = 70%
 
 # Transparency (30% opaque / 70% see-through)
-background-opacity = 0.3
+background-opacity = 0.75
 background-blur = true

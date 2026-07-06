@@ -101,7 +101,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "npx -y ccstatusline@latest",
+    "command": "~/.claude/statusline.sh",
     "padding": 0,
     "refreshInterval": 10
   },

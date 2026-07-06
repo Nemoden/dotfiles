@@ -21,7 +21,7 @@ return {
       },
       claude = {
         endpoint = "https://api.anthropic.com",
-        model = "claude-sonnet-4-6",
+        model = "claude-opus-4-8",
         timeout = 30000, -- Timeout in milliseconds
         extra_request_body = {
           temperature = 0.75,
@@ -35,7 +35,7 @@ return {
     behaviour = {
       auto_suggestions = false, -- false for now
     },
-    auto_suggestions_provider = "openai",
+    auto_suggestions_provider = "claude",
     windows = {
       edit = {
         start_insert = true,

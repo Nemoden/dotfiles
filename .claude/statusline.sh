@@ -41,11 +41,18 @@ CTX_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
 # Shorten cwd: show last 2 path components
 SHORT_CWD=$(echo "$CWD" | rev | cut -d'/' -f1-2 | rev)
 
-# Git branch
+# Git branch + dirty count + ahead/behind upstream
 GIT_BRANCH=""
-if git rev-parse --git-dir > /dev/null 2>&1; then
-    BRANCH=$(git branch --show-current 2>/dev/null)
-    [ -n "$BRANCH" ] && GIT_BRANCH=" ⎇ $BRANCH"
+if git -C "$CWD" rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git -C "$CWD" branch --show-current 2>/dev/null)
+    if [ -n "$BRANCH" ]; then
+        GIT_BRANCH=" ⎇ $BRANCH"
+        DIRTY=$(git -C "$CWD" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        [ "$DIRTY" -gt 0 ] && GIT_BRANCH+=" ${YELLOW}*$DIRTY${RST}${MAGENTA}"
+        read -r BEHIND AHEAD <<< "$(git -C "$CWD" rev-list --left-right --count '@{upstream}...HEAD' 2>/dev/null)"
+        [ -n "$AHEAD" ] && [ "$AHEAD" -gt 0 ] && GIT_BRANCH+=" ${GREEN}↑$AHEAD${RST}${MAGENTA}"
+        [ -n "$BEHIND" ] && [ "$BEHIND" -gt 0 ] && GIT_BRANCH+=" ${RED}↓$BEHIND${RST}${MAGENTA}"
+    fi
 fi
 
 # Round cost to 2 decimal places

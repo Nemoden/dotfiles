@@ -12,6 +12,7 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -124,8 +125,7 @@
   },
   "alwaysThinkingEnabled": false,
   "effortLevel": "high",
-  "skipWorkflowUsageWarning": true,
-  "skipAutoPermissionPrompt": true,
   "skipDangerousModePermissionPrompt": true,
-  "model": "opus"
+  "skipWorkflowUsageWarning": true,
+  "skipAutoPermissionPrompt": true
 }

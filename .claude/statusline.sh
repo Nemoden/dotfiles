@@ -72,7 +72,7 @@ COST_FMT=$(printf '$%.2f' "$COST")
 # Session lines changed; hidden when nothing touched
 LINES_DISPLAY=""
 if [ "$LINES_ADDED" -gt 0 ] || [ "$LINES_REMOVED" -gt 0 ]; then
-    LINES_DISPLAY=" ${GREEN}+$LINES_ADDED${RST} ${RED}−$LINES_REMOVED${RST}"
+    LINES_DISPLAY="${GREEN}+$LINES_ADDED${RST} ${RED}−$LINES_REMOVED${RST} | "
 fi
 
 # Effort display with intensity color
@@ -183,7 +183,7 @@ if [ -f "$USAGE_CACHE" ]; then
     [ -n "$SEGS" ] && USAGE_LINE="$SEGS"
 fi
 
-echo -e "${BOLD}$MODEL${RST}$EFFORT_DISPLAY | ${CTX_DISPLAY}${CTX_DISPLAY:+| }${GREEN}$COST_FMT${RST}${LINES_DISPLAY}${TS_DISPLAY}"
+echo -e "${BOLD}$MODEL${RST}$EFFORT_DISPLAY | ${CTX_DISPLAY}${CTX_DISPLAY:+| }${LINES_DISPLAY}${GREEN}$COST_FMT${RST}${TS_DISPLAY}"
 echo -e "${CYAN}📁 $SHORT_CWD${MAGENTA}$GIT_BRANCH${RST}"
 if [ -n "$USAGE_LINE" ]; then echo -e "$USAGE_LINE"; fi
 exit 0

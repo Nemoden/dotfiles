@@ -35,8 +35,6 @@ if [ -n "$EFFORT" ]; then
 fi
 CWD=$(echo "$input" | jq -r '.cwd // .workspace.current_dir // "?"')
 COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
-LINES_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
-LINES_REMOVED=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
 CTX_USED_PCT=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 CTX_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
 
@@ -68,12 +66,6 @@ fi
 
 # Round cost to 2 decimal places
 COST_FMT=$(printf '$%.2f' "$COST")
-
-# Session lines changed; hidden when nothing touched
-LINES_DISPLAY=""
-if [ "$LINES_ADDED" -gt 0 ] || [ "$LINES_REMOVED" -gt 0 ]; then
-    LINES_DISPLAY="${GREEN}+$LINES_ADDED${RST} ${RED}−$LINES_REMOVED${RST} | "
-fi
 
 # Effort display with intensity color
 EFFORT_DISPLAY=""
@@ -183,7 +175,7 @@ if [ -f "$USAGE_CACHE" ]; then
     [ -n "$SEGS" ] && USAGE_LINE="$SEGS"
 fi
 
-echo -e "${BOLD}$MODEL${RST}$EFFORT_DISPLAY | ${CTX_DISPLAY}${CTX_DISPLAY:+| }${LINES_DISPLAY}${GREEN}$COST_FMT${RST}${TS_DISPLAY}"
+echo -e "${BOLD}$MODEL${RST}$EFFORT_DISPLAY | ${CTX_DISPLAY}${CTX_DISPLAY:+| }${GREEN}$COST_FMT${RST}${TS_DISPLAY}"
 echo -e "${CYAN}📁 $SHORT_CWD${MAGENTA}$GIT_BRANCH${RST}"
 if [ -n "$USAGE_LINE" ]; then echo -e "$USAGE_LINE"; fi
 exit 0

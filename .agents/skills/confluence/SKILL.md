@@ -54,6 +54,38 @@ A wiki page is a reference, not an essay. Default to terse unless the user asks 
 
 The `content` array holds normal block nodes — paragraphs, tables, code blocks, lists. The `title` is what the reader sees collapsed.
 
+### Mermaid diagrams — rendered PNG + source in expand
+
+Confluence doesn't render mermaid natively. Convention (see example page 6201999515): for each diagram emit BOTH, source first, image second:
+
+1. `expand` (title like "Mermaid — <diagram name>") containing a `codeBlock` with `attrs.language: "mermaid"` and the raw mermaid source — keeps the diagram editable later.
+2. `mediaSingle` with the rendered PNG right below the expand.
+
+```json
+{"type": "expand", "attrs": {"title": "Mermaid — sharing flow"},
+ "content": [{"type": "codeBlock", "attrs": {"language": "mermaid"},
+              "content": [{"type": "text", "text": "sequenceDiagram\n  ..."}]}]},
+{"type": "mediaSingle",
+ "attrs": {"layout": "full-width", "width": 1800, "widthType": "pixel"},
+ "content": [{"type": "media",
+              "attrs": {"type": "file", "id": "<fileId>",
+                        "collection": "contentId-<page-id>",
+                        "alt": "diagram.png",
+                        "width": <px>, "height": <px>}}]}
+```
+
+Workflow (media node needs the page id + attachment fileId, so page must exist first):
+
+1. Create page with placeholder body (or use existing page).
+2. Upload the PNG as attachment (v1 API, see Attachments). The media `id` is `results[0].extensions.fileId` from the upload response (a UUID — NOT the `attXXXX` attachment id).
+3. PUT the full body with `media.attrs.id = fileId`, `collection = "contentId-<page-id>"`, `width`/`height` = actual pixel dims.
+
+PNG rendering notes:
+
+- User typically exports from mermaid.live — ask for the export or render via `mmdc` if available. Prefer **transparent background** exports (check: first pixel alpha == 0); opaque white duplicates look wrong in dark mode.
+- `mediaSingle` layout: `full-width` + width ~1800 for big sequence diagrams, `wide` + width ~1100 for timelines/smaller. `width`/`height` on the `media` node itself are the intrinsic pixel dims of the PNG.
+- Mermaid source gotchas for clean renders: no `;` inside sequenceDiagram message text (parse error), avoid unicode emphasis markers if the user's terminal renderer chokes — plain words like CRITICAL/FIXED survive everywhere.
+
 ---
 
 ## Spaces

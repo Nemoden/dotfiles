@@ -28,7 +28,7 @@ For each "extra" concern in a diff, ask:
 - **What does it cost to add now?** (lines, abstractions, coupling, write amplification, deploy blast)
 - **What does it cost to NOT add now?** (named user harm, named correctness break, named follow-up work that becomes harder)
 - **Is the bundling load-bearing or accidental?**
-  - **Load-bearing** = the feature is unsafe to ship without it. Example: exposing an HTTP endpoint that returns privilege-sensitive payloads without an authz check on that endpoint. The two are inseparable; splitting produces an unsafe interim state.
+  - **Load-bearing** = the feature is unsafe to ship without it. Example: exposing an HTTP endpoint that returns privilege-sensitive payloads without an access-control check on that endpoint. The two are inseparable; splitting produces an unsafe interim state.
   - **Accidental** = the concerns just happen to be in the same diff. Different rollout blast radius, different revert paths, different owners. Split.
 
 If the bundling is load-bearing, **do not recommend splitting it**. Recommend either (a) landing the dependency in a *prior* PR so this PR adds the feature on top, or (b) hardening both together in this PR. Recommending splits on load-bearing entanglement creates unsafe interim deploys.
@@ -519,7 +519,7 @@ proper-review is single-context by design. The phase gates (Phase 2 WHY → Phas
 **Dimension parallelism — auto-trigger thresholds.** After Phase 1 produces the context bundle (so the diff scope is known), evaluate the following. Spawn dimension-agents *each holding the whole diff* with a single lens when ANY of the following is true:
 
 - **Size:** changed-files ≥ 8 OR `additions + deletions` ≥ 400.
-- **Risk surface:** the diff touches ≥ 2 of {auth/authz, DB migrations, public API contract, infra/CI config, payment/PII handling}.
+- **Risk surface:** the diff touches ≥ 2 of {access control, DB migrations, public API contract, infra/CI config, payment/PII handling}.
 - **User opt-in (always fires, regardless of size/risk):** ANY of the following — explicit phrases like "use teams" / "use parallel agents" / "use subagents" / "deploy agents" / "split this review" / "fan out" / "dimension agents"; depth phrases like "do a thorough review" / "deep review" / "exhaustive review" / "be paranoid" / "leave no stone unturned"; specialism callouts like "security review" / "perf review" / "test review" / "review for X and Y" (multiple lenses named). Interpret intent generously — if user signals "more than one pass" or "more eyes," that's opt-in.
 
 Below those thresholds, default to single reviewer. Don't burn tokens on a 5-file logging PR.
@@ -528,7 +528,7 @@ When auto-triggered, log the trigger reason in the Context TL;DR (e.g. `Dimensio
 
 | Dimension | Agent / lens | Spawn when |
 |---|---|---|
-| Security | OWASP, secrets, authz, input handling | diff touches auth/authz, input parsing, or any user-facing endpoint |
+| Security | OWASP, secrets, access control, input handling | diff touches access control, input parsing, or any user-facing endpoint |
 | Performance | hot paths, N+1, allocations, complexity | diff has perf claim OR touches request-path / loop-heavy code |
 | Tests | coverage of WHY-relevant risk, flakiness, over-mocking | always, when parallelism triggers |
 | Migration / data | schema/migration safety, backfill, lock behaviour | diff contains `migrations/`, `*.sql`, or ORM schema changes |

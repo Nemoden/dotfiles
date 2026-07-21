@@ -1,9 +1,9 @@
 ---
-name: proper-review-v3
-description: Use when reviewing a PR, diff, branch, or any proposed code change. A staged review that mirrors how a senior engineer actually works — understand WHY first, calibrate how much rigor the change deserves, solve the problem independently (blind, via a subagent that never sees the diff) so judgment isn't anchored on the author's approach, THEN read the code and compare, and only LAST read bot/other reviews so they can't anchor you. Criticism is expressed as diffs, not prose walls. Triggers on "review this PR", "proper review v3", "review the diff", "/proper-review-v3", a GitHub PR URL, or any code review request.
+name: proper-review-v4
+description: Use when reviewing a PR, diff, branch, or any proposed code change. A staged review that mirrors how a senior engineer actually works — understand WHY first, calibrate how much rigor the change deserves, solve the problem independently (blind, via a subagent that never sees the diff) so judgment isn't anchored on the author's approach, THEN read the code and compare, then sweep the reach (consumers + project conventions outside the diff, un-anchored), and only LAST read bot/other reviews so they can't anchor you. Criticism is expressed as diffs, not prose walls. Triggers on "review this PR", "proper review v4", "review the diff", "/proper-review-v4", a GitHub PR URL, or any code review request.
 ---
 
-# Proper Review v3
+# Proper Review v4
 
 A review that reads the bots first confirms the bots. A review that reads the code before forming its own opinion is anchored on the author. This skill enforces the order a good human reviewer uses naturally:
 
@@ -50,6 +50,8 @@ You cannot interrogate a WHY you haven't read. Gather all reachable context, the
 
 **Chase references (one hop, breadth-first):** Jira key (`[A-Z]+-\d+`) → `jira` skill. Confluence URL → `confluence` skill. GitHub issue/PR link → `gh ... view`. Repo file → `Read`. External URL → `WebFetch`. Auth-walled link → ask user to paste. Recurse a second hop only if a linked ticket/doc is clearly load-bearing for WHY; else note `unfetched: <url>` and stop.
 
+**Load the repo's own written rules (for the Stage 3.5 convention probe).** Read the project's instruction/convention files — the agent-instructions file(s) (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` and equivalents, repo root AND the touched module's dir, since a nearer file overrides root), any `CONTRIBUTING`/style doc, and the linter/formatter config the changed files are subject to. Extract only **machine-checkable, project-specific hard rules** into a short checklist, quoted verbatim with source — bans and concrete thresholds (e.g. a ban on referencing ticket keys in code comments, banned words, a max line width, a branch-name pattern, a required wrapper/annotation on a given construct). Skip aspirational prose ("prefer clear names") — generic taste is a Stage-4 nit at most, not a convention check. If no convention doc is reachable, say so; never invent rules.
+
 Never fabricate. If you couldn't read it, say so. If PR body + commits + ticket + branch name are all uninformative → STOP, ask for the WHY.
 
 **Bots: enumerate, do NOT read content.** Record *that* bots reviewed and how many comments each left — never what they said. Reading their findings now would anchor you. Stash deep-links; open them in Stage 5.
@@ -71,6 +73,7 @@ TL;DR: <sources in importance order, e.g. "PR description, JIRA PROJ-123, code, 
 - Source / Primary (title + 1-line) / Author + branch / Diff scope (N files, +X/-Y)
 - Linked ticket(s) / Linked docs / Referenced files
 - Prior bot reviews: <login: N inline + M summary, latest YYYY-MM-DD — COUNTS ONLY> OR none
+- Convention sources: <instruction file(s) + linter — N hard rules loaded> OR none reachable
 - Unreachable / asked about: ...
 ```
 
@@ -207,6 +210,14 @@ Static diff reading misses bugs that need adversarial thinking and the risks a s
 
 **Evidence beyond the diff** (run when triggered): **build/type gate** — if CI is stale/unknown on typed code, run `mypy`/`tsc --noEmit`/`cargo check`; if you can't run it, require green CI in the verdict. **Blast radius** — on any renamed/removed/signature-changed exported symbol, `grep -rn "<symbol>"` (or LSP) to count callers; outside-diff callers not updated = 🔥 with a stub diff; cite the command.
 
+**Reach — what did this change OBLIGATE that's not in the diff?** Adversarial probes above ask "does the diff work?"; this asks "did the change *finish*?" Trust the happy-path correctness the author clearly handled — spend the budget here. Fires whenever the diff **adds a member to a closed set** (enum value, map/dict key, status constant, kind/type discriminator, schema enum entry, new `case`/branch) OR **changes a consumed surface** (response field, payload/event key, stored attribute, config key). The edited symbol keeps its name, so Blast-radius won't fire — yet every consumer that switches / looks-up / validates / whitelists over that set is now silently missing the new member, and those consumers are *outside the diff by construction* (the author didn't need to touch them, which is why they break).
+
+You've read the diff, the WHY, and the author's justification — so judging Reach in the main thread inherits "the author said it's cosmetic." Like the Stage 2.5 blind solve, un-anchor it: **when the set has ≥ a handful of consumers OR is consumed across a language / package / service boundary, dispatch a fresh subagent that sees ONLY the consumer side** — give it the set's name, the new member's value, and the ban *you may NOT read the author's diff or its reasoning; grep every consumer of this set and report which mishandle the new member.* It judges each consumer cold, can't inherit the author's framing. For a trivially-scoped set (one or two in-module consumers) an inline `grep`/LSP-search is fine — state which path you took.
+
+Either way: search the new member and its existing siblings across the **whole codebase — including other languages, packages, or services that consume the same set** (a back-end enum often drives a separate front-end map; cite the command); a consumer the diff didn't touch that mis-handles the new value = 🔥, that silently skips/defaults = ⚠️, cosmetic = 💭 — each written as a stub diff. **An in-diff "alignment" unit test does NOT discharge this** — a test inside the owning component can't observe a consumer in another. State the result even when clean: `Reach: <member> — N consumers searched (subagent | inline), all safe.`
+
+**Convention compliance** (only if Stage 1 loaded ≥1 rule). Run the diff's *added* lines against the loaded checklist. Each hit is a Stage-4 Issue (usually ⚠️/💭) with the rule quoted verbatim + source, so the author sees it's the *project's* rule, not your taste. In scope = a rule the repo wrote down; out of scope = generic style with no rule behind it. This is not "lint the PR" — only the loaded hard rules, nothing aspirational.
+
 ---
 
 ## Stage 4 — Issues (diff-driven)
@@ -277,6 +288,7 @@ Use the exact login captured in Stage 1 (not a hardcoded "claude-bot"). Because 
 TL;DR: <sources, importance order>
 - Source / Primary / Author+branch / Diff scope / Linked ticket(s) / Linked docs / Referenced files
 - Prior bot reviews: <login: counts, latest date — content unread> OR none
+- Convention sources: <instruction file(s) + linter — N hard rules loaded> OR none reachable
 - Unreachable / asked about: ...
 
 ## Stakes (Stage 1.5)
@@ -340,6 +352,8 @@ TL;DR: <e.g. "1 blocker, 3 nits — throwaway tier lifts the N+1.">
 - **Vibe verdicts** — "feels overengineered" → name the abstraction + missing caller; "needs more tests" → name the uncovered risk + a stub diff.
 - **Wall-of-text critique** — prose without a diff. 4+ sentences with no diff → stop and write the diff.
 - **Default-to-split on entanglement** — run cost/benefit first; some bundles are load-bearing.
+- **Proving the happy path instead of sweeping the reach** — burning the review re-verifying math / guards / normalisation the author clearly handled, while never searching which consumers of a new enum value / map key / discriminator went unswept. The consumer the author couldn't see is the one the diff-bound reviewer also can't see — search it (across languages/packages), un-anchored, before the verdict.
+- **Scoring a comment by your own taste when the repo wrote a rule** — praising or passing a comment without checking it against the project's loaded conventions. Convention compliance ≠ comment quality; run the Stage-1-loaded rules.
 - **Importing bot consensus** — "all bots green" is bot-to-bot conversation, not evidence. Derive findings yourself.
 - **Silent bot overlap** — raising what a bot raised without the `Prior bot:` line; reader can't tell you read them.
 - **Skipping praise** — every review ends with specific named What's good, even tough verdicts. Generic praise ("nice work") is worse than none.

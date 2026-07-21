@@ -28,7 +28,7 @@ For each "extra" concern in a diff, ask:
 - **What does it cost to add now?** (lines, abstractions, coupling, write amplification, deploy blast)
 - **What does it cost to NOT add now?** (named user harm, named correctness break, named follow-up work that becomes harder)
 - **Is the bundling load-bearing or accidental?**
-  - **Load-bearing** = the feature is unsafe to ship without it. Example: exposing an HTTP endpoint that returns privilege-sensitive payloads without an authz check on that endpoint. The two are inseparable; splitting produces an unsafe interim state.
+  - **Load-bearing** = the feature is unsafe to ship without it. Example: exposing an HTTP endpoint that returns privilege-sensitive payloads without an access-control check on that endpoint. The two are inseparable; splitting produces an unsafe interim state.
   - **Accidental** = the concerns just happen to be in the same diff. Different rollout blast radius, different revert paths, different owners. Split.
 
 If the bundling is load-bearing, **do not recommend splitting it**. Recommend either (a) landing the dependency in a *prior* PR so this PR adds the feature on top, or (b) hardening both together in this PR. Recommending splits on load-bearing entanglement creates unsafe interim deploys.

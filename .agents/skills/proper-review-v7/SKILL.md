@@ -96,7 +96,7 @@ If you accidentally read a bot finding (or the PR-body WHY) while skimming, name
 TL;DR: <what was fetched; WHY-prose stashed unread>
 - Source / Diff scope (N files, +X/-Y) / Author + branch / Commit subjects (1-line each)
 - Review file: /tmp/review-<slug>.md
-- WHY-prose stashed UNREAD: <PR body | ticket APG-123 desc | design doc url>
+- WHY-prose stashed UNREAD: <PR body | ticket PROJ-123 desc | design doc url>
 - Prior bot reviews: <login: N inline + M summary, latest YYYY-MM-DD — COUNTS ONLY> OR none
 - Convention sources: <instruction file(s) + linter — N hard rules loaded> OR none reachable
 - Unreachable / asked about: ...
@@ -284,7 +284,7 @@ With WHY locked, code-vs-WHY reconciled, and an independent solution in hand, ju
   - **Worse / differs** → highest-value finding a review produces. Name what your approach does that theirs doesn't; decide: real defect, or two valid ways? Worse on a Stage-3.5 risk axis (irreversible, corrupting, untimed) = blocker. Worse on taste only = nit.
   - Be honest when theirs is better. The blind solve un-anchors you; it isn't a claim your design is the standard.
 - **Naming-honesty.** For each name implying a contract — `version`, `validator`, `serializer`, `cache`, `lock`, `transaction`, `idempotent`, `registry`, `retry` — verify the implementation delivers the contract. A `get_prompt_version` returning a content hash is mis-named: the name is the defect.
-- **Entanglement audit.** When the PR bundles concerns, **don't default to "split it."** Ask per extra concern: cost to add now (lines, coupling, write-amplification, deploy blast)? cost to NOT add now (named harm, named correctness break, named follow-up made harder)? **Load-bearing** (feature unsafe without it — e.g. an endpoint returning privilege-sensitive payloads without its authz check) → don't split; land the dependency in a prior PR or harden both together. **Accidental** (different blast radius, revert path, owner) → split.
+- **Entanglement audit.** When the PR bundles concerns, **don't default to "split it."** Ask per extra concern: cost to add now (lines, coupling, write-amplification, deploy blast)? cost to NOT add now (named harm, named correctness break, named follow-up made harder)? **Load-bearing** (feature unsafe without it — e.g. an endpoint returning privilege-sensitive payloads without its access-control check) → don't split; land the dependency in a prior PR or harden both together. **Accidental** (different blast radius, revert path, owner) → split.
 - **Performance claims** demand a number: measured cost avoided, against what budget at the call site, user-visible? If the saved cost is invisible (background/async/off-critical-path), reject the optimisation — you pay complexity for nothing. "Performance" without a number is a vibe.
 - **Abstraction tax.** New class/interface/flag/helper needs 3+ current callers OR a named near-term caller. "Future flexibility" alone fails.
 - **Test shape.** Tests assert behaviour the WHY cares about, not implementation details.
@@ -306,7 +306,7 @@ Static diff reading misses bugs that need adversarial thinking and the risks a s
 **Named risks** (each conditioned by tier):
 1. **Irreversibility.** Mutates prod data, drops a column, rewrites records, takes an action with no rollback? Is there a dry-run / backup / reverse migration / kill switch? Irreversible + `prod-critical` = 💀 until a rollback path exists. (`throwaway-script` writing prod is still on the hook — this rarely lifts.)
 2. **Data corruption.** Partial failure leaving inconsistent state? Non-atomic multi-write without a transaction or idempotency key? Half-applying migration? Corruption of persistent state = 💀/🔥 at `prod-critical`.
-3. **Untimed external calls.** Every 3rd-party HTTP call, L2L invoke, external DB query — does it set a timeout? An unbounded wait hangs the caller and exhausts Lambda duration / connection pools. Missing timeout on a prod request path = 🔥.
+3. **Untimed external calls.** Every 3rd-party HTTP call, RPC / cross-service call, external DB query — does it set a timeout? An unbounded wait hangs the caller and exhausts the request budget / connection pools. Missing timeout on a hot request path = 🔥.
 4. **Performance / N+1.** Per-item queries in a loop, missing batch, O(n²) on a request path. 🔥 on a `prod-critical` request path; lifted for a one-time `throwaway-script` (state it: "N+1 acceptable — one-time backfill").
 5. **Cohesion / coupling / LoB.** Is the logic where a reader would look for it, or scattered? New coupling between modules that shouldn't know each other? Respect locality of behaviour — coincidental duplication beats wrong coupling; don't flag DRY violations that are actually correct locality.
 6. **Boy-scout / missed caveats.** A non-obvious constraint left uncommented, a WHY the next reader trips on, an easy leave-it-better skipped. 💭 nits, never blockers — but naming them is part of a real review.
@@ -429,7 +429,7 @@ Worked example (PR #598: right shape, one 🔥 contract bug → verdict derived 
 ```
 🟠 FIX-THEN-SHIP  │  🎯 purpose-match  │  🧩 fit-match  │  🛑 1 blocker  │  💭 2 nits  │  ⚠️ prod-critical  │  🤖 1/3 overlap
 
-Persists LEAP ids on user records via async L2L refresh — but the refresh payload fails the receiver's validation, so the backfill never lands.
+Persists external-provider ids on user records via an async refresh call — but the refresh payload fails the receiver's validation, so the backfill never lands.
 📄 /tmp/review-pr598.md  — ask "expand N" for any issue, or "show <stage>"
 ```
 
@@ -531,4 +531,4 @@ Never re-derive a finding from scratch when the user asks to expand it — that 
 
 ## Parallelism
 
-One reviewer holds the whole diff — the stage gates require it; parallel reviewers on file-slices break the WHY lock, the cold-read/reconciliation, and the entanglement audit. When the diff is large (≥8 files OR ≥400 lines) or touches ≥2 of {auth/authz, DB migrations, public API contract, infra/CI, payment/PII}, or the user opts in ("thorough", "deep review", "security review", "use agents"), you may spawn **dimension-agents that each hold the whole diff with a single lens** (security / performance / tests / migration / API-contract) feeding Stage 4 only — the main agent runs Stages 1a–3 + 5 + 6 and writes the verdict. Log the trigger in the Context-1a section (file). **Do not confuse these with the Stage 2.5 blind-solve subagent** — dimension-agents read the whole diff; the blind solver reads none of it.
+One reviewer holds the whole diff — the stage gates require it; parallel reviewers on file-slices break the WHY lock, the cold-read/reconciliation, and the entanglement audit. When the diff is large (≥8 files OR ≥400 lines) or touches ≥2 of {access control, DB migrations, public API contract, infra/CI, payment/PII}, or the user opts in ("thorough", "deep review", "security review", "use agents"), you may spawn **dimension-agents that each hold the whole diff with a single lens** (security / performance / tests / migration / API-contract) feeding Stage 4 only — the main agent runs Stages 1a–3 + 5 + 6 and writes the verdict. Log the trigger in the Context-1a section (file). **Do not confuse these with the Stage 2.5 blind-solve subagent** — dimension-agents read the whole diff; the blind solver reads none of it.

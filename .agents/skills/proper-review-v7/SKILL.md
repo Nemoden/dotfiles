@@ -1,6 +1,6 @@
 ---
 name: proper-review-v7
-description: Use when reviewing a PR, diff, branch, or any proposed code change. Same staged senior-engineer review as v6 (cold read → stated WHY → reconcile with HARD HALT → calibrate → blind independent solve → compare → reach sweep → bots LAST; full prose to /tmp file, distilled emoji statusline to chat), plus a derived verdict: any 💀/🔥 blocker mechanically forbids SHIP/SHIP-WITH-NITS — the new FIX-THEN-SHIP verdict covers "right shape, gated on listed blockers". Halts and clarifying asks always surface fully in chat. Triggers on "review this PR", "proper review v7", "review the diff", "/proper-review-v7", a GitHub PR URL, or any code review request.
+description: 'Use when reviewing a PR, diff, branch, or any proposed code change. Same staged senior-engineer review as v6 (cold read → stated WHY → reconcile with HARD HALT → calibrate → blind independent solve → compare → reach sweep → bots LAST; full prose to /tmp file, distilled emoji statusline to chat), plus a derived verdict: any 💀/🔥 blocker mechanically forbids SHIP/SHIP-WITH-NITS — the new FIX-THEN-SHIP verdict covers "right shape, gated on listed blockers". Halts and clarifying asks always surface fully in chat. Triggers on "review this PR", "proper review v7", "review the diff", "/proper-review-v7", a GitHub PR URL, or any code review request.'
 ---
 
 # Proper Review v7

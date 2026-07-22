@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>COMBINED · Fisheye + Annotated + Minimap</title>
+<link rel="stylesheet" href="../_shared.css">
+<style>
+  /* ---- topbar (custom, inline) ---- */
+  .topbar .one{font-size:11px;color:var(--faint)}
+  .topbar .one b{color:var(--dim)}
+
+  /* ---- three-region layout: minimap | fisheye | (fisheye holds depth) ---- */
+  .stage{display:grid;grid-template-columns:220px 1fr;gap:22px;
+         align-items:start;margin-top:16px}
+
+  /* LEFT: sticky minimap */
+  .minimap{position:sticky;top:64px;align-self:start}
+  .minimap .mm-title{font-size:11px;color:var(--faint);text-transform:uppercase;
+                     letter-spacing:.06em;margin:0 0 8px}
+  .mm-chips{display:flex;flex-direction:column;gap:5px}
+  .mm-chip{display:flex;align-items:center;gap:8px;border:1px solid var(--line);
+           border-radius:8px;background:var(--panel2);padding:6px 9px;cursor:pointer;
+           font-size:11.5px;color:var(--dim);transition:border-color .18s,background .18s,color .18s}
+  .mm-chip:hover{border-color:var(--faint);color:var(--ink)}
+  .mm-chip .mm-lbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mm-chip .mm-dot{width:7px;height:7px;border-radius:50%;flex:none;
+                   background:var(--faint)}
+  .mm-chip.touched .mm-dot{background:var(--write)}
+  .mm-chip.focus{border-color:var(--accent);background:rgba(88,166,255,.10);
+                 color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+  .mm-chip.focus .mm-lbl{font-weight:600}
+  .mm-hint{font-size:10.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+  .mm-hint kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;
+               padding:0 4px;font-size:10px}
+
+  /* CENTER: the fisheye column */
+  .fisheye{display:flex;flex-direction:column;gap:9px;min-width:0}
+
+  /* a station shell — all sizes are the same element, JS sets data-weight */
+  .fs{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+      cursor:pointer;overflow:hidden;
+      transition:opacity .30s ease, background .30s ease, border-color .30s ease, padding .30s ease}
+  .fs .fs-head{display:flex;align-items:baseline;gap:9px}
+  .fs .fs-lbl{font-weight:600}
+  .fs .fs-role{font-size:10px;padding:0 6px;border-radius:999px;border:1px solid var(--faint);
+               color:var(--faint)}
+  .fs .fs-sub{font-size:11.5px;color:var(--dim);margin-top:3px}
+  .fs .fs-detail{font-size:12.5px;color:var(--dim);margin-top:10px;line-height:1.6}
+  .fs .fs-detail b{color:var(--ink)}
+  .fs .fs-body{margin-top:12px}
+
+  /* distant slivers: label only, dim */
+  .fs[data-weight="far"]{padding:6px 12px;opacity:.45}
+  .fs[data-weight="far"] .fs-head{font-size:11.5px}
+  .fs[data-weight="far"] .fs-lbl{font-weight:500;color:var(--dim)}
+  .fs[data-weight="far"] .fs-role,
+  .fs[data-weight="far"] .fs-sub,
+  .fs[data-weight="far"] .fs-detail,
+  .fs[data-weight="far"] .fs-body{display:none}
+
+  /* neighbours (±1): medium — label + sub */
+  .fs[data-weight="near"]{padding:9px 13px;opacity:.85}
+  .fs[data-weight="near"] .fs-detail,
+  .fs[data-weight="near"] .fs-body{display:none}
+
+  /* focused: full card */
+  .fs[data-weight="focus"]{padding:14px 15px;opacity:1;
+                           border-color:var(--accent);background:var(--panel);
+                           box-shadow:0 0 0 1px rgba(88,166,255,.20)}
+
+  /* role accents on the left border */
+  .fs.core{border-left:3px solid var(--core)}
+  .fs.read{border-left:3px solid var(--read)}
+  .fs.input{border-left:3px solid var(--result)}
+  .fs.result{border-left:3px solid var(--result)}
+
+  .unit-title{font-size:11px;color:var(--faint);margin:14px 0 4px;
+              text-transform:uppercase;letter-spacing:.05em}
+</style>
+</head>
+<body>
+
+<!-- custom inline topbar -->
+<div class="topbar">
+  <a href="../../index.html">◀ catalog</a>
+  <span class="tname">COMBINED · Fisheye + Annotated + Minimap</span>
+  <span class="spacer"></span>
+  <span class="one"><b>good for:</b> deep reading of one part while the whole stays on screen</span>
+</div>
+
+<div class="wrap">
+  <h1>Focus + Context (Fisheye) + Annotated Source + Minimap</h1>
+  <div class="sub">
+    The <b>NEVER lose context</b> triple: a minimap tells you <i>where</i>, the
+    fisheye gives one station full <i>weight</i> while the rest shrink to slivers
+    that stay on screen, and the focused station opens to real annotated source for
+    <i>depth</i>. Three primitives, one screen — you never lose the whole to read a part.
+  </div>
+
+  <div id="legend"></div>
+
+  <div class="stage">
+    <!-- LEFT: sticky minimap -->
+    <aside class="minimap">
+      <div class="mm-title">Minimap · where</div>
+      <div class="mm-chips" id="chips"></div>
+      <div class="mm-hint">
+        click a chip or a station · <kbd>↑</kbd><kbd>↓</kbd> move focus<br>
+        <span style="color:var(--write)">●</span> touched by the change
+      </div>
+    </aside>
+
+    <!-- CENTER: fisheye column -->
+    <div class="fisheye" id="fisheye"></div>
+  </div>
+
+  <div class="kicker">
+    <b>Three primitives, one screen.</b> Minimap = <b>where</b> (the whole spine, always
+    visible, focus highlighted). Fisheye = <b>weight</b> (focused station full, neighbours
+    medium, distant ones dimmed slivers — never gone). Annotated source = <b>depth</b> (the
+    focused station opens to real code with expandable line-notes). Layered, they give
+    maximum contextual awareness: you drill into one part without ever navigating away from
+    the whole.
+  </div>
+</div>
+
+<script src="../_shared.js"></script>
+<script>
+  document.getElementById("legend").innerHTML = legend();
+
+  /* station id → SOURCES key(s). Others fall back to renderUnit(units). */
+  const SRC_MAP = {
+    sqs:      ["handler_dryrun"],
+    envelope: ["handler_dryrun"],
+    deps:     ["dry_run_deps", "inertstore"],
+  };
+
+  let focus = STATIONS.findIndex(s => s.id === "deps");   // open on the heart of the change
+  if (focus < 0) focus = 0;
+
+  /* ---------- render: annotated source (or units) for the focused station ---------- */
+  function focusBody(st){
+    const keys = SRC_MAP[st.id];
+    if (keys && keys.length){
+      return keys.map(k => renderAnnotatedSource(k)).join(
+        `<div class="unit-title">— and —</div>`
+      );
+    }
+    if (st.units && st.units.length){
+      return st.units.map(u =>
+        `<div class="unit-title">${esc(unitTitle(u))}</div>` + renderUnit(u)
+      ).join("");
+    }
+    return `<div class="fs-detail">No code unit for this station — it is a data-flow stage, not a changed file.</div>`;
+  }
+
+  function weightOf(i){
+    const d = Math.abs(i - focus);
+    if (d === 0) return "focus";
+    if (d === 1) return "near";
+    return "far";
+  }
+
+  function render(){
+    /* fisheye column */
+    const fe = document.getElementById("fisheye");
+    fe.innerHTML = STATIONS.map((st,i) => {
+      const w = weightOf(i);
+      const body = w === "focus"
+        ? `<div class="fs-detail">${st.detail}</div><div class="fs-body">${focusBody(st)}</div>`
+        : "";
+      return `<div class="fs ${st.role}" data-weight="${w}" data-i="${i}" onclick="setFocus(${i})">
+        <div class="fs-head">
+          <span class="fs-lbl">${st.label}</span>
+          <span class="fs-role">${st.role}</span>
+        </div>
+        <div class="fs-sub">${st.sub}</div>
+        ${body}
+      </div>`;
+    }).join("");
+
+    /* minimap chips */
+    const chips = document.getElementById("chips");
+    chips.innerHTML = STATIONS.map((st,i) =>
+      `<div class="mm-chip ${st.touched ? "touched":""} ${i===focus ? "focus":""}"
+            data-i="${i}" onclick="setFocus(${i})">
+        <span class="mm-dot"></span>
+        <span class="mm-lbl">${st.label}</span>
+      </div>`
+    ).join("");
+  }
+
+  function setFocus(i){
+    if (i < 0 || i >= STATIONS.length) return;
+    focus = i;
+    render();
+    /* keep the focused card in view without yanking the minimap off screen */
+    const card = document.querySelector('.fs[data-weight="focus"]');
+    if (card) card.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+
+  /* annotated-source note clicks must NOT bubble to the station's onclick (would refocus) */
+  document.getElementById("fisheye").addEventListener("click", (e) => {
+    if (e.target.closest(".as-line.has-note") || e.target.closest(".as-note")){
+      e.stopPropagation();
+    }
+  }, true);
+
+  /* keyboard: ArrowUp / ArrowDown move focus */
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown"){ e.preventDefault(); setFocus(focus + 1); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); setFocus(focus - 1); }
+  });
+
+  render();
+</script>
+</body>
+</html>

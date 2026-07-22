@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 — Collaborator Swimlanes</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- mode toggle ---- */
+  .modebar{display:flex;align-items:center;gap:12px;margin:0 0 16px}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;
+          background:var(--panel2)}
+  .toggle button{background:transparent;border:0;color:var(--dim);font:inherit;font-size:12px;
+          padding:6px 16px;cursor:pointer;transition:background .18s ease,color .18s ease}
+  .toggle button.on{color:var(--bg);font-weight:600}
+  .toggle button[data-mode="live"].on{background:var(--write)}
+  .toggle button[data-mode="dry"].on{background:var(--inert)}
+  .modenote{font-size:12px;color:var(--faint)}
+  .modenote b{color:var(--dim)}
+
+  /* ---- swimlane frame: header row + the SVG canvas ---- */
+  .lanes-head{display:grid;gap:0;margin-bottom:2px}
+  .lane-hd{text-align:center;padding:8px 4px;font-size:11px;line-height:1.3;
+           border-bottom:2px solid var(--line)}
+  .lane-hd .ln{font-weight:600;color:var(--ink);font-size:12px}
+  .lane-hd .lr{color:var(--faint);font-size:10px;display:block;margin-top:2px}
+  .lane-hd.read  .ln{color:var(--read)}
+  .lane-hd.write .ln{color:var(--write)}
+  .lane-hd.core  .ln{color:var(--core)}
+  .lane-hd.result .ln{color:var(--result)}
+
+  .canvas-wrap{position:relative;overflow-x:auto}
+  svg.seq{display:block;font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* lifelines */
+  .lifeline{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+
+  /* message groups — clickable */
+  .msg{cursor:default}
+  .msg.clickable{cursor:zoom-in}
+  .msg .mline{stroke-width:1.8;transition:stroke .3s ease,stroke-dasharray .3s ease}
+  .msg .mhead{transition:fill .3s ease}
+  .msg .mnum{fill:var(--faint);font-size:11px}
+  .msg .mlabel{font-size:11.5px;transition:fill .3s ease}
+  .msg .mnote{font-size:10px;fill:var(--inert);opacity:0;transition:opacity .3s ease}
+
+  /* role colouring — LIVE */
+  .msg.real  .mline{stroke:var(--read)}
+  .msg.real  .mhead{fill:var(--read)}
+  .msg.real  .mlabel{fill:var(--read)}
+  .msg.wr    .mline{stroke:var(--write)}
+  .msg.wr    .mhead{fill:var(--write)}
+  .msg.wr    .mlabel{fill:var(--write)}
+  .msg.ret   .mline{stroke:var(--result)}
+  .msg.ret   .mhead{fill:var(--result)}
+  .msg.ret   .mlabel{fill:var(--result)}
+
+  /* PREVIEW: write-messages recolor to inert dashed; note appears */
+  body.dry .msg.wr .mline{stroke:var(--inert);stroke-dasharray:6 4}
+  body.dry .msg.wr .mhead{fill:var(--inert)}
+  body.dry .msg.wr .mlabel{fill:var(--inert)}
+  body.dry .msg.wr .mnote{opacity:1}
+  /* return message: live=write-colour to a side effect, dry=result payload */
+  body.dry .msg.ret .mline, body:not(.dry) .msg.ret .mline{}
+
+  /* hover affordance on clickable messages */
+  .msg.clickable:hover .hitbox{fill:rgba(88,166,255,.07)}
+  .msg.clickable .hitbox{fill:transparent;transition:fill .14s ease}
+  .msg.clickable.open .hitbox{fill:rgba(88,166,255,.12)}
+  .msg.clickable .zbadge-t{fill:var(--faint);font-size:11px;transition:fill .14s ease}
+  .msg.clickable:hover .zbadge-t{fill:var(--accent)}
+  .msg.clickable.open .zbadge-t{fill:var(--accent)}
+
+  #detail{margin-top:6px}
+  #detail .dhead{font-size:12px;color:var(--dim);margin:0 0 8px}
+  #detail .dhead b{color:var(--ink)}
+</style>
+</head>
+<body class="live">
+<div id="top"></div>
+<div class="wrap">
+  <h1>Collaborator Swimlanes</h1>
+  <div class="sub">
+    Actors are vertical lanes; <b>time flows downward</b>; each numbered row is a message
+    (a horizontal arrow) from one lane to another. This is the call <b>order</b> and
+    who-calls-whom that a static box diagram hides.
+  </div>
+
+  <div class="kicker" style="margin-top:0">
+    <b>Same sequence of calls in both modes.</b> Preview does not add, remove, or reorder a
+    single message — <code>process_ticket</code> never learns it is a preview. All that changes is
+    what each <b>write-message DOES</b>: it becomes an inert no-op that returns a truthy value so
+    the one control-flow path still runs end-to-end. The reads (<code>store.get</code>) and the
+    reasoning (<code>classify_fn</code>) stay real.
+  </div>
+
+  <div class="modebar">
+    <div class="toggle" role="group" aria-label="execution mode">
+      <button data-mode="live" class="on" aria-pressed="true">LIVE</button>
+      <button data-mode="dry"  aria-pressed="false">PREVIEW</button>
+    </div>
+    <span class="modenote" id="modenote"></span>
+  </div>
+
+  <div id="legend"></div>
+
+  <div id="diagram"></div>
+
+  <div id="detail"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("top").outerHTML =
+    topbar("07","Collaborator Swimlanes",
+           "call ORDER and who-calls-whom; sequence/interaction; message-level diffs",
+           "big-picture structure; value provenance; deep code detail");
+
+  /* ---- legend + a 'message: real vs inert' key ---- */
+  document.getElementById("legend").innerHTML =
+    legend().replace("</div>",
+      `<span class="k"><span class="dot" style="background:var(--inert)"></span>message: real&nbsp;→&nbsp;inert (preview)</span></div>`);
+
+  /* ---------- LANES (actors) ---------- */
+  const LANES = [
+    { id:"handler",  name:"handler",       role:"core",   hint:"Lambda entry" },
+    { id:"run",      name:"process_ticket",role:"core",   hint:"the one path" },
+    { id:"store",    name:"store",         role:"read",   hint:"Dynamo" },
+    { id:"triage",   name:"classify_fn",   role:"read",   hint:"LLM" },
+    { id:"ticket",   name:"draft_writer",  role:"write",  hint:"draft" },
+    { id:"fire",     name:"reply_fn",      role:"write",  hint:"auto-reply" },
+    { id:"writeback",name:"status",        role:"write",  hint:"Zendesk" },
+  ];
+  const laneIdx = Object.fromEntries(LANES.map((l,i)=>[l.id,i]));
+
+  /* ---------- MESSAGES (ordered, top→bottom) ----------
+     from/to = lane ids. kind: 'real' (green) | 'wr' (write→inert) | 'ret' (return).
+     unit = UNITS id revealed on click (null = not clickable).
+     inertNote = the preview label shown on a write-message.
+     retDry / retLive = alt labels for the return message per mode. */
+  const MSGS = [
+    { from:"handler", to:"run",       label:"_run(deps, body, …)",              kind:"real" },
+    { from:"run",     to:"store",     label:"store.claim(ref)",                 kind:"wr",
+      inertNote:"[preview] no-op → True", unit:"inertstore" },
+    { from:"run",     to:"store",     label:"store.get(channel)  ← reads real row", kind:"real" },
+    { from:"run",     to:"triage",    label:"classify_fn(ticket_id, channel)",  kind:"real",  unit:"verdict?" },
+    { from:"run",     to:"writeback", label:"status.set_state(RECEIVED→…)",     kind:"wr",
+      inertNote:"[preview] no-op → truthy", unit:"inertwrite" },
+    { from:"run",     to:"ticket",    label:"draft_writer.create(content)",     kind:"wr",
+      inertNote:"[preview] no-op → DRAFT-9999-PREVIEW", unit:"inertwrite" },
+    { from:"run",     to:"fire",      label:"reply_fn(reply_text)",             kind:"wr",
+      inertNote:"[preview] no-op → PREVIEW-send", unit:"inertwrite" },
+    { from:"run",     to:"store",     label:"store.transition(→terminal)",      kind:"wr",
+      inertNote:"[preview] no-op → True", unit:"inertstore" },
+    { from:"run",     to:"handler",   kind:"ret",
+      liveLabel:"return RunReport  (side effects already sent)",
+      dryLabel:"return RunReport → PreviewPayload  (nothing persisted)",
+      unit:"runresult" },
+  ];
+
+  /* ---------- geometry ---------- */
+  const NLANE   = LANES.length;
+  const LANE_W  = 168;           // px per lane column
+  const PAD_L   = 8;
+  const PAD_T   = 14;
+  const ROW_H   = 62;            // vertical spacing between messages
+  const HEAD_H  = 0;             // header lives in HTML grid above the svg
+  const W       = PAD_L*2 + LANE_W*NLANE;
+  const H       = PAD_T*2 + ROW_H*MSGS.length + 24;
+  const laneX   = i => PAD_L + LANE_W*i + LANE_W/2;
+
+  /* build the HTML header row (grid aligned to lane centres) */
+  function buildHead(){
+    const head = document.createElement("div");
+    head.className = "lanes-head";
+    head.style.gridTemplateColumns = `${PAD_L}px repeat(${NLANE}, ${LANE_W}px) ${PAD_L}px`;
+    head.style.width = W + "px";
+    let html = `<div></div>`;
+    LANES.forEach(l=>{
+      html += `<div class="lane-hd ${l.role}">
+                 <span class="ln">${esc(l.name)}</span>
+                 <span class="lr">${esc(l.hint)}</span>
+               </div>`;
+    });
+    html += `<div></div>`;
+    head.innerHTML = html;
+    return head;
+  }
+
+  /* one message = arrow + number + label + optional inert note + hitbox */
+  function arrowSVG(m, i){
+    const y   = PAD_T + ROW_H*i + ROW_H*0.55;
+    const x1  = laneX(laneIdx[m.from]);
+    const x2  = laneX(laneIdx[m.to]);
+    const dir = x2 > x1 ? 1 : -1;
+    const headLen = 8;
+    const tipX = x2 - dir*3;               // stop just shy of the lifeline
+    // clickable if it maps to a unit
+    const unit = m.unit && !m.unit.endsWith("?") ? m.unit : null;
+    const cls  = ["msg", m.kind, unit ? "clickable" : ""].join(" ").trim();
+
+    // arrowhead
+    const head =
+      `<path class="mhead" d="M ${tipX} ${y} L ${tipX - dir*headLen} ${y-4} L ${tipX - dir*headLen} ${y+4} Z"/>`;
+
+    // label centred over the segment, above the line
+    const midX = (x1 + tipX)/2;
+    const label = m.kind==="ret"
+      ? `<text class="mlabel" x="${midX}" y="${y-8}" text-anchor="middle" data-role="ret"></text>`
+      : `<text class="mlabel" x="${midX}" y="${y-8}" text-anchor="middle">${esc(m.label)}</text>`;
+
+    // inert note (preview only) below the line, for write-messages
+    const note = m.inertNote
+      ? `<text class="mnote" x="${midX}" y="${y+13}" text-anchor="middle">${esc(m.inertNote)}</text>`
+      : "";
+
+    // self-context marker: number badge at the source lane
+    const num = `<text class="mnum" x="${x1 + dir*6}" y="${y-8}" text-anchor="${dir>0?"start":"end"}">${i+1}</text>`;
+
+    // zoom badge for clickable rows, near the target
+    const zbadge = unit
+      ? `<text class="zbadge-t" x="${tipX - dir*(headLen+8)}" y="${y-8}" text-anchor="middle">🔍</text>`
+      : "";
+
+    // invisible hitbox spanning this row for a comfortable click target
+    const hb = `<rect class="hitbox" x="${PAD_L}" y="${PAD_T+ROW_H*i}" width="${W-PAD_L*2}" height="${ROW_H}" rx="6"/>`;
+
+    return `<g class="${cls}" id="msg-${i}" data-unit="${unit||""}"
+               ${unit?'role="button" tabindex="0" aria-expanded="false"':""}>
+              ${hb}
+              <line class="mline" x1="${x1}" y1="${y}" x2="${tipX}" y2="${y}"/>
+              ${head}${label}${note}${num}${zbadge}
+            </g>`;
+  }
+
+  function buildSVG(){
+    let parts = [];
+    // lifelines
+    LANES.forEach((l,i)=>{
+      const x = laneX(i);
+      parts.push(`<line class="lifeline" x1="${x}" y1="${PAD_T-6}" x2="${x}" y2="${H-PAD_T}"/>`);
+    });
+    MSGS.forEach((m,i)=> parts.push(arrowSVG(m,i)));
+    return `<svg class="seq" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join("")}</svg>`;
+  }
+
+  const diagram = document.getElementById("diagram");
+  const wrap = document.createElement("div");
+  wrap.className = "canvas-wrap";
+  wrap.appendChild(buildHead());
+  wrap.insertAdjacentHTML("beforeend", buildSVG());
+  diagram.appendChild(wrap);
+
+  /* ---- return-message label depends on mode; set it now + on toggle ---- */
+  function applyMode(mode){
+    const dry = mode === "dry";
+    document.body.classList.toggle("dry", dry);
+    document.body.classList.toggle("live", !dry);
+    document.querySelectorAll('.toggle button').forEach(b=>{
+      const on = b.dataset.mode === (dry?"dry":"live");
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    // return-message text swaps
+    MSGS.forEach((m,i)=>{
+      if(m.kind!=="ret") return;
+      const t = document.querySelector(`#msg-${i} text[data-role="ret"]`);
+      if(t) t.textContent = dry ? m.dryLabel : m.liveLabel;
+    });
+    document.getElementById("modenote").innerHTML = dry
+      ? `writes are <b>inert</b> — no-op, return truthy; reads &amp; classify stay <b>real</b>`
+      : `every collaborator call performs its <b>real</b> side effect`;
+  }
+
+  /* ---- click a message → reveal its unit below ---- */
+  let openId = null;
+  function reveal(i){
+    const m = MSGS[i];
+    const g = document.getElementById(`msg-${i}`);
+    const det = document.getElementById("detail");
+    if(openId === i){                       // toggle closed
+      det.innerHTML = "";
+      g.classList.remove("open"); g.setAttribute("aria-expanded","false");
+      openId = null; return;
+    }
+    if(openId !== null){
+      const prev = document.getElementById(`msg-${openId}`);
+      if(prev){ prev.classList.remove("open"); prev.setAttribute("aria-expanded","false"); }
+    }
+    g.classList.add("open"); g.setAttribute("aria-expanded","true");
+    const label = m.kind==="ret"
+      ? (document.body.classList.contains("dry") ? m.dryLabel : m.liveLabel)
+      : m.label;
+    det.innerHTML =
+      `<p class="dhead">message <b>${i+1}</b> · <code>${esc(label)}</code></p>` +
+      renderUnit(m.unit);
+    openId = i;
+    det.scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+
+  MSGS.forEach((m,i)=>{
+    if(!(m.unit && !m.unit.endsWith("?"))) return;
+    const g = document.getElementById(`msg-${i}`);
+    g.addEventListener("click", ()=>reveal(i));
+    g.addEventListener("keydown", ev=>{
+      if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); reveal(i); }
+    });
+  });
+
+  document.querySelectorAll('.toggle button').forEach(b=>{
+    b.addEventListener("click", ()=>applyMode(b.dataset.mode));
+  });
+
+  applyMode("live");
+</script>
+</body>
+</html>

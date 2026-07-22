@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COMBINED · Altitude + Annotated + Provenance</title>
+<link rel="stylesheet" href="../_shared.css">
+<style>
+  /* ---- altitude descent layout (technique 05 spine) ---- */
+  .level{display:none;animation:fade .32s ease}
+  .level.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .crumb{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--faint);
+         margin:2px 0 18px;flex-wrap:wrap}
+  .crumb .pin{color:var(--dim)}
+  .crumb .step{padding:2px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
+  .crumb .step.clickable{cursor:pointer;color:var(--dim)}
+  .crumb .step.clickable:hover{color:var(--ink);border-color:var(--accent)}
+  .crumb .step.here{color:var(--ink);border-color:var(--accent)}
+  .crumb .sep{color:var(--faint)}
+
+  /* L0 mega-boxes */
+  .mega{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:8px}
+  .mega .box{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+             padding:22px 18px;cursor:pointer;transition:border-color .15s,transform .15s}
+  .mega .box:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .mega .box .cap{font-size:11px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+  .mega .box .hd{font-size:17px;font-weight:600;margin:8px 0 6px}
+  .mega .box .ln{font-size:12.5px;color:var(--dim)}
+  .mega .box.entry{border-top:3px solid var(--read)}
+  .mega .box.core{border-top:3px solid var(--core)}
+  .mega .box.result{border-top:3px solid var(--result)}
+  .mega .hint{grid-column:1/-1;text-align:center;color:var(--faint);font-size:12px;margin-top:2px}
+  @media(max-width:820px){.mega{grid-template-columns:1fr}}
+
+  /* L1 collaborator-swap boxes */
+  .swap{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .swap .u{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+           padding:13px 15px;cursor:pointer;transition:border-color .15s,transform .12s}
+  .swap .u:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .swap .u .ut{font-weight:600;font-size:13.5px}
+  .swap .u .uf{font-size:11px;color:var(--faint);margin-top:4px}
+  .swap .u.write{border-left:3px solid var(--write)}
+  .swap .u.inert{border-left:3px solid var(--inert)}
+  .swap .u.core{border-left:3px solid var(--core)}
+  .swap .u.result{border-left:3px solid var(--result)}
+  .l1-lead{color:var(--dim);font-size:13px;margin:4px 0 14px}
+  @media(max-width:820px){.swap{grid-template-columns:1fr}}
+
+  /* L2 ground */
+  .l2-nav{display:flex;align-items:center;gap:10px;margin:2px 0 16px}
+  .l2-nav .pn{padding:4px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+              cursor:pointer;font-size:12px;color:var(--dim)}
+  .l2-nav .pn:hover{color:var(--ink);border-color:var(--accent)}
+  .l2-nav .pn[disabled]{opacity:.35;cursor:default}
+  .l2-nav .cur{font-weight:600;color:var(--ink);font-size:14px}
+  .l2-nav .spacer{flex:1}
+
+  .ground-code{margin-bottom:22px}
+
+  /* value-provenance strip */
+  .pz-strip{border-top:1px dashed var(--line);margin-top:20px;padding-top:16px}
+  .pz-strip .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+                 margin-bottom:9px}
+  .pills{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{padding:4px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);
+        cursor:pointer;font-size:12.5px;color:var(--dim);transition:border-color .12s}
+  .pill:hover{color:var(--ink);border-color:var(--accent)}
+  .pill.active{color:var(--ink);border-color:var(--result);background:rgba(88,166,255,.1)}
+  .pz-out{overflow:hidden;max-height:0;transition:max-height .3s ease;margin-top:0}
+  .pz-out.open{max-height:640px;margin-top:14px}
+  .pz-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pz-grid .col .ch{font-size:11px;color:var(--faint);margin-bottom:5px}
+  .pz-note{color:var(--dim);font-size:12px;margin-top:12px;border-left:2px solid var(--result);
+           padding-left:12px}
+  .pz-note b{color:var(--result)}
+  @media(max-width:820px){.pz-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- custom inline topbar -->
+<div class="topbar">
+  <a href="../../index.html">◀ catalog</a>
+  <span class="tname">COMBINED · Altitude + Annotated + Provenance</span>
+  <span class="spacer"></span>
+  <span class="goodbad"><b>good for:</b> choose your depth, then read code AND trace values at the bottom</span>
+</div>
+
+<div class="wrap">
+  <h1>One descent, three techniques</h1>
+  <div class="sub">
+    Altitude decides HOW DEEP you go. At the bottom you get both the code
+    (annotated) and the data flow (provenance) — three techniques, one descent.
+  </div>
+
+  <div id="legend"></div>
+
+  <!-- breadcrumb, always visible -->
+  <div class="crumb" id="crumb"></div>
+
+  <!-- ===================== L0 : 10k ft ===================== -->
+  <section class="level on" id="L0">
+    <div class="mega">
+      <div class="box entry" onclick="go(1)">
+        <div class="cap">Entry</div>
+        <div class="hd">A direct invoke forks</div>
+        <div class="ln">{preview:true,ticket_id} hits the deployed Responder — not the queue.</div>
+      </div>
+      <div class="box core" onclick="go(1)">
+        <div class="cap">Core</div>
+        <div class="hd">Swap writes for no-op doubles</div>
+        <div class="ln">Same process_ticket, handed deps whose writes do nothing.</div>
+      </div>
+      <div class="box result" onclick="go(1)">
+        <div class="cap">Result</div>
+        <div class="hd">Inspect, don't persist</div>
+        <div class="ln">A RunReport → PreviewPayload. Verdict + reply, zero writes.</div>
+      </div>
+      <div class="hint">click any box to drop to 1k ft ↓</div>
+    </div>
+  </section>
+
+  <!-- ===================== L1 : 1k ft ===================== -->
+  <section class="level" id="L1">
+    <div class="l1-lead">
+      The collaborator swap, unit by unit. <b>No-op</b> doubles replace every
+      write; reads and reasoning stay real. Click a box to land on the ground.
+    </div>
+    <div class="swap" id="swap"></div>
+  </section>
+
+  <!-- ===================== L2 : ground ===================== -->
+  <section class="level" id="L2">
+    <div class="l2-nav">
+      <div class="pn" id="prev" onclick="stepUnit(-1)">◀ prev</div>
+      <div class="cur" id="curtitle"></div>
+      <div class="spacer"></div>
+      <div class="pn" id="next" onclick="stepUnit(1)">next ▶</div>
+    </div>
+
+    <div class="ground-code" id="groundCode"></div>
+
+    <!-- value-provenance strip: trace a value without leaving ground -->
+    <div class="pz-strip">
+      <div class="lbl">trace a value (provenance)</div>
+      <div class="pills" id="pills"></div>
+      <div class="pz-out" id="pzout"></div>
+    </div>
+  </section>
+
+  <div class="kicker">
+    <b>Altitude</b> is the spine: it decides how deep you commit before reading.
+    At ground level two more techniques compose in place — <b>annotated source</b>
+    (real code + expandable notes) tells you HOW the change works, and
+    <b>value provenance</b> (born → used code panes) tells you WHERE a value flows.
+    Three lenses, one continuous descent.
+  </div>
+</div>
+
+<script src="../_shared.js"></script>
+<script>
+  // legend from shared
+  document.getElementById("legend").innerHTML = legend();
+
+  // -------- state --------
+  let level = 0;               // 0 | 1 | 2
+  let unitIdx = 0;             // index into L1_UNITS at L2
+  let activeVal = null;        // currently-open provenance value
+
+  // L1 collaborator boxes → mapping to units + a source key when one exists.
+  // src: a SOURCES key (annotated source) OR null (fall back to renderUnit).
+  const L1_UNITS = [
+    { id:"drdeps",     kind:"core",   src:"dry_run_deps" },
+    { id:"inertstore", kind:"inert",  src:"inertstore" },
+    { id:"inertwrite", kind:"inert",  src:null },
+    { id:"runworker",  kind:"core",   src:null },
+    { id:"runresult",  kind:"result", src:null },
+    { id:"payload",    kind:"result", src:null },
+  ];
+  // the handler unit maps to an annotated source too; reachable from the crumb story
+  // via drdeps neighbours — kept in the same list ordering the prompt implies.
+
+  const PZ_VALUES = ["env","hands_prompt","ticket_key","verdict"];
+
+  // -------- breadcrumb --------
+  function renderCrumb(){
+    const steps = [
+      {n:"L0", lbl:"10k ft"},
+      {n:"L1", lbl:"1k ft"},
+      {n:"L2", lbl:"ground"},
+    ];
+    const parts = steps.map((s,i) => {
+      let cls = "step";
+      if(i === level) cls += " here";
+      else if(i < level) cls += " clickable";
+      const onclick = (i < level) ? `onclick="go(${i})"` : "";
+      return `<span class="${cls}" ${onclick}>${s.n} · ${s.lbl}</span>`;
+    });
+    document.getElementById("crumb").innerHTML =
+      `<span class="pin">📍</span>` + parts.join(`<span class="sep">›</span>`);
+  }
+
+  // -------- level switching (fade) --------
+  function go(lvl){
+    level = lvl;
+    ["L0","L1","L2"].forEach((id,i) =>
+      document.getElementById(id).classList.toggle("on", i === lvl));
+    if(lvl === 1) renderL1();
+    if(lvl === 2) renderL2();
+    renderCrumb();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  // -------- L1 : collaborator swap boxes --------
+  function renderL1(){
+    document.getElementById("swap").innerHTML = L1_UNITS.map((u,i) => `
+      <div class="u ${u.kind}" onclick="openUnit(${i})">
+        <div class="ut">${unitTitle(u.id)}</div>
+        <div class="uf">${UNITS[u.id] ? UNITS[u.id].file : ""}</div>
+      </div>`).join("");
+  }
+
+  function openUnit(i){
+    unitIdx = i;
+    activeVal = null;
+    go(2);
+  }
+
+  // -------- L2 : ground (annotated source + provenance strip) --------
+  function renderL2(){
+    const u = L1_UNITS[unitIdx];
+    document.getElementById("curtitle").textContent = unitTitle(u.id);
+
+    // annotated source if it maps to a SOURCES key, else the diff+why unit
+    const code = u.src
+      ? renderAnnotatedSource(u.src)
+      : renderUnit(u.id);
+    document.getElementById("groundCode").innerHTML = code;
+
+    // prev/next enable/disable
+    document.getElementById("prev").toggleAttribute("disabled", unitIdx === 0);
+    document.getElementById("next").toggleAttribute("disabled", unitIdx === L1_UNITS.length - 1);
+
+    // provenance pills (reset closed)
+    document.getElementById("pills").innerHTML = PZ_VALUES.map(v =>
+      `<span class="pill" id="pill_${v}" onclick="showProv('${v}')">${VALUES[v].label}</span>`).join("");
+    const out = document.getElementById("pzout");
+    out.classList.remove("open");
+    out.innerHTML = "";
+    activeVal = null;
+  }
+
+  function stepUnit(delta){
+    const next = unitIdx + delta;
+    if(next < 0 || next >= L1_UNITS.length) return;
+    unitIdx = next;
+    renderL2();
+    window.scrollTo({top:0, behavior:"smooth"});
+  }
+
+  // -------- provenance zoom (born / use code panes) --------
+  function showProv(v){
+    const out = document.getElementById("pzout");
+    PZ_VALUES.forEach(x =>
+      document.getElementById("pill_" + x).classList.toggle("active", x === v && activeVal !== v));
+
+    if(activeVal === v){            // toggle closed
+      out.classList.remove("open");
+      activeVal = null;
+      return;
+    }
+    activeVal = v;
+    const vc = VALUE_CODE[v];
+    out.innerHTML = `
+      <div class="pz-grid">
+        <div class="col"><div class="ch">born</div>${renderValueCodePane(vc.born)}</div>
+        <div class="col"><div class="ch">used</div>${renderValueCodePane(vc.use)}</div>
+      </div>
+      <div class="pz-note"><b>note:</b> ${esc(VALUES[v].note)}</div>`;
+    out.classList.add("open");
+  }
+
+  // annotated-source notes must not climb altitude levels
+  const _asToggle = asToggle;
+  window.asToggle = function(noteId, lineEl, ev){
+    if(ev) ev.stopPropagation();
+    _asToggle(noteId, lineEl);
+  };
+  // renderAnnotatedSource wires onclick="asToggle('id',this)" (no event arg);
+  // capture-phase guard stops the click bubbling to any level handler.
+  document.getElementById("groundCode").addEventListener("click", e => {
+    if(e.target.closest(".as-line.has-note")) e.stopPropagation();
+  }, true);
+
+  // init
+  renderCrumb();
+</script>
+</body>
+</html>

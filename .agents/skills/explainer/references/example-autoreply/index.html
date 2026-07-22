@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explainer Technique Catalog</title>
+<link rel="stylesheet" href="catalog/_shared.css">
+<style>
+  .hero{padding:26px 24px 6px}
+  .hero h1{font-size:24px;margin:0 0 6px}
+  .hero p{color:var(--dim);max-width:78ch;margin:0 0 4px;font-size:13.5px}
+  .hero .meta{color:var(--faint);font-size:12px;margin-top:8px}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+  .filters button{background:var(--panel2);border:1px solid var(--line);color:var(--dim);
+    border-radius:999px;padding:5px 13px;font:inherit;font-size:12px;cursor:pointer;transition:.15s}
+  .filters button.on{background:var(--result);color:#04121f;border-color:var(--result);font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:16px 18px;
+    display:flex;flex-direction:column;gap:8px;transition:.15s;text-decoration:none;color:inherit}
+  .card:hover{border-color:var(--result);transform:translateY(-2px);box-shadow:0 8px 26px rgba(88,166,255,.14)}
+  .card .head{display:flex;align-items:baseline;gap:10px}
+  .card .num{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+  .card .name{font-size:16px;font-weight:700}
+  .card .what{color:var(--dim);font-size:13px;line-height:1.5}
+  .card .gb{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;margin-top:2px}
+  .card .gb .lab{color:var(--faint)}
+  .card .gb .good{color:var(--read)}
+  .card .gb .bad{color:var(--write)}
+  .card .fam{align-self:flex-start;font-size:10px;color:var(--faint);border:1px solid var(--line);
+    border-radius:999px;padding:2px 8px;text-transform:uppercase;letter-spacing:.06em}
+  .card .open{margin-top:auto;color:var(--result);font-size:12px;font-weight:600}
+  .grouphdr{grid-column:1/-1;color:var(--faint);font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;margin:12px 0 -4px;padding-top:8px;border-top:1px solid var(--line)}
+  .howto{margin:26px 0 0;border-left:3px solid var(--accent);background:var(--panel2);
+    padding:14px 18px;border-radius:0 8px 8px 0;font-size:13px;color:var(--dim);max-width:82ch}
+  .howto b{color:var(--ink)}
+  .howto code{font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>Explainer Technique Catalog</h1>
+    <p>A library of interactive techniques for explaining a code change. Each is a self-contained demo built on the SAME content (a fictional support auto-responder "preview" change) so you compare <b>interaction shape</b>, not subject. Think of these like tools in an agentic loop: a future skill picks one (or a few) by name for the job at hand.</p>
+    <p class="meta">12 primitive techniques + 5 combined examples · shared renderer with indentation-safe diffs · dark theme · vanilla JS, no dependencies</p>
+    <div class="filters" id="filters">
+      <button class="on" data-fam="all">all</button>
+      <button data-fam="structure">structure</button>
+      <button data-fam="flow">flow / time</button>
+      <button data-fam="value">value / provenance</button>
+      <button data-fam="compare">compare</button>
+      <button data-fam="reading">reading</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="hero" style="padding-left:0;padding-right:0;margin-top:14px">
+    <h1 style="font-size:19px">Combined examples</h1>
+    <p>Techniques are primitives; they layer. Annotated-source slots into anything that shows code; state-machine and minimap ride along as side-cars; provenance zoom drops in at ground level. These examples compose 2–5 primitives to show when combining beats a single view — and where "integrated" tips into "cluttered".</p>
+  </div>
+  <div class="grid" id="combos"></div>
+
+  <div class="howto">
+    <b>How a skill would use this:</b> match the reader's question to a technique.
+    "Where does <code>channel</code> come from?" → <b>Value Provenance</b>.
+    "What happens when I run it?" → <b>Runtime Step-Through</b> or <b>Timeline Scrubber</b>.
+    "How is preview different from live?" → <b>Dual-Lens</b> or <b>State-Machine</b>.
+    "I keep getting lost in this big change" → <b>Minimap + Detail</b> or <b>Focus + Context</b>.
+    "Just explain it well in words" → <b>Narrative Walkthrough</b>.
+    Techniques compose — a doc can open with a Spine, let readers zoom via Altitude, and back each claim with Annotated Source.
+  </div>
+</div>
+
+<script>
+const T = [
+  {n:"01",id:"lifecycle-spine",name:"Lifecycle Spine",fam:"structure",
+   what:"The whole request path end-to-end; touched stations glow, click to expand each station's owned diffs.",
+   good:"seeing WHERE a change sits in the full flow; onboarding",
+   bad:"fine-grained control flow; timing / sequence order"},
+  {n:"02",id:"value-provenance",name:"Value Provenance",fam:"value",
+   what:"Pick a value (channel, draft_key…), highlight its born→read→used stations across the flow + show its trail.",
+   good:"answering 'where does this value come from / go?'",
+   bad:"control flow, timing, the code change itself"},
+  {n:"03",id:"runtime-step",name:"Runtime Step-Through",fam:"flow",
+   what:"Walk ONE request station by station (Prev/Next/Play); running state updates per step; LIVE vs PREVIEW.",
+   good:"understanding execution order & what happens on a run",
+   bad:"static structure; comparing many values at once"},
+  {n:"04",id:"dual-lens",name:"Dual-Lens Toggle",fam:"compare",
+   what:"Same diagram, two lenses; toggle flips each node's badges/colors in place so you see exactly what differs.",
+   good:"comparing two MODES of one structure (live/preview, prod/test)",
+   bad:"showing a linear process; deep per-node detail"},
+  {n:"05",id:"altitude-zoom",name:"Altitude Zoom",fam:"structure",
+   what:"Explicit depth ladder: 10k ft (3 boxes) → 1k ft (collaborators) → ground (signature diffs); breadcrumb.",
+   good:"letting the reader choose depth; docs for skimmers AND diggers",
+   bad:"showing flow / sequence; side-by-side comparison"},
+  {n:"07",id:"collaborator-swimlanes",name:"Collaborator Swimlanes",fam:"flow",
+   what:"Sequence diagram: actors are lanes, time flows down, numbered messages between them; LIVE/PREVIEW recolor.",
+   good:"call ORDER and who-calls-whom; message-level diffs",
+   bad:"big-picture structure; value provenance; deep code detail"},
+  {n:"08",id:"call-tree",name:"Call-Tree Outline",fam:"structure",
+   what:"Collapsible tree of the call path (caller→callee); expand nodes, click a leaf to reveal its code.",
+   good:"'what calls what' / call hierarchy; navigating a path",
+   bad:"spatial / flow intuition; timing; A/B comparison"},
+  {n:"09",id:"annotated-source",name:"Annotated Source",fam:"reading",
+   what:"The REAL source with line numbers; marked lines expand inline margin notes. A guided literate walkthrough.",
+   good:"literate walkthrough of real code; teaching a function",
+   bad:"architecture overview; flow across many files; A/B compare"},
+  {n:"10",id:"state-machine",name:"State-Machine Map",fam:"flow",
+   what:"States as nodes, transitions as labelled edges with trigger conditions; click an edge for its driving code.",
+   good:"domains that ARE a state machine; transitions + triggers",
+   bad:"non-stateful logic; provenance; call-sequence detail"},
+  {n:"12",id:"minimap-detail",name:"Minimap + Detail",fam:"reading",
+   what:"Persistent overview of the whole change + a large detail pane; scroll-spy keeps the minimap in sync.",
+   good:"keeping global context while reading local detail",
+   bad:"linear step-through; timing; prose explanation"},
+  {n:"13",id:"timeline-scrubber",name:"Timeline Scrubber",fam:"flow",
+   what:"Draggable video-style scrubber sweeps continuously through the lifecycle; state under the handle updates live.",
+   good:"building intuition for ORDER & causality by sweeping",
+   bad:"non-temporal structure; provenance; A/B compare"},
+  {n:"14",id:"focus-context-fisheye",name:"Focus + Context (Fisheye)",fam:"reading",
+   what:"Everything stays on screen; the focused station enlarges to full detail while the rest shrink to slivers.",
+   good:"depth-on-demand without EVER losing the whole",
+   bad:"precise A/B diff; printed / static output; simple linear reading"},
+];
+
+const COMBOS = [
+  {n:"A",file:"catalog/combined-examples/A-spine-plus-annotated.html",name:"Spine + Annotated Source",count:"2 primitives",
+   what:"The lifecycle spine, but expanding a touched station reveals REAL annotated code (line notes) in place — a map that becomes a guided reading.",
+   uses:"lifecycle spine · annotated source"},
+  {n:"B",file:"catalog/combined-examples/B-step-plus-statemachine.html",name:"Step-Through + State-Machine side-car",count:"2 primitives",
+   what:"Runtime step-through as centrepiece; the state-machine rides along as a side-car, lighting the current state/transition as you step.",
+   uses:"runtime step-through · state-machine (side-car)"},
+  {n:"C",file:"catalog/combined-examples/C-fisheye-annotated-minimap.html",name:"Fisheye + Annotated + Minimap",count:"3 primitives · never lose context",
+   what:"Minimap (where) + fisheye focus (weight) + annotated source in the focused card (depth). Deep-read one part while the whole stays on screen.",
+   uses:"fisheye · annotated source · minimap"},
+  {n:"D",file:"catalog/combined-examples/D-altitude-annotated-provenance.html",name:"Altitude + Annotated + Provenance",count:"3 primitives",
+   what:"Descend the altitude ladder; at ground level get BOTH annotated code AND value-provenance zoom (born/used code panes) without leaving the level.",
+   uses:"altitude zoom · annotated source · value provenance"},
+  {n:"E",file:"catalog/combined-examples/E-workbench.html",name:"The Workbench (upper bound)",count:"5 primitives · experiment",
+   what:"An IDE-like cockpit: minimap + spine/scrubber + annotated main + state-machine + provenance, one shared cursor. Built to FEEL where integrated tips into cluttered.",
+   uses:"minimap · spine · step · state-machine · provenance"},
+];
+
+const FAM_ORDER = [
+  ["structure","Structure — how the pieces fit"],
+  ["flow","Flow & time — order, execution, transitions"],
+  ["value","Value & provenance — where data comes from"],
+  ["compare","Compare — A/B, before/after, mode toggles"],
+  ["reading","Reading — code-first & prose-first walkthroughs"],
+];
+
+function card(t){
+  return `<a class="card" href="catalog/${t.n}-${t.id}.html">
+    <span class="fam">${t.fam}</span>
+    <div class="head"><span class="num">${t.n}</span><span class="name">${t.name}</span></div>
+    <div class="what">${t.what}</div>
+    <div class="gb">
+      <span class="lab">good for</span><span class="good">${t.good}</span>
+      <span class="lab">weak for</span><span class="bad">${t.bad}</span>
+    </div>
+    <span class="open">open demo →</span>
+  </a>`;
+}
+function render(fam){
+  const grid = document.getElementById('grid');
+  if(fam==='all'){
+    grid.innerHTML = FAM_ORDER.map(([f,label])=>{
+      const items = T.filter(t=>t.fam===f);
+      if(!items.length) return "";
+      return `<div class="grouphdr">${label}</div>` + items.map(card).join("");
+    }).join("");
+  } else {
+    grid.innerHTML = T.filter(t=>t.fam===fam).map(card).join("");
+  }
+}
+function comboCard(c){
+  return `<a class="card" href="${c.file}">
+    <span class="fam">${c.count}</span>
+    <div class="head"><span class="num">${c.n}</span><span class="name">${c.name}</span></div>
+    <div class="what">${c.what}</div>
+    <div class="gb">
+      <span class="lab">layers</span><span class="good">${c.uses}</span>
+    </div>
+    <span class="open">open example →</span>
+  </a>`;
+}
+document.getElementById('combos').innerHTML = COMBOS.map(comboCard).join("");
+
+document.getElementById('filters').addEventListener('click', e=>{
+  if(e.target.tagName!=='BUTTON') return;
+  document.querySelectorAll('#filters button').forEach(b=>b.classList.toggle('on', b===e.target));
+  render(e.target.dataset.fam);
+});
+render('all');
+</script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 — Timeline Scrubber</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- layout ---- */
+  .grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  /* ---- mode toggle (matches technique 03) ---- */
+  .toprow{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .modeswitch{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .modeswitch button{background:var(--panel2);color:var(--dim);border:0;padding:6px 13px;
+       font:inherit;font-size:12px;cursor:pointer}
+  .modeswitch button.live.on{background:var(--write);color:#1a0f05;font-weight:600}
+  .modeswitch button.dry.on{background:var(--inert);color:#0d0518;font-weight:600}
+  .modehint{font-size:12px;color:var(--faint)}
+
+  /* ---- the scrubber timeline ---- */
+  .scrub{margin:8px 0 40px;padding:0 8px}
+  .scrubwrap{position:relative;height:44px}
+  /* the visual track sits behind the (transparent) range input */
+  .track{position:absolute;left:0;right:0;top:20px;height:4px;border-radius:99px;
+         background:var(--panel2)}
+  .track>.fill{position:absolute;left:0;top:0;height:100%;border-radius:99px;
+         background:var(--accent);width:0;transition:width .12s ease}
+  .track.dry>.fill{background:var(--inert)}
+  /* the draggable handle, positioned by JS */
+  .handle{position:absolute;top:11px;width:22px;height:22px;border-radius:50%;
+         background:var(--accent);border:3px solid var(--bg);
+         box-shadow:0 0 0 1px var(--accent),0 2px 8px #000a;
+         transform:translateX(-50%);transition:left .12s ease;pointer-events:none}
+  .track.dry ~ .handle,.scrubwrap.dry .handle{background:var(--inert);box-shadow:0 0 0 1px var(--inert),0 2px 8px #000a}
+
+  /* the real range input, laid transparent over the track for native drag/keyboard */
+  input[type=range].timeline{
+    -webkit-appearance:none;appearance:none;position:absolute;left:0;right:0;top:12px;
+    width:100%;height:20px;background:transparent;margin:0;cursor:pointer}
+  input[type=range].timeline:focus{outline:none}
+  input[type=range].timeline:focus-visible{outline:2px solid var(--accent);outline-offset:6px;border-radius:6px}
+  /* webkit: hide default track+thumb, we draw our own */
+  input[type=range].timeline::-webkit-slider-runnable-track{height:20px;background:transparent}
+  input[type=range].timeline::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;
+    background:transparent;border:0;cursor:grab}
+  input[type=range].timeline::-webkit-slider-thumb:active{cursor:grabbing}
+  /* moz */
+  input[type=range].timeline::-moz-range-track{height:20px;background:transparent;border:0}
+  input[type=range].timeline::-moz-range-thumb{width:22px;height:22px;border-radius:50%;
+    background:transparent;border:0;cursor:grab}
+  input[type=range].timeline::-moz-range-progress{background:transparent}
+
+  /* tick marks + station labels under the timeline */
+  .ticks{position:relative;height:74px;margin-top:2px}
+  .tick{position:absolute;top:0;transform:translateX(-50%);text-align:center;
+        cursor:pointer;user-select:none}
+  .tick .pip{width:2px;height:8px;background:var(--line);margin:0 auto 6px}
+  .tick .lab{font-size:10.5px;color:var(--faint);white-space:nowrap;line-height:1.25;
+        max-width:78px;transition:color .12s}
+  .tick.touched .pip{background:var(--inert)}
+  .tick.here .pip{background:var(--accent);height:12px;width:3px}
+  .tick.here .lab{color:var(--ink);font-weight:600}
+  .tick.done .lab{color:var(--dim)}
+  .scrubwrap.dry .tick.here .pip{background:var(--inert)}
+
+  /* ---- current-station panel ---- */
+  .now{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+       padding:16px 18px}
+  .now .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .now .head .lbl{font-size:16px;font-weight:600}
+  .now .rolechip{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--faint);
+       color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
+  .now .rolechip.core{color:var(--core);border-color:var(--core)}
+  .now .rolechip.read{color:var(--read);border-color:var(--read)}
+  .now .rolechip.result{color:var(--result);border-color:var(--result)}
+  .now .rolechip.input{color:var(--dim);border-color:var(--dim)}
+  .now .touchtag{font-size:10px;padding:1px 7px;border-radius:999px;
+       border:1px solid var(--inert);color:var(--inert)}
+  .now .detail{color:var(--dim);font-size:13px;margin-bottom:14px}
+  .now .units-h{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;
+       margin:16px 0 8px}
+  .now .no-units{color:var(--faint);font-size:12px;font-style:italic}
+
+  /* ---- accumulated-state list (right rail) ---- */
+  .accum{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+         padding:14px 16px;position:sticky;top:74px}
+  .accum h3{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim)}
+  .accum .cap{font-size:11px;color:var(--faint);margin-bottom:12px}
+  .accum ol{list-style:none;margin:0;padding:0;counter-reset:step}
+  .accum li{position:relative;padding:7px 0 7px 26px;font-size:12.5px;border-top:1px solid var(--line)}
+  .accum li:first-child{border-top:0}
+  .accum li .n{position:absolute;left:0;top:7px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .accum li .what{color:var(--ink)}
+  .accum li .eff{display:block;margin-top:2px;font-size:11.5px}
+  .accum li .eff.live{color:var(--write)}
+  .accum li .eff.dry{color:var(--inert)}
+  .accum li.current{background:linear-gradient(90deg,#ffffff08,transparent)}
+  .accum li.current .n{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Timeline Scrubber</h1>
+  <p class="sub">Grab the handle and sweep. The panel below is <b>exactly</b> the position under the handle —
+     drag back and forth to feel the ORDER of the request lifecycle, not just its steps. Continuous, not clicky
+     (that's technique 03). Scrubbing makes causality tactile: sweep to <b>⑥</b> and you SEE that channel was already
+     read at <b>②</b> long before classify needs it.</p>
+
+  <div id="legend-slot"></div>
+
+  <div class="toprow">
+    <div class="modeswitch" id="mode">
+      <button class="live on" data-mode="live">LIVE</button>
+      <button class="dry" data-mode="dry">PREVIEW</button>
+    </div>
+    <span class="modehint" id="modehint"></span>
+  </div>
+
+  <!-- the scrubber -->
+  <div class="scrub">
+    <div class="scrubwrap" id="scrubwrap">
+      <div class="track" id="track"><div class="fill" id="fill"></div></div>
+      <div class="handle" id="handle"></div>
+      <input type="range" class="timeline" id="range" min="0" step="1"
+             aria-label="lifecycle position" />
+    </div>
+    <div class="ticks" id="ticks"></div>
+  </div>
+
+  <div class="grid">
+    <div class="now" id="now"></div>
+    <aside class="accum" id="accum"></aside>
+  </div>
+
+  <div class="kicker">
+    <b>Why a scrubber, not a stepper?</b> A stepper (technique 03) advances one discrete click at a time — good for
+    reading, bad for building a mental model of <b>causality</b>. A scrubber lets you rock the handle between two
+    stations and watch what appears and disappears, so the dependency between them becomes muscle memory: channel is
+    <i>born at ②</i> and only <i>read at ⑥</i>, so a preview gets the right channel for free because the READ is real.
+    Weak for non-temporal structure, provenance across time, and A/B compare — for those, reach for techniques 02,
+    04, or 06.
+  </div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("top").outerHTML = topbar(
+    "13","Timeline Scrubber",
+    "building intuition for ORDER & causality by sweeping back/forth; temporal changes",
+    "non-temporal structure; provenance; A/B compare");
+  document.getElementById("legend-slot").innerHTML = legend();
+
+  const N = STATIONS.length;
+  let pos = 0;               // current station index 0..N-1
+  let mode = "live";         // "live" | "dry"
+
+  const range   = document.getElementById("range");
+  const fill    = document.getElementById("fill");
+  const handle  = document.getElementById("handle");
+  const track   = document.getElementById("track");
+  const wrap     = document.getElementById("scrubwrap");
+  const ticksEl = document.getElementById("ticks");
+  const nowEl   = document.getElementById("now");
+  const accumEl = document.getElementById("accum");
+  const hintEl  = document.getElementById("modehint");
+
+  range.max = String(N - 1);
+  range.value = "0";
+
+  /* percentage along the track for station index i (0 => 0%, N-1 => 100%) */
+  function pct(i){ return N === 1 ? 0 : (i / (N - 1)) * 100; }
+
+  /* build the tick marks + labels once */
+  ticksEl.innerHTML = STATIONS.map((s, i) =>
+    `<div class="tick" data-i="${i}" style="left:${pct(i)}%">
+       <div class="pip"></div>
+       <div class="lab">${esc(s.label)}</div>
+     </div>`).join("");
+  // clicking a tick jumps the scrubber there
+  ticksEl.querySelectorAll(".tick").forEach(t =>
+    t.addEventListener("click", () => setPos(Number(t.dataset.i))));
+
+  /* what a station "did" — used by the accumulated-state list. Effect wording
+     flips with LIVE vs PREVIEW for the stations the change actually touches. */
+  function effect(s){
+    if(mode === "live"){
+      switch(s.id){
+        case "monitor":  return ["persisted", "wrote ticket ROW (state=RECEIVED) with channel + service"];
+        case "sqs":      return ["persisted", "queue delivered Records; handler looped"];
+        case "deps":     return ["persisted", "real collaborators wired — every WRITE is live"];
+        case "runworker":return ["persisted", "claimed the lease (Dynamo write), transitioned state"];
+        case "fork":     return ["persisted", "cut a real draft / sent the auto-reply"];
+        case "result":   return ["persisted", "writes fired: Dynamo / Zendesk / draft / auto-reply / S3 audit"];
+        default:         return [null, null];
+      }
+    }
+    // preview: reads stay real, every WRITE is inert
+    switch(s.id){
+      case "monitor":  return [null, null]; // row already exists; preview READS it, writes nothing
+      case "sqs":      return ["dry", "[preview] direct invoke {dry_run:true} — no queue, nothing written"];
+      case "deps":     return ["dry", "[preview] dry_run_deps swapped every WRITE for an inert double"];
+      case "runworker":return ["dry", "[preview] _NoopStore.claim() logged, returned True — nothing persisted"];
+      case "fork":     return ["dry", "[preview] draft_writer.create logged DRAFT-9999-PREVIEW — no draft write"];
+      case "result":   return ["dry", "[preview] writes were inert; only a RunReport was built"];
+      default:         return [null, null];
+    }
+  }
+
+  function setPos(i){
+    pos = Math.max(0, Math.min(N - 1, i));
+    if(range.value !== String(pos)) range.value = String(pos);
+    render();
+  }
+
+  /* range input drives pos (native drag + keyboard arrows, snapped to integer) */
+  range.addEventListener("input", () => setPos(Number(range.value)));
+
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll("#mode button").forEach(b =>
+      b.classList.toggle("on", b.dataset.mode === m));
+    track.classList.toggle("dry", m === "dry");
+    wrap.classList.toggle("dry", m === "dry");
+    hintEl.textContent = m === "live"
+      ? "each position PERSISTED — real writes fired along the way"
+      : "each position is inert — reads real, writes '[preview] logged, nothing written'";
+    render();
+  }
+  document.querySelectorAll("#mode button").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+  function render(){
+    // move the visual handle + fill to the current station
+    const p = pct(pos);
+    fill.style.width = p + "%";
+    handle.style.left = p + "%";
+
+    // tick states
+    ticksEl.querySelectorAll(".tick").forEach(t => {
+      const i = Number(t.dataset.i);
+      t.classList.toggle("here", i === pos);
+      t.classList.toggle("done", i < pos);
+      t.classList.toggle("touched", STATIONS[i].touched);
+    });
+
+    const s = STATIONS[pos];
+
+    // current-station panel
+    const units = s.units.length
+      ? `<div class="units-h">changed units at this station</div>` +
+        s.units.map(id => renderUnit(id)).join('<div style="height:14px"></div>')
+      : `<div class="units-h">changed units at this station</div>
+         <div class="no-units">none — this station is unchanged by the preview work.</div>`;
+    nowEl.innerHTML =
+      `<div class="head">
+         <span class="lbl">${esc(s.label)}</span>
+         <span class="rolechip ${s.role}">${esc(s.role)}</span>
+         ${s.touched ? `<span class="touchtag">touched by preview</span>` : ``}
+       </div>
+       <div class="detail">${esc(s.detail)}</div>
+       <div style="font-size:12px;color:var(--faint)">${esc(s.sub)}</div>
+       ${units}`;
+
+    // accumulated-state list: RECEIVED → ... → current
+    const rows = [];
+    for(let i = 0; i <= pos; i++){
+      const st = STATIONS[i];
+      const [kind, text] = effect(st);
+      const effHtml = kind
+        ? `<span class="eff ${kind}">${esc(text)}</span>`
+        : `<span class="eff" style="color:var(--faint)">no side effect at this station</span>`;
+      rows.push(
+        `<li class="${i === pos ? "current" : ""}">
+           <span class="n">${st.label.slice(0,1)}</span>
+           <span class="what">${esc(st.label.slice(1).trim())}</span>
+           ${effHtml}
+         </li>`);
+    }
+    accumEl.innerHTML =
+      `<h3>what has happened</h3>
+       <div class="cap">RECEIVED → … → position ${pos + 1} of ${N} &nbsp;·&nbsp; ${mode === "live" ? "LIVE" : "PREVIEW"}</div>
+       <ol>${rows.join("")}</ol>`;
+  }
+
+  setMode("live");
+  setPos(0);
+</script>
+</body>
+</html>

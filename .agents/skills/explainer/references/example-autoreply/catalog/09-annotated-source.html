@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>09 · Annotated Source</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---------- annotated source listing ---------- */
+  .toolbar{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  .toolbar button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .toolbar button:hover{border-color:var(--accent)}
+  .toolbar .count{font-size:12px;color:var(--faint)}
+
+  .src{background:#0a0e14;border:1px solid var(--line);border-radius:8px;
+    padding:8px 0;overflow-x:auto;font-size:13px;line-height:1.6}
+
+  /* one code line */
+  .ln{display:flex;align-items:flex-start}
+  .ln .num{flex:0 0 auto;width:3em;text-align:right;padding-right:12px;
+    color:var(--faint);user-select:none}
+  .ln .mk{flex:0 0 auto;width:1.5em;text-align:center;color:transparent;user-select:none}
+  .ln .code{flex:1;white-space:pre;padding-right:14px}   /* pre => indentation kept */
+
+  /* annotated lines: marker + highlight + clickable */
+  .ln.anno{cursor:pointer}
+  .ln.anno .mk{color:var(--accent)}
+  .ln.anno .code{border-radius:3px}
+  .ln.anno:hover{background:rgba(88,166,255,.07)}
+  .ln.anno:hover .code{background:rgba(88,166,255,.06)}
+  .ln.anno.on{background:rgba(88,166,255,.10)}
+  .ln.anno.on .mk{color:var(--result)}
+
+  /* the gotcha lines get a warmer marker */
+  .ln.anno.warn .mk{color:var(--write)}
+  .ln.anno.warn:hover{background:rgba(240,136,62,.07)}
+  .ln.anno.warn.on{background:rgba(240,136,62,.10)}
+  .ln.anno.warn.on .mk{color:var(--write)}
+
+  /* the inline note revealed under a line */
+  .note{overflow:hidden;max-height:0;transition:max-height .26s ease;
+    background:var(--panel2);border-left:2px solid var(--accent)}
+  .note.warn{border-left-color:var(--white,var(--write));border-left-color:var(--write)}
+  .note.open{max-height:260px}
+  .note .body{padding:9px 14px 11px;font-size:12.5px;color:var(--dim);
+    white-space:normal;line-height:1.55}
+  .note .body b{color:var(--ink)}
+  .note .body .gotcha{color:var(--write);font-weight:600}
+
+  .filetag{margin:8px 2px 0}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Annotated Source</h1>
+  <div class="sub">The real <code>handler()</code> as a normal code listing — line numbers, correct
+    indentation — with expandable margin notes on the lines that matter. Click a
+    <span style="color:var(--accent)">●</span> line to read why it's there.</div>
+
+  <div id="legendrow"></div>
+
+  <div class="toolbar">
+    <button id="toggleAll">Reveal all notes</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="src" id="src"></div>
+  <div class="filetag">responder.py · handler(event, context)</div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+/* Real source of handler(), verbatim. Each entry: [code, annotationKey?].
+   Indentation is REAL leading spaces on `code`; rendered on a white-space:pre
+   row so Python indentation survives (HTML would otherwise collapse it). */
+const LINES = [
+  ['def handler(event, context):'],
+  ['    ...'],
+  ['    # Preview: a DIRECT invoke with {"preview": true, "ticket_id": <id>} —'],
+  ['    # NOT a queue event (no Records).'],
+  ['    if event.get("preview"):', 'fork'],
+  ['        from autoreply.sources.zendesk import parse_ticket_arg'],
+  ['        ticket_id = parse_ticket_arg(event["ticket_id"])'],
+  ['        body = Event('],
+  ['            kind="NEW_TICKET", subject=Subject(ticket_id=ticket_id),'],
+  ['            source=SOURCE, occurred_at=now.isoformat(),'],
+  ['            payload=NewTicketPayload(lang=event.get("lang"),', 'deadenv'],
+  ['                                     first_seen_ms=0, channel=event.get("channel")),'],
+  ['            raw={"id": ticket_id},'],
+  ['        ).model_dump_json()'],
+  ['        result = _run(preview_deps(deps), body,', 'inertdeps'],
+  ['                      now_iso=now.isoformat(), lease_expiry_ts=now.isoformat())'],
+  ['        return preview_payload(result)', 'ret'],
+  [''],
+  ['    for rec in event.get("Records", []):', 'livepath'],
+  ['        _run(deps, rec["body"],'],
+  ['             now_iso=now.isoformat(), lease_expiry_ts=lease_expiry.isoformat())'],
+];
+
+/* Annotations keyed to the marked lines. `warn` flags the two gotchas. */
+const NOTES = {
+  fork: {
+    html: 'The fork. A direct <code>aws lambda invoke</code> sets this; queue deliveries never do. ' +
+          'Everything indented under here is the new preview path.',
+  },
+  deadenv: {
+    warn: true,
+    html: '<span class="gotcha">GOTCHA:</span> <code>channel</code> here is essentially <b>dead</b> — ' +
+          '<code>process_ticket</code> reads channel from the real <b>ROW</b> ' +
+          '(<code>row.get(\'channel\')</code>), not from this payload. It\'s set for shape parity only.',
+  },
+  inertdeps: {
+    html: 'The whole trick: same <code>_run</code>/<code>process_ticket</code>, but handed ' +
+          '<code>preview_deps(deps)</code> — no-op write collaborators. ' +
+          '<code>lease_expiry_ts=now</code> (never-expired) is a deliberate no-op since ' +
+          '<code>claim</code> is a no-op.',
+  },
+  ret: {
+    html: 'Only the preview path returns a value; the queue loop returns <code>None</code>. ' +
+          '<code>handler</code>\'s return type widened to allow this.',
+  },
+  livepath: {
+    html: 'The unchanged live path — now calls the shared <code>_run</code> helper instead of ' +
+          'inlining <code>process_ticket</code>.',
+  },
+};
+
+/* ---------- render ---------- */
+document.getElementById('legendrow').innerHTML =
+  `<div class="legend">
+     <span class="k"><span class="dot" style="background:var(--accent)"></span>annotated line — click to expand</span>
+     <span class="k"><span class="dot" style="background:var(--write)"></span>gotcha (dead channel · no-op deps)</span>
+   </div>`;
+
+function render(){
+  const src = document.getElementById('src');
+  let html = '';
+  LINES.forEach((entry, i) => {
+    const [code, key] = entry;
+    const n = i + 1;
+    const note = key ? NOTES[key] : null;
+    const warn = note && note.warn;
+    if(note){
+      const cls = 'ln anno' + (warn ? ' warn' : '');
+      html += `<div class="${cls}" data-key="${key}">` +
+                `<span class="num">${n}</span>` +
+                `<span class="mk">●</span>` +
+                `<span class="code">${esc(code)}</span>` +
+              `</div>`;
+      html += `<div class="note${warn ? ' warn' : ''}" data-note="${key}">` +
+                `<div class="body">${note.html}</div>` +
+              `</div>`;
+    } else {
+      html += `<div class="ln">` +
+                `<span class="num">${n}</span>` +
+                `<span class="mk"></span>` +
+                `<span class="code">${esc(code)}</span>` +
+              `</div>`;
+    }
+  });
+  src.innerHTML = html;
+}
+render();
+
+document.getElementById('count').textContent =
+  Object.keys(NOTES).length + ' annotated lines';
+
+/* click an annotated line → toggle its note */
+document.getElementById('src').addEventListener('click', (e) => {
+  const line = e.target.closest('.ln.anno');
+  if(!line) return;
+  const key = line.getAttribute('data-key');
+  const note = document.querySelector(`.note[data-note="${key}"]`);
+  const open = note.classList.toggle('open');
+  line.classList.toggle('on', open);
+  syncToggleLabel();
+});
+
+/* reveal-all / hide-all */
+const toggleAllBtn = document.getElementById('toggleAll');
+function allOpen(){
+  const notes = document.querySelectorAll('.note');
+  return [...notes].every(n => n.classList.contains('open'));
+}
+function syncToggleLabel(){
+  toggleAllBtn.textContent = allOpen() ? 'Hide all notes' : 'Reveal all notes';
+}
+toggleAllBtn.addEventListener('click', () => {
+  const open = !allOpen();
+  document.querySelectorAll('.note').forEach(n => n.classList.toggle('open', open));
+  document.querySelectorAll('.ln.anno').forEach(l => l.classList.toggle('on', open));
+  syncToggleLabel();
+});
+syncToggleLabel();
+</script>
+
+<script>
+/* topbar + kicker injected after DOM so they can use shared helpers */
+document.getElementById('top').innerHTML = topbar(
+  "09", "Annotated Source",
+  "literate walkthrough of real code; teaching an actual function line-by-line",
+  "architecture overview; flow across many files; A/B compare"
+);
+document.getElementById('kicker').innerHTML =
+  `<b>When this beats a diagram:</b> reading the real code with the two gotchas called out ` +
+  `(dead <code>channel</code>, no-op deps) is often faster than any diagram for a small, dense change. ` +
+  `You're looking at the file you'd open anyway — just guided.`;
+</script>
+</body>
+</html>

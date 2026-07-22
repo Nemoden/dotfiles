@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COMBINED · The Workbench (5 techniques)</title>
+<link rel="stylesheet" href="../_shared.css">
+<style>
+  /* ============================================================
+     THE WORKBENCH — an IDE-like cockpit layering 5 techniques over
+     ONE shared 'current station' cursor:
+       12 minimap  ·  01+03 spine+scrubber  ·  09 annotated source
+       ·  10 state-machine side-car  ·  02 provenance strip
+     Layout: CSS grid — left rail | center | right rail.
+     ============================================================ */
+  body{overflow-x:hidden}
+
+  .wb{
+    display:grid;
+    grid-template-columns:180px minmax(0,1fr) 260px;
+    gap:14px;
+    max-width:1320px;margin:0 auto;padding:16px 20px 60px;
+    align-items:start;
+  }
+
+  /* every rail region shares a framed, titled card look */
+  .region{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+          overflow:hidden}
+  .region > .rt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+          color:var(--faint);padding:8px 12px;border-bottom:1px solid var(--line);
+          background:var(--panel2);display:flex;align-items:center;gap:8px}
+  .region > .rt .rt-tech{margin-left:auto;color:var(--faint);opacity:.7;font-size:10px}
+  .region > .rb{padding:10px 12px}
+
+  /* ---------- 1. MINIMAP (left rail, technique 12) ---------- */
+  .mm{position:sticky;top:78px}
+  .mm .chip{display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+       border:1px solid var(--line);background:var(--panel2);color:var(--dim);
+       border-radius:8px;padding:7px 9px;margin:0 0 6px;cursor:pointer;font:inherit;
+       font-size:11.5px;line-height:1.25;transition:border-color .15s,background .15s}
+  .mm .chip:hover{border-color:var(--accent)}
+  .mm .chip .cix{flex:none;color:var(--faint)}
+  .mm .chip .clab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mm .chip .cdot{flex:none;width:7px;height:7px;border-radius:2px;background:transparent}
+  .mm .chip.touched .cdot{background:var(--result)}
+  .mm .chip.touched .clab{color:var(--ink)}
+  .mm .chip.current{border-color:var(--accent);background:rgba(88,166,255,.12);color:var(--ink)}
+  .mm .chip.current .cix{color:var(--accent)}
+  .mm .mmnote{font-size:10px;color:var(--faint);margin-top:6px;line-height:1.35}
+
+  /* ---------- 2. SPINE + STEP scrubber (center top, 01 + 03) ---------- */
+  .spinebar .rb{padding:12px}
+  .spine-row{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+  .snode{flex:1 0 auto;min-width:96px;position:relative;display:flex;align-items:center}
+  .snode .sn{flex:1;border:1px solid var(--line);background:var(--panel2);border-radius:8px;
+       padding:7px 8px;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;
+       min-height:52px}
+  .snode .sn:hover{border-color:var(--accent)}
+  .snode.dim .sn{opacity:.5}
+  .snode.touched .sn{border-left:3px solid var(--result)}
+  .snode.current .sn{border-color:var(--accent);background:rgba(88,166,255,.14);
+       box-shadow:0 0 0 1px var(--accent) inset}
+  .snode .sn .sl{font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis}
+  .snode .sn .sr{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
+  .snode .conn{flex:none;width:14px;color:var(--faint);text-align:center;font-size:12px}
+  .snode:last-child .conn{display:none}
+
+  .scrub{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .scrub button{font:inherit;font-size:12px;background:var(--panel2);color:var(--ink);
+       border:1px solid var(--line);border-radius:7px;padding:5px 12px;cursor:pointer}
+  .scrub button:hover{border-color:var(--accent)}
+  .scrub button:disabled{opacity:.4;cursor:default}
+  .scrub .step-read{font-size:11px;color:var(--dim);margin-left:auto}
+  .scrub .step-read b{color:var(--ink)}
+  .scrub .prog{flex-basis:100%;height:3px;background:var(--line);border-radius:2px;margin-top:2px;overflow:hidden}
+  .scrub .prog > i{display:block;height:100%;background:var(--accent);transition:width .3s ease}
+
+  /* ---------- global LIVE | PREVIEW toggle ---------- */
+  .modebar{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{font:inherit;font-size:11px;background:var(--panel2);color:var(--dim);
+       border:0;padding:5px 12px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:#04121f;font-weight:600}
+  .seg button.on.dry{background:var(--inert);color:#120a1f}
+  .modebar .persist{font-size:11px;color:var(--faint);display:inline-flex;align-items:center;gap:6px}
+  .modebar .persist .pdot{width:8px;height:8px;border-radius:50%;background:var(--write)}
+  .modebar .persist.inert .pdot{background:var(--inert)}
+
+  /* ---------- 3. MAIN PANE (center, technique 09) ---------- */
+  .mainpane .rb{padding:12px}
+  .mainpane .mp-detail{color:var(--dim);font-size:12.5px;line-height:1.5;margin:0 0 12px;
+       border-left:2px solid var(--line);padding-left:12px}
+  .mainpane .srcgap{height:14px}
+  .mainpane .mp-empty{color:var(--faint);font-size:12.5px;padding:14px;text-align:center;
+       border:1px dashed var(--line);border-radius:8px}
+
+  /* ---------- 4. STATE-MACHINE side-car (right rail top, technique 10) ---------- */
+  .sm .rb{padding:12px 12px 14px}
+  .sm .sstep{position:relative;padding-left:22px;margin:0 0 4px}
+  .sm .sstep::before{content:"";position:absolute;left:6px;top:16px;bottom:-6px;width:2px;
+       background:var(--line)}
+  .sm .sstep:last-child::before{display:none}
+  .sm .sstate{border:1px solid var(--line);background:var(--panel2);border-radius:8px;
+       padding:6px 9px;position:relative;transition:border-color .15s,background .15s}
+  .sm .sstate .dotm{position:absolute;left:-19px;top:9px;width:9px;height:9px;border-radius:50%;
+       background:var(--faint);border:2px solid var(--panel)}
+  .sm .sstate .snm{font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.03em}
+  .sm .sstate .sds{font-size:10px;color:var(--faint);margin-top:2px;line-height:1.35}
+  .sm .sstep.active .sstate{border-color:var(--accent);background:rgba(88,166,255,.12)}
+  .sm .sstep.active .sstate .snm{color:var(--ink)}
+  .sm .sstep.active .dotm{background:var(--accent)}
+  .sm .sstep.done .dotm{background:var(--result)}
+  .sm .fork-note{font-size:10px;color:var(--inert);margin:8px 0 0;line-height:1.4;
+       border-top:1px dashed var(--line);padding-top:8px}
+  .sm .fork-note b{color:var(--ink)}
+
+  /* ---------- 5. PROVENANCE strip (right rail bottom, technique 02) ---------- */
+  .prov .rb{padding:10px 12px 12px}
+  .prov .phint{font-size:10.5px;color:var(--faint);margin:0 0 8px;line-height:1.4}
+  .prov .pills{display:flex;flex-wrap:wrap;gap:6px}
+  .prov .pill{font:inherit;font-size:11px;background:var(--panel2);color:var(--result);
+       border:1px solid var(--result);border-radius:999px;padding:3px 10px;cursor:pointer;
+       opacity:.82;transition:opacity .15s,background .15s}
+  .prov .pill:hover{opacity:1}
+  .prov .pill.sel{background:rgba(88,166,255,.16);opacity:1;font-weight:600}
+  .prov .ptype{color:var(--faint);font-size:9.5px}
+
+  /* provenance drawer at the bottom of the right rail */
+  .drawer{overflow:hidden;max-height:0;transition:max-height .3s ease;border-top:0 solid var(--line)}
+  .drawer.open{max-height:1200px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+  .drawer .dname{font-size:12px;font-weight:600;color:var(--ink);margin:0 0 2px}
+  .drawer .dname .dt{font-size:10px;color:var(--faint);font-weight:400;margin-left:6px}
+  .drawer .dnote{font-size:11px;color:var(--dim);line-height:1.45;margin:0 0 10px}
+  .drawer .dlab{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+       margin:8px 0 3px}
+  .drawer .pz-pane{font-size:11.5px}
+
+  /* honest experiment caption */
+  .caption{max-width:1320px;margin:0 auto 4px;padding:0 20px}
+  .caption .exp-tag{display:inline-block;font-size:12px;color:var(--dim);
+       border-left:3px solid var(--inert);background:var(--panel2);padding:6px 12px;
+       border-radius:0 8px 8px 0}
+  .caption .exp-tag b{color:var(--ink)}
+  .caption .legendwrap{margin-top:10px}
+
+  .kicker{max-width:1320px;margin:26px auto 0;padding:0 20px}
+  .kicker > div{border-left:3px solid var(--accent);background:var(--panel2);
+       padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:var(--dim)}
+  .kicker b{color:var(--ink)}
+
+  /* ---------- narrow screens: stack the rails ---------- */
+  @media (max-width:980px){
+    .wb{grid-template-columns:1fr}
+    .mm{position:static}
+    .mm .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .mm .chip{width:auto;margin:0}
+    .mm .mmnote{flex-basis:100%}
+  }
+</style>
+</head>
+<body>
+
+<!-- custom topbar: back to catalog ROOT (two levels up from combined-examples/) -->
+<div class="topbar">
+  <a href="../../index.html">◀ catalog</a>
+  <span class="tnum">COMBINED</span>
+  <span class="tname">The Workbench (5 techniques)</span>
+  <span class="spacer"></span>
+  <span class="goodbad"><b>good for:</b> a single dense cockpit — everything at once</span>
+</div>
+
+<div class="caption">
+  <span class="exp-tag"><b>Experiment: is more better, or just busy? You decide.</b>
+    Five techniques share one cursor — minimap, spine+scrubber, annotated source,
+    state-machine, provenance.</span>
+  <div class="legendwrap"><div id="legend"></div></div>
+</div>
+
+<div class="wb">
+
+  <!-- ===== LEFT RAIL: MINIMAP (technique 12) ===== -->
+  <div class="region mm">
+    <div class="rt">Minimap <span class="rt-tech">tech 12</span></div>
+    <div class="rb">
+      <div class="chips" id="minimap"></div>
+      <div class="mmnote">● = touched by the change · highlight = current step</div>
+    </div>
+  </div>
+
+  <!-- ===== CENTER: spine strip on top, big annotated main below ===== -->
+  <div>
+    <!-- SPINE + SCRUBBER (techniques 01 + 03) -->
+    <div class="region spinebar">
+      <div class="rt">Lifecycle spine + step scrubber <span class="rt-tech">tech 01 + 03</span></div>
+      <div class="rb">
+        <div class="spine-row" id="spine"></div>
+
+        <div class="scrub">
+          <button id="btn-prev">◀ Prev</button>
+          <button id="btn-play">▶ Play</button>
+          <button id="btn-next">Next ▶</button>
+          <span class="step-read">station <b id="step-n">1</b> / <span id="step-tot">8</span></span>
+          <div class="prog"><i id="prog"></i></div>
+        </div>
+
+        <div class="modebar">
+          <div class="seg" id="modeseg">
+            <button data-mode="live" class="on">LIVE</button>
+            <button data-mode="dry">PREVIEW</button>
+          </div>
+          <span class="persist" id="persist">
+            <span class="pdot"></span><span id="persist-txt">writes persist</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN PANE: annotated source (technique 09) -->
+    <div class="region mainpane" style="margin-top:14px">
+      <div class="rt">Reading pane · annotated source <span class="rt-tech">tech 09</span></div>
+      <div class="rb" id="mainpane"></div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT RAIL: state-machine top, provenance bottom ===== -->
+  <div>
+    <!-- STATE-MACHINE side-car (technique 10) -->
+    <div class="region sm">
+      <div class="rt">ticket state path <span class="rt-tech">tech 10</span></div>
+      <div class="rb" id="statemachine"></div>
+    </div>
+
+    <!-- PROVENANCE strip (technique 02) -->
+    <div class="region prov" style="margin-top:14px">
+      <div class="rt">Provenance <span class="rt-tech">tech 02</span></div>
+      <div class="rb">
+        <p class="phint">Independent of the step cursor — inspect any value anytime.
+          Click a pill for its born / use code.</p>
+        <div class="pills" id="pills"></div>
+        <div class="drawer" id="drawer"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="kicker" id="kicker"></div>
+
+<script src="../_shared.js"></script>
+<script>
+  document.getElementById("legend").innerHTML = legend();
+
+  document.getElementById("kicker").innerHTML =
+    `<div><b>The workbench is the upper bound, not the recommendation.</b> Almost every
+     explanation wants a <b>subset</b> of this — the spine alone, or annotated source alone.
+     The value of building the maximal cockpit is to <i>feel</i> where "integrated" (one
+     cursor drives everything, so context never scatters) tips into "cluttered" (five
+     regions competing for the same glance). Judge it against the single-technique pages:
+     if a subset reads faster for a given question, that subset wins.</div>`;
+
+  /* ============================================================
+     SHARED STATE: one 'current station' index drives minimap +
+     spine cursor + main pane + state-machine. Provenance is separate.
+     ============================================================ */
+  let cur = 0;                 // index into STATIONS
+  let mode = "live";           // "live" | "dry"
+  let playing = false, timer = null;
+  let selValue = null;         // provenance selection (independent)
+
+  /* STATION → annotated SOURCES keys (technique 09 mapping).
+     sqs/envelope → handler_dryrun; deps → dry_run_deps + inertstore;
+     others fall back to renderUnit() over station.units. */
+  const STATION_SOURCE = {
+    envelope: ["handler_dryrun"],
+    sqs:      ["handler_dryrun"],
+    deps:     ["dry_run_deps", "inertstore"],
+  };
+
+  /* STATION → which state-machine step is active, per the brief:
+     ①-⑤ = RECEIVED ; ⑥ process_ticket drives RECEIVED→CLASSIFYING→CLASSIFIED ;
+     ⑦ = CLASSIFIED ; ⑧ result → AUTO_REPLIED (send fork). */
+  const STATE_STEPS = [
+    { key:"RECEIVED",     desc:"row written by the Intake; not yet claimed" },
+    { key:"CLASSIFYING",  desc:"lease claimed; LLM reasoning in flight" },
+    { key:"CLASSIFIED",   desc:"Verdict produced; fork decided" },
+    { key:"AUTO_REPLIED", desc:"send fork: reply_text built & sent" },
+  ];
+  /* per-station: which state steps are DONE and which is ACTIVE (index into STATE_STEPS).
+     -1 active means "no state driven yet at this station". */
+  function stateFor(stationId){
+    switch(stationId){
+      case "ddissue":  return { active:-1, done:0 };         // pre-row
+      case "monitor":  return { active:0,  done:0 };         // RECEIVED written
+      case "envelope": return { active:0,  done:1 };
+      case "sqs":      return { active:0,  done:1 };
+      case "deps":     return { active:0,  done:1 };
+      case "runworker":return { active:2,  done:2 };         // drives RECEIVED→CLASSIFYING→CLASSIFIED
+      case "fork":     return { active:2,  done:3 };         // CLASSIFIED, fork decided
+      case "result":   return { active:3,  done:4 };         // AUTO_REPLIED
+      default:         return { active:-1, done:0 };
+    }
+  }
+
+  /* -------- MINIMAP (technique 12) -------- */
+  function renderMinimap(){
+    document.getElementById("minimap").innerHTML = STATIONS.map((st,i)=>{
+      const cls = ["chip", st.touched?"touched":"", i===cur?"current":""].join(" ").trim();
+      // short label: strip the circled number, keep the name
+      const short = st.label.replace(/^[①②③④⑤⑥⑦⑧]\s*/,"");
+      const ix = st.label.match(/^[①②③④⑤⑥⑦⑧]/);
+      return `<button class="${cls}" onclick="setStation(${i})" title="${esc(st.label)}">
+        <span class="cix">${ix?ix[0]:(i+1)}</span>
+        <span class="clab">${esc(short)}</span>
+        <span class="cdot"></span>
+      </button>`;
+    }).join("");
+  }
+
+  /* -------- SPINE + SCRUBBER (techniques 01 + 03) -------- */
+  function renderSpine(){
+    document.getElementById("spine").innerHTML = STATIONS.map((st,i)=>{
+      const cls = ["snode", st.touched?"touched":"dim", i===cur?"current":""].join(" ").trim();
+      const short = st.label.replace(/^[①②③④⑤⑥⑦⑧]\s*/,"");
+      return `<div class="${cls}">
+        <div class="sn" onclick="setStation(${i})" title="${esc(st.detail)}">
+          <div class="sl">${esc(st.label.match(/^[①②③④⑤⑥⑦⑧]/)?.[0]||i+1)} ${esc(short)}</div>
+          <div class="sr">${esc(st.role)}</div>
+        </div>
+        <div class="conn">→</div>
+      </div>`;
+    }).join("");
+    document.getElementById("step-tot").textContent = STATIONS.length;
+  }
+  function updateSpineCursor(){
+    document.querySelectorAll("#spine .snode").forEach((n,i)=>
+      n.classList.toggle("current", i===cur));
+    document.getElementById("step-n").textContent = cur+1;
+    document.getElementById("prog").style.width =
+      ((cur)/(STATIONS.length-1)*100)+"%";
+    document.getElementById("btn-prev").disabled = (cur===0 && !playing);
+    document.getElementById("btn-next").disabled = (cur===STATIONS.length-1 && !playing);
+  }
+
+  /* -------- MAIN PANE: annotated source (technique 09) -------- */
+  function renderMain(){
+    const st = STATIONS[cur];
+    let html = `<div class="mp-detail">${esc(st.detail)}</div>`;
+    const srcKeys = STATION_SOURCE[st.id];
+    if(srcKeys){
+      html += srcKeys.map((k,i)=>
+        (i?`<div class="srcgap"></div>`:"") + renderAnnotatedSource(k)).join("");
+    } else if(st.units.length){
+      html += st.units.map(renderUnit).join(`<div class="srcgap"></div>`);
+    } else {
+      html += `<div class="mp-empty">No code units on this station — it is part of the
+               request path but the change does not touch it.</div>`;
+    }
+    document.getElementById("mainpane").innerHTML = html;
+
+    /* annotated-source notes toggle via asToggle; stop propagation so a note
+       click never bubbles to the pane / spine handlers. */
+    document.querySelectorAll("#mainpane .as-line").forEach(line=>
+      line.addEventListener("click", e=>e.stopPropagation()));
+  }
+
+  /* -------- STATE-MACHINE side-car (technique 10) -------- */
+  function renderStateMachine(){
+    const st = STATIONS[cur];
+    const { active, done } = stateFor(st.id);
+    const dry = mode==="dry";
+    let html = STATE_STEPS.map((s,i)=>{
+      const isActive = i===active;
+      const isDone = i<done && !isActive;
+      const cls = ["sstep", isActive?"active":"", isDone?"done":""].join(" ").trim();
+      // in preview the terminal write step is relabelled to make the inert-ness explicit
+      let name = s.key, desc = s.desc;
+      if(dry && s.key==="AUTO_REPLIED"){
+        name = "AUTO_REPLIED*";
+        desc = "fork DECIDED & reply built — but the send is inert (no auto-reply)";
+      }
+      return `<div class="${cls}">
+        <div class="sstate"><span class="dotm"></span>
+          <div class="snm">${esc(name)}</div>
+          <div class="sds">${esc(desc)}</div>
+        </div>
+      </div>`;
+    }).join("");
+    html += dry
+      ? `<p class="fork-note"><b>PREVIEW:</b> states are <i>computed</i> but never
+         persisted — <code>_NoopStore.claim</code> returns True so the path reaches the
+         end, writing nothing. <b>*</b> = would-be terminal.</p>`
+      : `<p class="fork-note"><b>LIVE:</b> each transition is a real Dynamo write; the
+         terminal <b>AUTO_REPLIED</b> sends the auto-reply for real.</p>`;
+    document.getElementById("statemachine").innerHTML = html;
+  }
+
+  /* -------- PROVENANCE strip + drawer (technique 02) -------- */
+  function renderPills(){
+    document.getElementById("pills").innerHTML = Object.keys(VALUES).map(k=>{
+      const v = VALUES[k];
+      return `<button class="pill ${k===selValue?"sel":""}" onclick="selectValue('${k}')">
+        ${esc(v.label)} <span class="ptype">${esc(v.type)}</span>
+      </button>`;
+    }).join("");
+  }
+  function renderDrawer(){
+    const dr = document.getElementById("drawer");
+    if(!selValue){ dr.className="drawer"; dr.innerHTML=""; return; }
+    const v = VALUES[selValue];
+    const code = VALUE_CODE[selValue];
+    let html = `<div class="dname">${esc(v.label)}<span class="dt">${esc(v.type)}</span></div>
+      <div class="dnote">${esc(v.note)}</div>`;
+    if(code){
+      html += `<div class="dlab">born</div>${renderValueCodePane(code.born)}`;
+      html += `<div class="dlab">used</div>${renderValueCodePane(code.use)}`;
+    }
+    dr.className="drawer open";
+    dr.innerHTML = html;
+  }
+  function selectValue(k){
+    selValue = (selValue===k) ? null : k;   // toggle
+    renderPills();
+    renderDrawer();
+  }
+
+  /* ============================================================
+     ONE setter — every technique re-reads the shared cursor.
+     ============================================================ */
+  function setStation(i){
+    cur = Math.max(0, Math.min(STATIONS.length-1, i));
+    renderMinimap();
+    updateSpineCursor();
+    renderMain();
+    renderStateMachine();
+  }
+  function next(){ if(cur<STATIONS.length-1) setStation(cur+1); else if(playing) stopPlay(); }
+  function prev(){ if(cur>0) setStation(cur-1); }
+
+  /* -------- Play / scrubber (technique 03) -------- */
+  function startPlay(){
+    playing = true;
+    document.getElementById("btn-play").textContent = "❚❚ Pause";
+    if(cur===STATIONS.length-1) setStation(0);
+    timer = setInterval(()=>{
+      if(cur>=STATIONS.length-1){ stopPlay(); return; }
+      setStation(cur+1);
+    }, 1500);
+    updateSpineCursor();
+  }
+  function stopPlay(){
+    playing = false;
+    document.getElementById("btn-play").textContent = "▶ Play";
+    if(timer){ clearInterval(timer); timer=null; }
+    updateSpineCursor();
+  }
+  function togglePlay(){ playing ? stopPlay() : startPlay(); }
+
+  /* -------- LIVE | PREVIEW mode toggle -------- */
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll("#modeseg button").forEach(b=>{
+      const on = b.dataset.mode===m;
+      b.classList.toggle("on", on);
+      b.classList.toggle("dry", on && m==="dry");
+    });
+    const persist = document.getElementById("persist");
+    persist.classList.toggle("inert", m==="dry");
+    document.getElementById("persist-txt").textContent =
+      m==="dry" ? "nothing persisted (inert writes)" : "writes persist";
+    renderStateMachine();
+  }
+
+  /* -------- wire up -------- */
+  document.getElementById("btn-prev").addEventListener("click", prev);
+  document.getElementById("btn-next").addEventListener("click", next);
+  document.getElementById("btn-play").addEventListener("click", togglePlay);
+  document.querySelectorAll("#modeseg button").forEach(b=>
+    b.addEventListener("click", ()=>setMode(b.dataset.mode)));
+
+  /* initial render */
+  renderMinimap();
+  renderSpine();
+  renderPills();
+  setMode("live");
+  setStation(0);
+</script>
+</body>
+</html>

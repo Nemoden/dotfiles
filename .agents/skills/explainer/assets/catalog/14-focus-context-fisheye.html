@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>14 · Focus + Context (Fisheye)</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- fisheye-specific layout ---- */
+  .fish{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+
+  /* every station is a flex item that reflows on focus change */
+  .st{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+      overflow:hidden;cursor:pointer;position:relative;
+      transition:opacity .30s ease, max-height .34s cubic-bezier(.2,.7,.2,1),
+                 padding .30s ease, border-color .30s ease, box-shadow .30s ease,
+                 transform .30s ease;
+      outline:none}
+  .st .head{display:flex;align-items:baseline;gap:10px;padding:0}
+  .st .lab{font-weight:600;color:var(--ink)}
+  .st .sub{color:var(--dim);font-size:12px;margin:0}
+  .st .role{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--faint);
+            color:var(--faint);margin-left:auto;flex:none}
+
+  /* degree-of-interest weight classes (JS toggles these) */
+  .st.doi-far   {max-height:34px;padding:8px 13px;opacity:.42}
+  .st.doi-far   .sub, .st.doi-far .body{display:none}
+  .st.doi-near  {max-height:74px;padding:11px 13px;opacity:.78}
+  .st.doi-near  .body{display:none}
+  .st.doi-focus {max-height:1200px;padding:15px 15px 17px;opacity:1;cursor:default}
+
+  /* the depth-of-interest accent: focused glows, near border warms, far stays flat */
+  .st.doi-focus{border-color:var(--accent);
+                box-shadow:0 0 0 1px var(--accent), 0 0 26px -6px var(--accent);
+                background:linear-gradient(180deg,var(--panel2),#131a27)}
+  .st.doi-near {border-color:var(--line)}
+  .st.doi-focus .lab{color:var(--accent)}
+
+  /* thin accent spine on the left tracks role (reuses palette) */
+  .st.role-input .lab::before,
+  .st .lab{position:relative}
+  .st[data-role="core"]  {border-left:3px solid var(--core)}
+  .st[data-role="read"]  {border-left:3px solid var(--read)}
+  .st[data-role="input"] {border-left:3px solid var(--result)}
+  .st[data-role="result"]{border-left:3px solid var(--result)}
+  .st[data-role="write"] {border-left:3px solid var(--write)}
+
+  /* focused-station body */
+  .st .body{margin-top:12px}
+  .st .detail{color:var(--dim);font-size:12.5px;line-height:1.6;margin:0 0 12px;
+              border-left:2px solid var(--line);padding-left:11px}
+  .st .detail b{color:var(--ink)}
+  .st .units{display:flex;flex-direction:column;gap:14px}
+  .st .unit-title{font-weight:600;color:var(--ink);font-size:13px;margin:2px 0 6px}
+  .st .no-units{color:var(--faint);font-size:12px;font-style:italic}
+
+  /* touched marker */
+  .touched{font-size:10px;color:var(--inert);border:1px solid var(--inert);
+           border-radius:999px;padding:1px 6px;margin-left:2px}
+  .untouched{font-size:10px;color:var(--faint);border:1px solid var(--faint);
+             border-radius:999px;padding:1px 6px;margin-left:2px;opacity:.7}
+
+  .hint{color:var(--faint);font-size:11px;margin:2px 0 12px}
+  .hint kbd{background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;
+            border-radius:4px;padding:0 5px;color:var(--dim);font-size:10.5px}
+</style>
+</head>
+<body>
+<div id="tb"></div>
+<div class="wrap">
+  <h1>Focus + Context (Fisheye)</h1>
+  <div class="sub" id="sub"></div>
+  <div id="lg"></div>
+  <div class="hint">Click any station to focus it, or use <kbd>↑</kbd> <kbd>↓</kbd> to move focus. The rest never leaves the screen — it just shrinks.</div>
+
+  <div class="fish" id="fish"></div>
+
+  <div class="kicker" id="kick"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("tb").innerHTML = topbar(
+    "14","Focus + Context (Fisheye)",
+    "depth-on-demand without ever losing the whole; dense flows where context matters",
+    "precise A/B diff; printed/static output; simple linear reading");
+
+  document.getElementById("sub").textContent =
+    "Everything stays on screen. The focused station expands to full detail; its neighbours hold a one-line summary; distant stations collapse to dimmed slivers. Move focus and the sizes re-flow.";
+
+  document.getElementById("lg").innerHTML = legend();
+
+  document.getElementById("kick").innerHTML =
+    "<b>Fisheye keeps the entire flow on screen.</b> The reason it beats a modal or drawer for " +
+    "“where am I?” is that you never navigate <i>away</i> from context to get detail — you " +
+    "just re-weight it. Degree-of-interest falls off with distance from focus (glow → dim → sliver), " +
+    "so the whole lifecycle spine and your current depth are visible in one glance.";
+
+  const fish = document.getElementById("fish");
+  let focus = 4; // start on ⑤ Deps — where the change lives
+
+  // build the station cards once
+  STATIONS.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = "st";
+    el.dataset.role = s.role;
+    el.dataset.idx = i;
+    el.tabIndex = 0;
+
+    const unitsHtml = s.units.length
+      ? `<div class="units">${s.units.map(uid =>
+          `<div><div class="unit-title">${esc(unitTitle(uid))}</div>${renderUnit(uid)}</div>`
+        ).join("")}</div>`
+      : `<div class="no-units">No code units — this station is unchanged by the preview; it is context for the ones that are.</div>`;
+
+    el.innerHTML =
+      `<div class="head">
+         <span class="lab">${esc(s.label)}</span>
+         <span class="${s.touched ? "touched" : "untouched"}">${s.touched ? "touched" : "unchanged"}</span>
+         <span class="role">${esc(s.role)}</span>
+       </div>
+       <p class="sub">${esc(s.sub)}</p>
+       <div class="body">
+         <p class="detail">${esc(s.detail)}</p>
+         ${unitsHtml}
+       </div>`;
+
+    el.addEventListener("click", () => setFocus(i));
+    fish.appendChild(el);
+  });
+
+  const cards = [...fish.children];
+
+  function setFocus(i){
+    focus = Math.max(0, Math.min(STATIONS.length - 1, i));
+    cards.forEach((el, idx) => {
+      const d = Math.abs(idx - focus);
+      el.classList.remove("doi-focus","doi-near","doi-far");
+      el.classList.add(d === 0 ? "doi-focus" : d === 1 ? "doi-near" : "doi-far");
+      el.setAttribute("aria-expanded", d === 0 ? "true" : "false");
+    });
+    cards[focus].focus({preventScroll:true});
+    cards[focus].scrollIntoView({behavior:"smooth", block:"nearest"});
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown"){ e.preventDefault(); setFocus(focus + 1); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); setFocus(focus - 1); }
+  });
+
+  setFocus(focus);
+</script>
+</body>
+</html>

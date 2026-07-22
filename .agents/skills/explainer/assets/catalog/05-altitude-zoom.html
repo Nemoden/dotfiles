@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>05 · Altitude Zoom</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- altitude-specific chrome ---- */
+  .crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+         margin:0 0 20px;padding:9px 12px;border:1px solid var(--line);
+         border-radius:8px;background:var(--panel);font-size:12px}
+  .crumb .pin{color:var(--faint)}
+  .crumb .step{padding:2px 9px;border-radius:999px;border:1px solid var(--line);
+               color:var(--dim);cursor:default;background:var(--panel2)}
+  .crumb .step.clk{cursor:pointer}
+  .crumb .step.clk:hover{color:var(--ink);border-color:var(--accent)}
+  .crumb .step.here{color:var(--ink);border-color:var(--accent);
+                    background:var(--panel);font-weight:600}
+  .crumb .sep{color:var(--faint)}
+  .crumb .focus{margin-left:auto;color:var(--dim);font-size:11px}
+  .crumb .focus b{color:var(--ink)}
+
+  /* ---- fading layer stack ---- */
+  .stage{position:relative}
+  .layer{opacity:0;transform:translateY(6px);transition:opacity .3s ease,transform .3s ease;
+         pointer-events:none;position:absolute;inset:0 0 auto 0}
+  .layer.on{opacity:1;transform:none;pointer-events:auto;position:relative}
+  .altcap{font-size:11px;color:var(--faint);letter-spacing:.08em;
+          text-transform:uppercase;margin-bottom:12px}
+  .altcap b{color:var(--dim)}
+
+  /* ---- L0 mega boxes ---- */
+  .mega{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:stretch}
+  .box{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+       padding:22px 18px;cursor:pointer;transition:border-color .15s,transform .1s;
+       display:flex;flex-direction:column;gap:6px;text-align:left}
+  .box:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .box .lbl{font-weight:600;font-size:15px}
+  .box .one{color:var(--dim);font-size:12px}
+  .box.entry{border-top:3px solid var(--read)}
+  .box.core{border-top:3px solid var(--inert)}
+  .box.res{border-top:3px solid var(--result)}
+  .box .go{margin-top:auto;font-size:11px;color:var(--faint)}
+  .megaflow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:0;align-items:center}
+  .megaflow .fa{color:var(--faint);font-size:20px;padding:0 8px}
+
+  /* ---- L1 swap boxes ---- */
+  .l1grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .l1grid .full{grid-column:1 / -1}
+  .swap{cursor:pointer;transition:border-color .15s,transform .1s}
+  .swap:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .swap .lead{font-size:12px;color:var(--dim);margin-top:4px}
+  .swap .go{font-size:11px;color:var(--faint);margin-top:8px}
+  .l1note{margin:16px 0 4px;font-size:12px;color:var(--dim)}
+
+  /* ---- L2 ground ---- */
+  .l2head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .l2head .name{font-weight:600;font-size:15px}
+  .nav{display:flex;gap:8px;margin-left:auto}
+  .nav button{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+              border-radius:6px;padding:5px 12px;cursor:pointer;font:inherit;font-size:12px}
+  .nav button:hover{color:var(--ink);border-color:var(--accent)}
+  .l2pos{font-size:11px;color:var(--faint);align-self:center}
+</style>
+</head>
+<body>
+<div id="topbar"></div>
+<div class="wrap">
+  <h1>Altitude Zoom</h1>
+  <div class="sub">The <b>same change</b> at three altitudes. At 10,000 ft it is 3 boxes.
+    At ground it is a one-line return-type change (<code>str | None</code> → <code>RunReport</code>)
+    plus a set of no-op doubles. Pick your depth — descend by clicking a box, climb via the breadcrumb.</div>
+  <div id="legend"></div>
+
+  <div class="crumb" id="crumb"></div>
+
+  <div class="stage">
+    <!-- L0 -->
+    <section class="layer" id="L0">
+      <div class="altcap"><b>L0</b> · 10,000 ft — the whole system as three mega-boxes</div>
+      <div class="mega megaflow">
+        <div class="box entry" data-to="L1">
+          <div class="lbl">ENTRY</div>
+          <div class="one">A Zendesk ticket arrives, or a human directly invokes with <code>preview:true</code>.</div>
+          <div class="go">click to descend ▾</div>
+        </div>
+        <div class="fa">→</div>
+        <div class="box core" data-to="L1">
+          <div class="lbl">CORE</div>
+          <div class="one">One path: <code>process_ticket</code> claims, classifies, forks. Collaborators are injected.</div>
+          <div class="go">click to descend ▾</div>
+        </div>
+        <div class="fa">→</div>
+        <div class="box res" data-to="L1">
+          <div class="lbl">RESULT</div>
+          <div class="one">Live: real writes send. Preview: a <code>RunReport</code> you can inspect, nothing persisted.</div>
+          <div class="go">click to descend ▾</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- L1 -->
+    <section class="layer" id="L1">
+      <div class="altcap"><b>L1</b> · 1,000 ft — the collaborator swap + the return-type change</div>
+      <div class="l1grid" id="l1boxes"></div>
+      <div class="l1note">Same change, closer up: <b>reads stay real</b>, every <b>write becomes a no-op double</b>,
+        and <code>process_ticket</code> now returns a <code>RunReport</code> instead of <code>str | None</code>.
+        Click any box for the ground-level diff.</div>
+    </section>
+
+    <!-- L2 -->
+    <section class="layer" id="L2">
+      <div class="altcap"><b>L2</b> · ground — the exact signature/diff for one unit</div>
+      <div class="l2head">
+        <span class="name" id="l2name"></span>
+        <span class="nav">
+          <button id="prev">◀ prev</button>
+          <span class="l2pos" id="l2pos"></span>
+          <button id="next">next ▶</button>
+        </span>
+      </div>
+      <div id="l2body"></div>
+    </section>
+  </div>
+
+  <div class="kicker">
+    <b>Altitude Zoom</b> lets the reader choose their own depth. A skimmer stops at L0 —
+    three boxes, one glance. A digger descends to the exact <code>str | None → RunReport</code>
+    diff. The breadcrumb keeps both oriented: it is always the <i>same change</i>, just re-focused.
+  </div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("topbar").outerHTML =
+    topbar("05","Altitude Zoom",
+      "letting the reader choose their own depth; docs that serve both skimmers and diggers",
+      "showing flow/sequence; side-by-side comparison");
+  document.getElementById("legend").outerHTML = legend();
+
+  // L1 boxes → unit ids at ground level. Order = the L2 walk order.
+  const L1_UNITS = ["drdeps","inertstore","inertwrite","runworker","runresult","payload"];
+  const KIND = { // colour role for the swap box left-border
+    drdeps:"inert", inertstore:"read", inertwrite:"inert",
+    runworker:"core", runresult:"result", payload:"result"
+  };
+  const LEAD = {
+    drdeps:"builds the no-op Deps — the whole swap in one function",
+    inertstore:"reads pass through to the real store; claim/transition just return True",
+    inertwrite:"status / send / draft_writer replaced by no-op doubles",
+    runworker:"the one path, unchanged body — only its return TYPE changes",
+    runresult:"the new dataclass every exit now packs its findings into",
+    payload:"the fixed-shape Pydantic payload the preview handler returns"
+  };
+  const FULLROW = { drdeps:true, payload:true }; // span both columns
+
+  // render L1 boxes
+  document.getElementById("l1boxes").innerHTML = L1_UNITS.map(id =>
+    `<div class="node swap ${KIND[id]} ${FULLROW[id]?'full':''}" data-unit="${id}">
+       <div class="t">${esc(unitTitle(id))}</div>
+       <div class="lead">${esc(LEAD[id])}</div>
+       <div class="go">click for ground-level diff ▾</div>
+     </div>`
+  ).join("");
+
+  // ---- altitude state machine ----
+  let level = "L0";
+  let focusIdx = 0; // index into L1_UNITS for L2
+
+  function show(next){
+    level = next;
+    ["L0","L1","L2"].forEach(l =>
+      document.getElementById(l).classList.toggle("on", l===level));
+    renderCrumb();
+    if(level==="L2") renderL2();
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  function renderCrumb(){
+    const foc = level==="L2"
+      ? unitTitle(L1_UNITS[focusIdx])
+      : (level==="L1" ? "the collaborator swap" : "the whole system");
+    const step = (id,label) => {
+      const order = {L0:0,L1:1,L2:2};
+      const cur = order[level], me = order[id];
+      const here = me===cur;
+      const clk = me < cur; // earlier levels are climbable
+      return `<span class="step ${here?'here':''} ${clk?'clk':''}"
+                    ${clk?`data-climb="${id}"`:''}>${label}</span>`;
+    };
+    document.getElementById("crumb").innerHTML =
+      `<span class="pin">📍</span>` +
+      step("L0","L0 · 10k ft") + `<span class="sep">/</span>` +
+      step("L1","L1 · 1k ft") + `<span class="sep">/</span>` +
+      step("L2","L2 · ground") +
+      `<span class="focus">focus: <b>${esc(foc)}</b></span>`;
+  }
+
+  function renderL2(){
+    const id = L1_UNITS[focusIdx];
+    document.getElementById("l2name").textContent = unitTitle(id);
+    document.getElementById("l2pos").textContent = `${focusIdx+1} / ${L1_UNITS.length}`;
+    document.getElementById("l2body").innerHTML = renderUnit(id);
+  }
+
+  // ---- wiring ----
+  // L0 boxes → L1
+  document.querySelectorAll('#L0 .box').forEach(b =>
+    b.addEventListener("click", () => show("L1")));
+
+  // L1 boxes → L2 focused on the clicked unit
+  document.querySelectorAll('#L1 .swap').forEach(b =>
+    b.addEventListener("click", () => {
+      focusIdx = L1_UNITS.indexOf(b.dataset.unit);
+      show("L2");
+    }));
+
+  // breadcrumb climb
+  document.getElementById("crumb").addEventListener("click", e => {
+    const s = e.target.closest("[data-climb]");
+    if(s) show(s.dataset.climb);
+  });
+
+  // L2 prev/next walk between units at ground level
+  document.getElementById("prev").addEventListener("click", () => {
+    focusIdx = (focusIdx - 1 + L1_UNITS.length) % L1_UNITS.length;
+    renderL2(); renderCrumb();
+  });
+  document.getElementById("next").addEventListener("click", () => {
+    focusIdx = (focusIdx + 1) % L1_UNITS.length;
+    renderL2(); renderCrumb();
+  });
+
+  show("L0");
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 · Call-Tree Outline</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- Call-tree specific ---- */
+  .controls{display:flex;gap:8px;margin:0 0 14px}
+  .controls button{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;font:inherit;font-size:12px;cursor:pointer}
+  .controls button:hover{color:var(--ink);border-color:var(--faint)}
+
+  .tree{font-size:13px;line-height:1.5}
+  .tree ul{list-style:none;margin:0;padding-left:20px;
+    border-left:1px dashed var(--line)}
+  .tree > ul{padding-left:0;border-left:none}
+  .tree li{margin:0}
+
+  .row-l{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:6px}
+  .row-l:hover{background:var(--panel)}
+
+  /* triangle toggle */
+  .tw{width:14px;flex:0 0 14px;color:var(--faint);cursor:pointer;
+    user-select:none;text-align:center;transition:transform .15s}
+  .tw.leaf{visibility:hidden}
+
+  .name{font-weight:600;color:var(--core)}
+  .call{color:var(--faint)}
+  .note-inline{color:var(--dim);font-size:11.5px;font-style:italic}
+
+  /* role-tinted leaves via a left bar on the label */
+  .role{border-left:3px solid transparent;padding-left:7px;border-radius:0}
+  .role.inert  .name{color:var(--inert)}
+  .role.inert  {border-left-color:var(--inert)}
+  .role.read   .name{color:var(--read)}
+  .role.read   {border-left-color:var(--read)}
+  .role.result .name{color:var(--result)}
+  .role.result {border-left-color:var(--result)}
+  .role.core   {border-left-color:var(--core)}
+
+  .peek{border:1px solid var(--line);border-color:var(--inert);color:var(--inert);
+    background:transparent;border-radius:5px;font-size:10px;padding:0 5px;
+    cursor:pointer;line-height:1.6}
+  .peek:hover{background:var(--panel)}
+  .role.read .peek{border-color:var(--read);color:var(--read)}
+  .role.result .peek{border-color:var(--result);color:var(--result)}
+  .role.core .peek{border-color:var(--faint);color:var(--dim)}
+
+  .children.collapsed{display:none}
+  .detail{margin:6px 0 4px 21px}
+  .detail.hide{display:none}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Call-Tree Outline</h1>
+  <div class="sub">
+    The preview request as a collapsible call hierarchy — <code>handler</code> at the root,
+    every callee nested under its caller. Expand a node to see what it calls; hit
+    <span style="color:var(--inert)">🔍</span> on any node to unfold the actual code it maps to,
+    rendered inline.
+  </div>
+
+  <div id="legend"></div>
+
+  <div class="controls">
+    <button id="expandAll">▾ expand all</button>
+    <button id="collapseAll">▸ collapse all</button>
+  </div>
+
+  <div class="tree" id="tree"></div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+document.getElementById("top").outerHTML = topbar(
+  "08","Call-Tree Outline",
+  "'what calls what' / call hierarchy; navigating a code path like an outline",
+  "spatial/flow intuition; timing; A/B comparison"
+);
+document.getElementById("legend").innerHTML = legend();
+
+document.getElementById("kicker").innerHTML =
+  `<b>The one insight, made structural:</b> read the tree top-down and notice that
+   <code>process_ticket</code> sits <b>under <code>_run</code> under <code>handler</code>, unchanged</b> — the
+   same node the live queue path reaches. The preview-ness is <b>not</b> in that spine; it lives
+   <b>entirely inside the <code>preview_deps</code> subtree</b> (its 🔍 is the one-line
+   <code>dataclasses.replace</code>; its children are the no-op doubles that swap in)
+   handed to <code>_run</code>. Collapse everything but those two siblings and the shape is the
+   whole argument: <b>same path, swapped collaborators.</b>`;
+
+/* ---- The call tree. Each node:
+     name  : symbol
+     call  : how it's invoked / signature hint (optional)
+     unit  : UNITS id → gets a 🔍 that reveals renderUnit() (optional)
+     note  : one-line inline note for unit-less nodes (optional)
+     role  : inert | read | result | core (leaf tint)
+     kids  : child nodes
+     open  : start expanded?                                          ---- */
+const TREE = [{
+  name:"handler(event)", call:"— Responder Lambda entry", unit:"handler",
+  role:"core", open:true,
+  kids:[
+    { name:"preview_deps(deps)", call:"→ Deps", unit:"drdeps",
+      role:"core", open:true,
+      kids:[
+        { name:"_NoopStore(real.store)", call:"reads pass through", unit:"inertstore", role:"read" },
+        { name:"_NoopStatus()", call:"no Zendesk write", unit:"inertwrite", role:"inert" },
+        { name:"_NoopDraft()", call:"fake DRAFT key", unit:"inertwrite", role:"inert" },
+        { name:"_NoopReply()", call:"no reply sent", unit:"inertwrite", role:"inert" },
+        { name:"audit=None", call:"(no double)",
+          note:"no double — the S3 audit path is simply skipped (code guards `if audit is not None`)", role:"inert" },
+      ]},
+    { name:"_run(preview_deps(deps), body)", call:"→ RunReport", unit:"runhelper",
+      role:"core", open:true,
+      kids:[
+        { name:"process_ticket(...)", call:"→ RunReport · UNCHANGED body", unit:"runworker",
+          role:"core", open:true,
+          kids:[
+            { name:"store.claim()", call:"→ True (no-op gate)", unit:"inertstore", role:"inert" },
+            { name:"store.get()", call:"→ real row", unit:"inertstore", role:"read" },
+            { name:"classify_fn()", call:"→ Verdict (real, LLM)",
+              note:"reasoning collaborator — kept real by preview_deps; no unit, this is the point of the preview", role:"read" },
+            { name:"RunReport(...)", call:"packs verdict / reply / evidence", unit:"runresult", role:"result" },
+          ]},
+      ]},
+    { name:"preview_payload(result)", call:"→ PreviewPayload", unit:"payload", role:"result" },
+  ]
+}];
+
+/* ---- render ---- */
+const tree = document.getElementById("tree");
+
+function nodeEl(node){
+  const li = document.createElement("li");
+  const hasKids = node.kids && node.kids.length;
+  const roleCls = node.role ? "role "+node.role : "";
+
+  const line = document.createElement("div");
+  line.className = "row-l "+roleCls;
+
+  // triangle
+  const tw = document.createElement("span");
+  tw.className = "tw"+(hasKids ? "" : " leaf");
+  tw.textContent = hasKids ? (node.open ? "▾" : "▸") : "•";
+  line.appendChild(tw);
+
+  // name + call hint
+  const nm = document.createElement("span");
+  nm.className = "name";
+  nm.textContent = node.name;
+  line.appendChild(nm);
+  if(node.call){
+    const c = document.createElement("span");
+    c.className = "call";
+    c.textContent = node.call;
+    line.appendChild(c);
+  }
+
+  // 🔍 for unit-mapped nodes, else inline note
+  let detail = null;
+  if(node.unit){
+    const peek = document.createElement("button");
+    peek.className = "peek";
+    peek.textContent = "🔍 "+node.unit;
+    peek.title = "reveal "+unitTitle(node.unit);
+    line.appendChild(peek);
+
+    detail = document.createElement("div");
+    detail.className = "detail hide";
+    detail.innerHTML = renderUnit(node.unit);   // indentation via shared renderer
+
+    peek.addEventListener("click", e=>{
+      e.stopPropagation();
+      detail.classList.toggle("hide");
+      peek.style.opacity = detail.classList.contains("hide") ? "" : ".6";
+    });
+  } else if(node.note){
+    const n = document.createElement("span");
+    n.className = "note-inline";
+    n.textContent = "— "+node.note;
+    line.appendChild(n);
+  }
+
+  li.appendChild(line);
+  if(detail) li.appendChild(detail);
+
+  // children
+  if(hasKids){
+    const ul = document.createElement("ul");
+    ul.className = "children"+(node.open ? "" : " collapsed");
+    node.kids.forEach(k => ul.appendChild(nodeEl(k)));
+    li.appendChild(ul);
+
+    const toggle = ()=>{
+      const c = ul.classList.toggle("collapsed");
+      tw.textContent = c ? "▸" : "▾";
+    };
+    tw.addEventListener("click", e=>{ e.stopPropagation(); toggle(); });
+    // clicking the name toggles too (but 🔍 is stop-propagated)
+    line.addEventListener("click", ()=> toggle());
+  }
+  return li;
+}
+
+const rootUl = document.createElement("ul");
+TREE.forEach(n => rootUl.appendChild(nodeEl(n)));
+tree.appendChild(rootUl);
+
+/* ---- expand / collapse all ---- */
+function setAll(collapse){
+  tree.querySelectorAll("ul.children").forEach(ul=>{
+    ul.classList.toggle("collapsed", collapse);
+  });
+  tree.querySelectorAll(".tw:not(.leaf)").forEach(tw=>{
+    tw.textContent = collapse ? "▸" : "▾";
+  });
+}
+document.getElementById("expandAll").addEventListener("click", ()=>setAll(false));
+document.getElementById("collapseAll").addEventListener("click", ()=>setAll(true));
+</script>
+</body>
+</html>

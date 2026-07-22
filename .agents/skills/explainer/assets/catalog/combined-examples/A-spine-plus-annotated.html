@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COMBINED · Spine + Annotated Source</title>
+<link rel="stylesheet" href="../_shared.css">
+<style>
+  /* --- spine layout (technique 01), scoped here --- */
+  .spine{max-width:760px}
+  .station{position:relative}
+  .station .node{cursor:default}
+  .station.touched .node{cursor:pointer}
+  .station.touched .node:hover{border-color:var(--accent)}
+  .station.dim{opacity:.42}
+  .station.dim .node{background:var(--panel)}
+  .station .node .head{display:flex;align-items:center;gap:8px}
+  .station .node .head .chev{margin-left:auto;color:var(--faint);font-size:12px;
+       transition:transform .2s ease}
+  .station.open .node .head .chev{transform:rotate(90deg);color:var(--accent)}
+  .station .badge{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--faint);
+       color:var(--faint)}
+  .station.touched .badge{color:var(--result);border-color:var(--result)}
+  .spine-arrow{color:var(--faint);text-align:center;font-size:15px;margin:4px 0;line-height:1}
+  .exp{overflow:hidden;max-height:0;transition:max-height .3s ease}
+  .exp.open{max-height:4000px;margin-top:10px}
+  .exp .expwrap{border-left:2px solid var(--line);margin-left:6px;padding-left:14px}
+  .exp .stationhint{color:var(--dim);font-size:12px;margin:0 0 10px}
+  .exp .srcgap{height:14px}
+</style>
+</head>
+<body>
+
+<!-- custom topbar: back to catalog ROOT (two levels up from combined-examples/) -->
+<div class="topbar">
+  <a href="../../index.html">◀ catalog</a>
+  <span class="tnum">COMBINED</span>
+  <span class="tname">Spine + Annotated Source</span>
+  <span class="spacer"></span>
+  <span class="goodbad"><b>good for:</b> big-picture + read the actual code in place</span>
+</div>
+
+<div class="wrap">
+  <h1>Lifecycle Spine + Annotated Source</h1>
+  <p class="sub">
+    Two techniques layered: the <b>lifecycle spine</b> (technique 01) is the frame —
+    the whole request path, entry to exit. But expanding a touched station no longer
+    shows a plain diff; it reveals <b>annotated source</b> (technique's code-reading
+    primitive): real code with clickable margin notes, in context.
+  </p>
+
+  <div id="legend"></div>
+
+  <div class="spine" id="spine"></div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<script src="../_shared.js"></script>
+<script>
+  document.getElementById("legend").innerHTML = legend();
+
+  document.getElementById("kicker").innerHTML =
+    `<b>Annotated source is a PRIMITIVE.</b> It is not a page of its own — it slots into
+     any technique that shows code. Here it slots into the spine's expand panels, and the
+     spine stops being just a <i>map</i> of the change and becomes a <b>guided reading</b>:
+     you follow the request path, and at each touched stop you drop straight into the real
+     lines with the notes that explain them.`;
+
+  /* Which SOURCES key (annotated source) a station reveals, if any.
+     Stations without a mapping fall back to renderUnit() over station.units. */
+  const STATION_SOURCE = {
+    envelope: ["handler_dryrun"],
+    sqs:      ["handler_dryrun"],
+    deps:     ["dry_run_deps", "inertstore"],
+    // runworker + result: no SOURCES key → renderUnit() over their units
+  };
+
+  function stationBody(st){
+    let html = `<div class="expwrap">`;
+    html += `<div class="stationhint">${esc(st.detail)}</div>`;
+
+    const srcKeys = STATION_SOURCE[st.id];
+    if (srcKeys) {
+      // annotated source embedded as the station's payload
+      html += srcKeys.map((k,i) =>
+        (i ? `<div class="srcgap"></div>` : "") + renderAnnotatedSource(k)
+      ).join("");
+    } else {
+      // fallback: full diff units for stations without a SOURCES mapping
+      html += (st.units.length
+        ? st.units.map(renderUnit).join(`<div class="srcgap"></div>`)
+        : `<div class="stationhint">No code units on this station.</div>`);
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  function render(){
+    const spine = document.getElementById("spine");
+    let html = "";
+    STATIONS.forEach((st, idx) => {
+      const touched = st.touched;
+      const cls = ["station", touched ? "touched" : "dim"].join(" ");
+      const badge = touched ? "touched" : "untouched";
+      html += `
+        <div class="${cls}" id="stn_${st.id}">
+          <div class="node ${st.role}" ${touched ? `onclick="toggle('${st.id}')"` : ""}>
+            <div class="head">
+              <span class="t">${esc(st.label)}</span>
+              <span class="badge">${badge}</span>
+              ${touched ? `<span class="chev">▶</span>` : ""}
+            </div>
+            <div class="f">${esc(st.sub)}</div>
+          </div>
+          ${touched ? `<div class="exp" id="exp_${st.id}">${stationBody(st)}</div>` : ""}
+        </div>`;
+      if (idx < STATIONS.length - 1) html += `<div class="spine-arrow">↓</div>`;
+    });
+    spine.innerHTML = html;
+  }
+
+  function toggle(id){
+    const stn = document.getElementById("stn_" + id);
+    const exp = document.getElementById("exp_" + id);
+    if (!stn || !exp) return;
+    const open = exp.classList.toggle("open");
+    stn.classList.toggle("open", open);
+  }
+
+  render();
+
+  /* Annotated-source notes toggle via the shared asToggle. The code lines live
+     INSIDE a clickable station node, so a click on a note would bubble up and
+     collapse the station. Stop propagation on any annotated-source line so
+     toggling a note never closes the spine station around it. */
+  document.querySelectorAll(".as-line").forEach(line => {
+    line.addEventListener("click", e => e.stopPropagation());
+  });
+</script>
+</body>
+</html>

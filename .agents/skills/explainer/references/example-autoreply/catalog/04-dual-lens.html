@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 — Dual-Lens Toggle</title>
+<link rel="stylesheet" href="./_shared.css">
+<style>
+  /* ---------- the toggle: the star of the show ---------- */
+  .lens{display:flex;align-items:center;gap:14px;margin:6px 0 20px}
+  .switch{display:inline-flex;border:1px solid var(--line);border-radius:999px;
+          background:var(--panel);padding:3px;position:relative;user-select:none}
+  .switch button{border:0;background:transparent;color:var(--dim);cursor:pointer;
+          font:inherit;font-size:13px;font-weight:600;padding:7px 20px;border-radius:999px;
+          position:relative;z-index:2;transition:color .28s}
+  /* the sliding pill sits behind the labels and cross-fades its colour */
+  .switch .pill{position:absolute;top:3px;bottom:3px;left:3px;border-radius:999px;
+          z-index:1;transition:transform .28s ease, background .28s ease, box-shadow .28s ease;
+          width:calc(50% - 3px)}
+  .mode-live  .switch .pill{transform:translateX(0);
+          background:rgba(240,136,62,.18);box-shadow:inset 0 0 0 1px var(--write)}
+  .mode-dry   .switch .pill{transform:translateX(100%);
+          background:rgba(163,113,247,.18);box-shadow:inset 0 0 0 1px var(--inert)}
+  .mode-live  .switch button.b-live{color:var(--write)}
+  .mode-dry   .switch button.b-dry {color:var(--inert)}
+  .lens-hint{font-size:12px;color:var(--faint)}
+  .lens-hint b{color:var(--dim)}
+
+  /* ---------- the spine, rendered ONCE ---------- */
+  .spine{margin:8px 0 0}
+  .station{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+           padding:0;transition:border-color .28s, box-shadow .28s, opacity .28s}
+  .station.stable{opacity:.62}                    /* reads: don't flip, sit quiet */
+  .st-head{display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 14px;user-select:none}
+  .st-head:hover{background:var(--panel)}
+  .st-meta{flex:1;min-width:0}
+  .st-label{font-weight:600}
+  .st-sub{color:var(--dim);font-size:12px;margin-top:2px}
+  .st-caret{color:var(--faint);font-size:12px;transition:transform .2s;flex-shrink:0}
+  .station.open .st-caret{transform:rotate(90deg)}
+
+  /* the mode-dependent border colour, driven by a CSS var flipped per mode */
+  .station.flips{border-left:3px solid var(--edge)}
+
+  /* the flipping badge: caption + pill. cross-fades on mode change */
+  .badge{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;
+         transition:opacity .28s ease}
+  .badge.fade{opacity:0}                           /* momentary state mid-swap */
+  .badge .pillrole{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap}
+  .badge .cap{font-size:11px;color:var(--faint);white-space:nowrap}
+  /* colour classes reused for badge pills */
+  .role-write{color:var(--write);border-color:var(--write)}
+  .role-inert{color:var(--inert);border-color:var(--inert)}
+  .role-read {color:var(--read); border-color:var(--read)}
+  .role-result{color:var(--result);border-color:var(--result)}
+  .role-core {color:var(--core); border-color:var(--core)}
+
+  .reveal{overflow:hidden;max-height:0;transition:max-height .28s ease}
+  .reveal.open{max-height:1200px}
+  .st-body{padding:0 14px 14px}
+  .st-detail{color:var(--ink);font-size:12.5px;line-height:1.6;
+             border-left:2px solid var(--line);padding:2px 0 2px 12px;margin:6px 0 12px}
+  .st-unit{margin-top:12px}
+  .st-unit-title{font-size:12px;color:var(--dim);margin-bottom:5px}
+  .st-unit-title b{color:var(--ink)}
+  .st-nounit{color:var(--faint);font-size:12px;font-style:italic}
+  .spine-arrow{text-align:center;color:var(--faint);font-size:16px;line-height:1;margin:5px 0;height:14px}
+
+  /* ---------- "what flipped" summary ---------- */
+  .flipsum{margin:22px 0 0;border:1px solid var(--line);border-radius:var(--radius);
+           background:var(--panel);padding:14px 16px}
+  .flipsum h3{margin:0 0 4px;font-size:13px}
+  .flipsum .cur{font-size:12px;color:var(--dim);margin-bottom:10px}
+  .flipsum .cur b{color:var(--edge)}
+  .flipsum ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .flipsum li{display:flex;align-items:baseline;gap:10px;font-size:12.5px}
+  .flipsum li .st{color:var(--faint);flex-shrink:0;width:2em}
+  .flipsum li .now{color:var(--edge);font-weight:600}
+  .flipsum li .arr{color:var(--faint)}
+</style>
+</head>
+<body class="mode-live">
+<div id="top"></div>
+<div class="wrap">
+  <h1>Dual-Lens Toggle</h1>
+  <div class="sub">
+    One diagram, two lenses. The lifecycle spine is drawn <b>once</b>; the
+    <b>[ LIVE | PREVIEW ]</b> switch re-tints it in place. Watch the write-stations
+    flip <span style="color:var(--write)">orange "real write"</span> ⇄
+    <span style="color:var(--inert)">purple "inert double"</span> while the reads
+    stay <span style="color:var(--read)">green</span> in both. Nothing re-lays-out —
+    only the badges cross-fade, so your eye tracks exactly what differs.
+    <b>Click a station</b> for its detail + the code it owns.
+  </div>
+  <div id="legend"></div>
+
+  <div class="lens" id="lens">
+    <div class="switch" role="tablist" aria-label="mode">
+      <span class="pill"></span>
+      <button class="b-live" data-mode="live">LIVE</button>
+      <button class="b-dry"  data-mode="dry">PREVIEW</button>
+    </div>
+    <span class="lens-hint"><b>same spine</b> — the switch swaps write collaborators for inert doubles</span>
+  </div>
+
+  <div id="spine" class="spine"></div>
+  <div id="flipsum"></div>
+  <div id="kicker"></div>
+</div>
+
+<script src="./_shared.js"></script>
+<script>
+  document.getElementById("top").innerHTML =
+    topbar("04","Dual-Lens Toggle",
+      "comparing two modes of the SAME structure (before/after, live/preview, prod/test)",
+      "showing a linear process; deep per-node detail");
+  document.getElementById("legend").innerHTML = legend();
+
+  /* ------------------------------------------------------------------
+     LENS TABLE: for each station, how each lens tints it.
+     Reads keep the SAME entry in both lenses (stable). Write-relevant
+     stations carry a distinct entry per lens — that difference IS the flip.
+     role -> badge pill colour class + label; cap -> the small caption. ------ */
+  const LENS = {
+    // ④ entry: live = queue delivery (real), preview = direct invoke fork
+    sqs: {
+      flips:true,
+      live:{ role:"core", label:"queue event",   edge:"--write",
+             cap:"queue Records → handler loop" },
+      dry: { role:"core", label:"direct invoke", edge:"--inert",
+             cap:"aws lambda invoke {preview:true}" },
+    },
+    // ⑤ deps: the heart of the flip
+    deps: {
+      flips:true,
+      live:{ role:"write", label:"real writes", edge:"--write",
+             cap:"real store · status · draft_writer · send" },
+      dry: { role:"inert", label:"inert doubles", edge:"--inert",
+             cap:"reads real · every WRITE swapped for a double" },
+    },
+    // ⑥ process_ticket: same code, but its side effects land or don't
+    runworker: {
+      flips:true,
+      live:{ role:"write", label:"persists",  edge:"--write",
+             cap:"claim + transitions hit the store" },
+      dry: { role:"inert", label:"no write",   edge:"--inert",
+             cap:"[preview] logged, claim gate returns True" },
+    },
+    // ⑧ result: real side effects vs a RunReport payload
+    result: {
+      flips:true,
+      live:{ role:"write", label:"writes fire", edge:"--write",
+             cap:"store write · auto-reply sent · draft" },
+      dry: { role:"result", label:"RunReport only", edge:"--result",
+             cap:"[preview] logged, no write → PreviewPayload" },
+    },
+    // reads / stable stations — SAME badge in both lenses
+    ddissue:  { flips:false, both:{ role:"read", label:"input",     edge:"--read", cap:"raw Zendesk ticket (uuid)" } },
+    monitor:  { flips:false, both:{ role:"read", label:"real read", edge:"--read", cap:"row read is real in both modes" } },
+    envelope: { flips:false, both:{ role:"read", label:"envelope",  edge:"--read", cap:"validated the same in both" } },
+    fork:     { flips:false, both:{ role:"core", label:"pure fn",   edge:"--core", cap:"decision is identical in both" } },
+  };
+  function lensFor(id, mode){
+    const L = LENS[id];
+    return L.flips ? L[mode] : L.both;
+  }
+
+  /* ---------- render the spine ONCE ---------- */
+  const spine = document.getElementById("spine");
+  const flipping = [];   // station els that flip, for the animation pass
+
+  STATIONS.forEach((s, i) => {
+    const L = LENS[s.id];
+    const el = document.createElement("div");
+    el.className = "station " + (L.flips ? "flips" : "stable");
+    el.dataset.id = s.id;
+
+    const units = s.units.length
+      ? s.units.map(id =>
+          `<div class="st-unit">
+             <div class="st-unit-title"><b>${esc(unitTitle(id))}</b></div>
+             ${renderUnit(id)}
+           </div>`).join("")
+      : `<div class="st-nounit">On the path, but the change does not touch it — same in both lenses.</div>`;
+
+    el.innerHTML =
+      `<div class="st-head">
+         <span class="st-caret">▶</span>
+         <div class="st-meta">
+           <div class="st-label">${esc(s.label)}</div>
+           <div class="st-sub">${esc(s.sub)}</div>
+         </div>
+         <span class="badge">
+           <span class="pillrole"></span>
+           <span class="cap"></span>
+         </span>
+       </div>
+       <div class="reveal">
+         <div class="st-body">
+           <div class="st-detail">${esc(s.detail)}</div>
+           ${units}
+         </div>
+       </div>`;
+
+    const head = el.querySelector(".st-head");
+    const reveal = el.querySelector(".reveal");
+    head.addEventListener("click", () => {
+      const open = el.classList.toggle("open");
+      reveal.classList.toggle("open", open);
+    });
+
+    spine.appendChild(el);
+    if (L.flips) flipping.push(el);
+    if (i < STATIONS.length - 1) {
+      const a = document.createElement("div");
+      a.className = "spine-arrow";
+      a.textContent = "↓";
+      spine.appendChild(a);
+    }
+  });
+
+  /* ---------- paint a station's badge for a mode (no layout change) ---------- */
+  function paintStation(el, mode){
+    const view = lensFor(el.dataset.id, mode);
+    const pill = el.querySelector(".pillrole");
+    const cap  = el.querySelector(".cap");
+    pill.className = "pillrole role-" + view.role;
+    pill.textContent = view.label;
+    cap.textContent = view.cap;
+    el.style.setProperty("--edge", `var(${view.edge})`);
+  }
+
+  /* ---------- the "what flipped" summary ---------- */
+  function renderFlipSum(mode){
+    const isDry = mode === "dry";
+    const rows = STATIONS
+      .filter(s => LENS[s.id].flips)
+      .map(s => {
+        const now  = lensFor(s.id, mode);
+        const then = lensFor(s.id, isDry ? "live" : "dry");
+        return `<li>
+          <span class="st">${esc(s.label.slice(0,1))}</span>
+          <span>
+            <span class="lbl">${esc(s.label.slice(2))}</span> —
+            <span style="text-decoration:line-through;color:var(--faint)">${esc(then.label)}</span>
+            <span class="arr">→</span>
+            <span class="now">${esc(now.label)}</span>
+            <span style="color:var(--faint)"> · ${esc(now.cap)}</span>
+          </span>
+        </li>`;
+      }).join("");
+
+    const stableCount = STATIONS.filter(s => !LENS[s.id].flips).length;
+    document.getElementById("flipsum").innerHTML =
+      `<div class="flipsum">
+         <h3>What flipped — <span style="color:var(--edge)">${isDry ? "PREVIEW" : "LIVE"}</span> lens</h3>
+         <div class="cur">${flipping.length} write-relevant stations flip;
+           <b>${stableCount} read/pure stations are identical in both lenses</b>.</div>
+         <ul>${rows}</ul>
+       </div>`;
+    document.getElementById("flipsum")
+      .querySelector(".flipsum").style.setProperty("--edge",
+        `var(${isDry ? "--inert" : "--write"})`);
+  }
+
+  /* ---------- drive the mode ---------- */
+  let mode = "live";
+  function setMode(next){
+    if (next === mode) return;
+    mode = next;
+    document.body.classList.toggle("mode-dry",  mode === "dry");
+    document.body.classList.toggle("mode-live", mode === "live");
+
+    // cross-fade only the flipping badges: fade out → repaint → fade in
+    flipping.forEach(el => el.querySelector(".badge").classList.add("fade"));
+    setTimeout(() => {
+      flipping.forEach(el => {
+        paintStation(el, mode);
+        el.querySelector(".badge").classList.remove("fade");
+      });
+      renderFlipSum(mode);
+    }, 200);
+
+    // update the accent var used by summary text/borders live
+    document.documentElement.style.setProperty("--edge",
+      `var(${mode === "dry" ? "--inert" : "--write"})`);
+  }
+
+  document.querySelectorAll(".switch button").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+  // initial paint (all stations, both flipping + stable, no animation)
+  document.querySelectorAll(".station").forEach(el => paintStation(el, mode));
+  document.documentElement.style.setProperty("--edge", "var(--write)");
+  renderFlipSum(mode);
+
+  document.getElementById("kicker").innerHTML =
+    `<div class="kicker">
+       <b>The toggle IS the design.</b> Preview isn't a second code path — it's the
+       <b>same spine</b> with its WRITE collaborators swapped for inert doubles at
+       ⑤ <code>Deps</code>. Flipping the lens re-tints ④ ⑤ ⑥ ⑧ in place;
+       the reads (② Intake, ③ envelope) and the pure ⑦ fork are <b>byte-identical</b>
+       between lenses. That is why a preview is trustworthy: everything green you
+       see in PREVIEW is the <i>same real read</i> LIVE performs.
+     </div>`;
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 · Narrative Walkthrough</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- prose column in a readable measure ---- */
+  .story{max-width:70ch;font:15px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .story p{margin:0 0 18px}
+  .story .lede{color:var(--ink);font-size:16px}
+  .story h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+            margin:26px 0 8px;font-weight:600}
+
+  /* ---- inline reveal chip ---- */
+  .ref{color:var(--accent);cursor:pointer;font:inherit;background:none;border:0;padding:0;
+       text-decoration:underline dotted;text-underline-offset:3px;
+       border-radius:3px;white-space:nowrap}
+  .ref .mag{font-size:.8em;opacity:.7;margin-left:1px}
+  .ref:hover{color:var(--ink);text-decoration-color:var(--ink)}
+  .ref:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .ref.active{color:var(--ink);background:var(--panel2);
+              text-decoration-color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
+  .story code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ---- layout: prose left, docked evidence panel right ---- */
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:34px;align-items:start;margin-top:8px}
+
+  .dock{position:sticky;top:78px;border:1px solid var(--line);border-radius:var(--radius);
+        background:var(--panel);overflow:hidden}
+  .dock .dhead{display:flex;align-items:center;gap:8px;padding:10px 13px;
+               border-bottom:1px solid var(--line);background:var(--panel2)}
+  .dock .dhead .dt{font-weight:600;font-size:13px;flex:1;min-width:0;
+                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dock .dhead .dclose{background:none;border:1px solid var(--line);color:var(--dim);
+        border-radius:6px;cursor:pointer;font-size:14px;line-height:1;padding:3px 8px}
+  .dock .dhead .dclose:hover{color:var(--ink);border-color:var(--dim)}
+  .dock .dbody{padding:12px 13px}
+  .dock .dhint{padding:34px 16px;color:var(--faint);font-size:12.5px;text-align:center}
+  .dock .dhint b{color:var(--dim)}
+
+  /* ---- narrow screens: dock becomes an inline drawer under the active paragraph ---- */
+  .drawer{display:none;margin:0 0 18px;border:1px solid var(--line);border-radius:var(--radius);
+          background:var(--panel);overflow:hidden}
+  .drawer .dhead{display:flex;align-items:center;gap:8px;padding:9px 12px;
+                 border-bottom:1px solid var(--line);background:var(--panel2)}
+  .drawer .dhead .dt{font-weight:600;font-size:12.5px;flex:1}
+  .drawer .dhead .dclose{background:none;border:1px solid var(--line);color:var(--dim);
+        border-radius:6px;cursor:pointer;font-size:13px;padding:2px 7px}
+  .drawer .dbody{padding:11px 12px}
+
+  @media (max-width:880px){
+    .layout{grid-template-columns:1fr}
+    .dock{display:none}
+    .drawer.open{display:block}
+  }
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <div class="story">
+    <h1>The preview, told as a story</h1>
+  </div>
+  <p class="sub">Read top to bottom. The underlined terms<span class="mag">🔍</span> are the evidence — click one and the actual code docks on the right, without losing your place in the sentence.</p>
+
+  <div class="layout">
+    <!-- PROSE COLUMN -->
+    <main class="story" id="prose">
+
+      <p class="lede">You have a live Ticket arriving in Zendesk and a question that has no safe answer today:
+      <em>what would the responder actually do to this?</em> Running it for real is the only way to find out —
+      and that means writes. It claims a lease in Dynamo, transitions the ticket, maybe files a draft,
+      maybe sends the auto-reply, maybe stashes an audit blob in S3. You cannot preview the decision without
+      committing to its consequences.</p>
+      <div class="drawer" data-drawer></div>
+
+      <p>The way out was hiding in plain sight.
+      <button class="ref" data-ref="runworker">process_ticket<span class="mag">🔍</span></button>
+      never touches Dynamo, Zendesk, the draft, the auto-reply or S3 directly — every side effect already goes
+      through a collaborator handed in from outside. If the writes are injected, then a preview isn't a
+      new behaviour we bolt on. It's the <em>same</em> behaviour with different collaborators. There is no
+      second code path to write, and therefore no second code path to drift out of sync.</p>
+      <div class="drawer" data-drawer></div>
+
+      <p>That insight becomes one function.
+      <button class="ref" data-ref="drdeps">preview_deps<span class="mag">🔍</span></button>
+      takes the real dependency bundle and returns a copy with every <em>write</em> collaborator swapped
+      for a no-op double — while keeping the reasoning collaborators (classify, the draft brief, the reply template)
+      and the real store's <em>reads</em> untouched. The reasoning stays honest; only the consequences are
+      neutralised. Crucially,
+      <button class="ref" data-ref="runworker">process_ticket<span class="mag">🔍</span></button>
+      is never told any of this. It receives dependencies, as always, and runs.</p>
+      <div class="drawer" data-drawer></div>
+
+      <p>The doubles are deliberately dull.
+      <button class="ref" data-ref="inertstore">_NoopStore<span class="mag">🔍</span></button>
+      passes reads straight through to the real store, so the run sees the real row, the real channel, the real
+      IAM identity — but its <code>claim</code> and <code>transition</code> calls simply return truthy so the
+      control-flow gates (<code>if not store.claim(...)</code>) pass and the one path runs end to end,
+      persisting nothing. The
+      <button class="ref" data-ref="inertwrite">no-op doubles<span class="mag">🔍</span></button>
+      for the rest — <code>_NoopReply</code>, <code>_NoopDraft</code>, <code>_NoopStatus</code> —
+      log what they would have done and hand back a plausible-shaped value, so downstream rendering still works
+      but no Zendesk write, no reply sent, and no draft filed ever happen.</p>
+      <div class="drawer" data-drawer></div>
+
+      <p>So how does the caller ever <em>see</em> what happened, if nothing was written? That's the other half
+      of the change.
+      <button class="ref" data-ref="runworker">process_ticket<span class="mag">🔍</span></button>
+      now packs everything it computed into a
+      <button class="ref" data-ref="runresult">RunReport<span class="mag">🔍</span></button>
+      on the way out. A <em>live</em> run can still learn its outcome by observing the side effects it caused;
+      a <em>preview</em> run reads the RunReport instead. The
+      <button class="ref" data-ref="handler">handler<span class="mag">🔍</span></button>
+      forks once at the very top on a direct invoke, renders that RunReport into a
+      <button class="ref" data-ref="payload">PreviewPayload<span class="mag">🔍</span></button>,
+      and returns it. Two ways to read the same run — but still one code path producing it.</p>
+      <div class="drawer" data-drawer></div>
+
+      <p>The subtle payoff is <code>channel</code>. A preview event you construct by hand could easily carry the
+      wrong channel in its payload — but it doesn't matter, because
+      <button class="ref" data-ref="runworker">process_ticket<span class="mag">🔍</span></button>
+      never reads channel from the event. It reads it from the real ticket row, through
+      <button class="ref" data-ref="inertstore">_NoopStore<span class="mag">🔍</span></button>'s
+      pass-through get. The preview gets channel <em>right</em> for the same reason it gets everything else right:
+      the reads are real. Only the writing is pretend.</p>
+      <div class="drawer" data-drawer></div>
+
+    </main>
+
+    <!-- DOCKED EVIDENCE PANEL (wide screens) -->
+    <aside>
+      <div class="dock" id="dock">
+        <div class="dhint" id="dhint">
+          <b>Nothing open.</b><br>Click any underlined term to dock its code here.
+        </div>
+        <div id="dockpanel" hidden>
+          <div class="dhead">
+            <span class="dt" id="docktitle"></span>
+            <button class="dclose" id="dockclose" aria-label="Close panel">✕</button>
+          </div>
+          <div class="dbody" id="dockbody"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="kicker">
+    <b>Why this technique:</b> prose carries the <b>why</b> better than boxes — the change is a chain of
+    reasoning (<i>injected writes → swap the writes → keep the reads → return a result</i>), and a chain reads
+    as sentences, not as a diagram. The inline reveals keep the prose honest: every claim is one click from the
+    actual code that backs it, so nothing is asserted that the diff can't show.
+  </div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+(function(){
+  const refs = Array.from(document.querySelectorAll(".ref"));
+  const dock = document.getElementById("dock");
+  const dhint = document.getElementById("dhint");
+  const dpanel = document.getElementById("dockpanel");
+  const dtitle = document.getElementById("docktitle");
+  const dbody  = document.getElementById("dockbody");
+  const dclose = document.getElementById("dockclose");
+
+  let activeId = null;
+
+  function clearActive(){
+    refs.forEach(r => r.classList.remove("active"));
+    document.querySelectorAll(".drawer[data-drawer]").forEach(d => {
+      d.classList.remove("open"); d.innerHTML = "";
+    });
+  }
+
+  function closeAll(){
+    clearActive();
+    activeId = null;
+    dpanel.hidden = true;
+    dhint.style.display = "";
+  }
+
+  function drawerFor(refEl){
+    // the drawer that immediately follows this ref's paragraph
+    const p = refEl.closest("p");
+    let n = p ? p.nextElementSibling : null;
+    return (n && n.matches(".drawer[data-drawer]")) ? n : null;
+  }
+
+  function open(refEl){
+    const id = refEl.dataset.ref;
+    // toggle off if the same ref is clicked again
+    if(id === activeId){ closeAll(); return; }
+    activeId = id;
+
+    clearActive();
+    // highlight every ref that points at the same unit
+    refs.forEach(r => { if(r.dataset.ref === id) r.classList.add("active"); });
+
+    // wide-screen docked panel
+    dhint.style.display = "none";
+    dpanel.hidden = false;
+    dtitle.textContent = unitTitle(id);
+    dtitle.title = unitTitle(id);
+    dbody.innerHTML = renderUnit(id);
+
+    // narrow-screen inline drawer under this paragraph
+    const dr = drawerFor(refEl);
+    if(dr){
+      dr.innerHTML =
+        '<div class="dhead"><span class="dt">'+ esc(unitTitle(id)) +
+        '</span><button class="dclose" data-drawerclose>✕</button></div>' +
+        '<div class="dbody">'+ renderUnit(id) +'</div>';
+      dr.classList.add("open");
+      dr.querySelector("[data-drawerclose]").addEventListener("click", closeAll);
+    }
+  }
+
+  refs.forEach(r => r.addEventListener("click", () => open(r)));
+  dclose.addEventListener("click", closeAll);
+  document.addEventListener("keydown", e => { if(e.key === "Escape") closeAll(); });
+
+  // topbar
+  document.getElementById("top").outerHTML = topbar(
+    "11", "Narrative Walkthrough",
+    "language-first readers; PR descriptions & docs; explaining WHY not just WHAT",
+    "spatial/flow intuition; quick visual scan; big structure"
+  );
+})();
+</script>
+</body>
+</html>

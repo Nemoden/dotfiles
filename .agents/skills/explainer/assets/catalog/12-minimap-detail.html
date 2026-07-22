@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>12 · Minimap + Detail</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- two-column overview + detail ---- */
+  .md{display:grid;grid-template-columns:260px 1fr;gap:24px;align-items:start;margin-top:18px}
+
+  /* left minimap: sticky, the always-visible whole */
+  .mini{position:sticky;top:64px;align-self:start;
+        border:1px solid var(--line);border-radius:var(--radius);
+        background:var(--panel);padding:12px;max-height:calc(100vh - 92px);overflow:auto}
+  .mini h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+           margin:0 0 8px;font-weight:600}
+  .mini .mininote{font-size:10.5px;color:var(--faint);margin:0 0 12px;line-height:1.45}
+
+  /* station chips = compact lifecycle spine */
+  .chip{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;
+        border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+        color:var(--dim);padding:7px 9px;margin-bottom:5px;font:inherit;font-size:12px;
+        transition:border-color .15s,background .15s,color .15s}
+  .chip:hover{color:var(--ink);border-color:var(--faint)}
+  .chip .cdot{width:8px;height:8px;border-radius:3px;flex:none;background:var(--faint)}
+  .chip.touched .cdot{background:var(--accent)}
+  .chip .clabel{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .cmark{font-size:9px;color:var(--faint);border:1px solid var(--line);
+               border-radius:999px;padding:0 5px;flex:none}
+  .chip.touched .cmark{color:var(--accent);border-color:var(--accent)}
+  .chip.active{border-color:var(--accent);background:rgba(88,166,255,.10);color:var(--ink);
+               box-shadow:inset 3px 0 0 var(--accent)}
+
+  /* nested changed-unit list under each touched station */
+  .unitlist{list-style:none;margin:0 0 8px;padding:0 0 0 18px}
+  .unitlist li{margin:3px 0}
+  .ulink{background:none;border:0;color:var(--dim);cursor:pointer;font:inherit;font-size:11px;
+         padding:2px 6px;border-radius:6px;text-align:left;width:100%;
+         border-left:2px solid var(--line)}
+  .ulink:hover{color:var(--ink);border-left-color:var(--faint)}
+  .ulink.active{color:var(--ink);border-left-color:var(--accent);background:rgba(88,166,255,.08)}
+
+  .miniglobal{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);
+              font-size:10.5px;color:var(--faint);line-height:1.5}
+  .miniglobal b{color:var(--dim)}
+
+  /* right detail pane */
+  .detail{min-width:0}
+  .crumb{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);
+         margin:0 0 4px;flex-wrap:wrap}
+  .crumb .cb{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;
+             padding:0;text-decoration:none}
+  .crumb .cb:hover{text-decoration:underline}
+  .crumb .sep{color:var(--faint)}
+  .crumb .here{color:var(--ink);font-weight:600}
+
+  /* each station renders as a section the scroll-spy watches */
+  .sec{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+       padding:16px 18px;margin-bottom:20px;scroll-margin-top:64px}
+  .sec .shead{display:flex;align-items:baseline;gap:10px}
+  .sec .stitle{font-size:15px;font-weight:600;margin:0}
+  .sec .srole{font-size:10px;color:var(--faint);border:1px solid var(--line);
+              border-radius:999px;padding:1px 7px}
+  .sec .ssub{font-size:12px;color:var(--dim);margin:2px 0 0}
+  .sec .sdetail{font-size:13px;color:var(--ink);line-height:1.6;margin:12px 0 0;
+                border-left:2px solid var(--line);padding-left:12px}
+  .sec.on{border-color:var(--accent)}
+  .sec .untouched{font-size:12px;color:var(--faint);margin-top:12px;font-style:italic}
+
+  .uwrap{margin-top:16px}
+  .uwrap .uh{font-size:12.5px;font-weight:600;color:var(--core);margin:0 0 6px}
+  .uwrap .unit{margin-bottom:18px}
+
+  .mode-note{font-size:11px;color:var(--faint);margin:0 0 14px}
+  .mode-note b{color:var(--dim)}
+
+  @media (max-width:820px){
+    .md{grid-template-columns:1fr}
+    .mini{position:sticky;top:52px;max-height:none;display:flex;flex-direction:column;
+          overflow:visible}
+    .mini .strip{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px}
+    .mini .strip .chip{width:auto;margin-bottom:0;white-space:nowrap;flex:none}
+    .mini .strip .chip .clabel{white-space:nowrap;overflow:visible}
+    .mini .unitlist,.mini .cmark,.mini .miniglobal{display:none}
+    .mini .mininote{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="tb"></div>
+<div class="wrap">
+  <h1>Minimap + Detail</h1>
+  <div class="sub">A persistent overview of the whole change on the left; the depth on the right. The minimap always shows <b>where you are</b> in the lifecycle while you read one part of it.</div>
+  <div id="lg"></div>
+
+  <div class="md">
+    <!-- LEFT: the always-visible whole -->
+    <aside class="mini">
+      <h2>The whole change</h2>
+      <p class="mininote">Every station of the request path. Marked ones are touched by the preview change. Click to jump; scroll the detail and the map follows.</p>
+      <div id="chips"></div>
+      <div class="miniglobal">
+        <b>Reading a part?</b> This map stays put so you never lose the whole. The highlighted chip is the section under your eye right now.
+      </div>
+    </aside>
+
+    <!-- RIGHT: the depth -->
+    <main class="detail">
+      <div class="crumb" id="crumb"></div>
+      <div class="mode-note" id="modenote"></div>
+      <div id="pane"></div>
+    </main>
+  </div>
+
+  <div class="kicker" id="kick"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("tb").innerHTML = topbar(
+    "12","Minimap + Detail",
+    "keeping global context while reading local detail; large changes you can get lost in",
+    "linear step-through; timing; prose explanation"
+  );
+  document.getElementById("lg").innerHTML = legend();
+  document.getElementById("kick").innerHTML =
+    "<b>Why this shape:</b> the minimap is the antidote to being dropped mid-flow. "+
+    "In a long diff you lose the whole while reading a part — a chip fixed on the left "+
+    "keeps the lifecycle spine in view, and scroll-spy answers <b>“where am I?”</b> "+
+    "without you asking. Overview + detail beats a single scroll when the change is big enough to get lost in.";
+
+  const roleMap = {input:"input",read:"read",core:"core",result:"result"};
+
+  /* ---------- LEFT MINIMAP ---------- */
+  const chipsEl = document.getElementById("chips");
+  // narrow-screen strip wrapper + normal stacked list share the same chips
+  function buildMinimap(){
+    let html = '<div class="strip">';
+    STATIONS.forEach(st => {
+      const touched = st.touched ? "touched" : "";
+      const mark = st.touched ? '<span class="cmark">changed</span>' : '';
+      html += `<button class="chip ${touched}" data-station="${st.id}" id="chip-${st.id}">
+                 <span class="cdot"></span>
+                 <span class="clabel">${esc(st.label)}</span>${mark}
+               </button>`;
+      // nested changed units (hidden on narrow via CSS)
+      if (st.units.length){
+        html += '<ul class="unitlist">';
+        st.units.forEach(uid => {
+          html += `<li><button class="ulink" data-station="${st.id}" data-unit="${uid}" id="ulink-${uid}">${esc(unitTitle(uid))}</button></li>`;
+        });
+        html += '</ul>';
+      }
+    });
+    html += '</div>';
+    chipsEl.innerHTML = html;
+  }
+  buildMinimap();
+
+  /* ---------- RIGHT DETAIL ----------
+     We render ALL stations as sections once, then scroll to the requested one.
+     A selected UNIT re-renders the pane to that single unit, large. */
+  const pane = document.getElementById("pane");
+  const crumbEl = document.getElementById("crumb");
+  const noteEl = document.getElementById("modenote");
+
+  let mode = "spine";        // "spine" (all stations) | "unit" (one unit)
+  let activeStation = STATIONS[0].id;
+  let activeUnit = null;
+  let io = null;             // IntersectionObserver for scroll-spy
+
+  function stationById(id){ return STATIONS.find(s => s.id === id); }
+  function stationOfUnit(uid){ return STATIONS.find(s => s.units.includes(uid)); }
+
+  function renderSpine(){
+    let html = "";
+    STATIONS.forEach(st => {
+      const units = st.units.map(uid =>
+        `<div class="unit"><div class="uh">${esc(unitTitle(uid))}</div>${renderUnit(uid)}</div>`
+      ).join("");
+      const body = st.units.length
+        ? `<div class="uwrap">${units}</div>`
+        : `<div class="untouched">Not touched by this change — shown for context (the whole path).</div>`;
+      html += `<section class="sec" id="sec-${st.id}" data-station="${st.id}">
+        <div class="shead">
+          <h3 class="stitle">${esc(st.label)}</h3>
+          <span class="srole">${roleMap[st.role]||st.role}</span>
+        </div>
+        <div class="ssub">${esc(st.sub)}</div>
+        <div class="sdetail">${esc(st.detail)}</div>
+        ${body}
+      </section>`;
+    });
+    pane.innerHTML = html;
+  }
+
+  function renderUnitLarge(uid){
+    const st = stationOfUnit(uid);
+    pane.innerHTML = `<section class="sec on">
+      <div class="shead">
+        <h3 class="stitle">${esc(unitTitle(uid))}</h3>
+        <span class="srole">${st ? esc(st.label) : ""}</span>
+      </div>
+      <div class="uwrap"><div class="unit">${renderUnit(uid)}</div></div>
+    </section>`;
+  }
+
+  /* ---------- breadcrumb ---------- */
+  function renderCrumb(){
+    const st = stationById(activeStation);
+    let html = `<button class="cb" data-goto="spine">Lifecycle</button>`;
+    if (st){
+      if (mode === "unit"){
+        html += `<span class="sep">▸</span><button class="cb" data-station="${st.id}">${esc(st.label)}</button>`;
+        html += `<span class="sep">▸</span><span class="here">${esc(unitTitle(activeUnit))}</span>`;
+      } else {
+        html += `<span class="sep">▸</span><span class="here">${esc(st.label)}</span>`;
+      }
+    }
+    crumbEl.innerHTML = html;
+    noteEl.innerHTML = mode === "unit"
+      ? `<b>Focus:</b> one unit, large. The map still marks its home station on the left.`
+      : `<b>Overview scroll:</b> the whole path top-to-bottom. The left chip tracks your position automatically.`;
+  }
+
+  /* ---------- minimap active state ---------- */
+  function markMinimap(){
+    document.querySelectorAll(".chip").forEach(c =>
+      c.classList.toggle("active", c.dataset.station === activeStation && mode === "spine"));
+    document.querySelectorAll(".ulink").forEach(u =>
+      u.classList.toggle("active", u.dataset.unit === activeUnit && mode === "unit"));
+    // in unit mode, keep the owning station chip subtly lit too
+    if (mode === "unit"){
+      const c = document.getElementById("chip-"+activeStation);
+      if (c) c.classList.add("active");
+    }
+  }
+
+  /* ---------- scroll-spy: which station is under the eye ---------- */
+  function attachSpy(){
+    if (io) io.disconnect();
+    io = new IntersectionObserver(entries => {
+      if (mode !== "spine") return;
+      // pick the entry nearest the top that is intersecting
+      const visible = entries.filter(e => e.isIntersecting)
+        .sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top);
+      if (!visible.length) return;
+      const id = visible[0].target.dataset.station;
+      if (id && id !== activeStation){
+        activeStation = id;
+        document.querySelectorAll(".sec").forEach(s =>
+          s.classList.toggle("on", s.dataset.station === id));
+        markMinimap();
+        renderCrumb();
+        // keep the active chip scrolled into view within the minimap
+        const chip = document.getElementById("chip-"+id);
+        if (chip) chip.scrollIntoView({block:"nearest",inline:"nearest"});
+      }
+    }, { rootMargin:"-15% 0px -70% 0px", threshold:0 });
+    document.querySelectorAll(".sec").forEach(s => io.observe(s));
+  }
+
+  /* ---------- navigation ---------- */
+  function showSpine(scrollTo){
+    mode = "spine";
+    activeUnit = null;
+    renderSpine();
+    attachSpy();
+    if (scrollTo){
+      activeStation = scrollTo;
+      const el = document.getElementById("sec-"+scrollTo);
+      if (el) el.scrollIntoView({behavior:"smooth",block:"start"});
+      document.querySelectorAll(".sec").forEach(s =>
+        s.classList.toggle("on", s.dataset.station === scrollTo));
+    }
+    markMinimap();
+    renderCrumb();
+  }
+
+  function showUnit(uid){
+    const st = stationOfUnit(uid);
+    mode = "unit";
+    activeUnit = uid;
+    if (st) activeStation = st.id;
+    if (io) io.disconnect();
+    renderUnitLarge(uid);
+    window.scrollTo({top:0,behavior:"smooth"});
+    markMinimap();
+    renderCrumb();
+  }
+
+  /* ---------- events (delegated) ---------- */
+  chipsEl.addEventListener("click", e => {
+    const ulink = e.target.closest(".ulink");
+    if (ulink){ showUnit(ulink.dataset.unit); return; }
+    const chip = e.target.closest(".chip");
+    if (chip){ showSpine(chip.dataset.station); }
+  });
+  crumbEl.addEventListener("click", e => {
+    const btn = e.target.closest("[data-goto],[data-station]");
+    if (!btn) return;
+    if (btn.dataset.goto === "spine"){ showSpine(STATIONS[0].id); return; }
+    if (btn.dataset.station){ showSpine(btn.dataset.station); }
+  });
+
+  /* ---------- boot ---------- */
+  showSpine(null);
+</script>
+</body>
+</html>

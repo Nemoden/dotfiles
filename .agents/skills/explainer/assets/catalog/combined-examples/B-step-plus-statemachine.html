@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>COMBINED · Step-Through + State-Machine side-car</title>
+<link rel="stylesheet" href="../_shared.css">
+<style>
+  /* two-column: stepper (main) + sticky state-machine side-car */
+  .cols{display:grid;grid-template-columns:1fr 340px;gap:22px;align-items:start}
+  @media (max-width:860px){ .cols{grid-template-columns:1fr} }
+
+  /* ---- stepper controls ---- */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+       border-radius:8px;padding:7px 13px;font:inherit;cursor:pointer}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;color:var(--dim);border-color:var(--line)}
+  .btn.play{border-color:var(--result);color:var(--result)}
+  .toggle{margin-left:auto;display:inline-flex;border:1px solid var(--line);
+          border-radius:999px;overflow:hidden}
+  .toggle button{background:transparent;border:0;color:var(--dim);font:inherit;
+                 padding:6px 14px;cursor:pointer}
+  .toggle button.on{background:var(--panel2);color:var(--ink)}
+  .toggle button.live.on{color:var(--write)}
+  .toggle button.dry.on{color:var(--inert)}
+
+  /* ---- progress ---- */
+  .prog{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:12px;color:var(--dim)}
+  .bar{flex:1;height:6px;background:var(--panel2);border:1px solid var(--line);
+       border-radius:999px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s ease}
+  .prog b{color:var(--ink)}
+
+  /* ---- station spine (all 8, spotlight current) ---- */
+  .spine{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:16px}
+  .stn{flex:1;min-width:56px;text-align:center;border:1px solid var(--line);
+       border-radius:8px;padding:6px 4px;font-size:10.5px;color:var(--faint);
+       background:var(--panel2);transition:all .2s}
+  .stn.past{color:var(--dim);border-color:#264;}
+  .stn.past .stmk{color:var(--read)}
+  .stn.cur{color:var(--ink);border-color:var(--accent);
+           box-shadow:0 0 0 1px var(--accent),0 0 16px rgba(88,166,255,.35);background:var(--panel)}
+  .stn.future{opacity:.45}
+  .stmk{display:block;font-size:12px;margin-bottom:2px}
+
+  /* ---- current station readout ---- */
+  .cur-card{border:1px solid var(--accent);border-radius:var(--radius);
+            background:var(--panel);padding:14px 16px}
+  .cur-card .ct{font-size:15px;font-weight:600}
+  .cur-card .cs{color:var(--dim);font-size:12px;margin:2px 0 10px}
+  .cur-card .cd{color:var(--dim);font-size:12.5px;line-height:1.6}
+  .cur-card .cd b{color:var(--ink)}
+  .units{margin-top:12px;display:flex;flex-direction:column;gap:12px}
+  .no-units{color:var(--faint);font-size:12px;margin-top:10px;font-style:italic}
+
+  /* state readout line under the stepper */
+  .readout{margin-top:14px;border-radius:8px;padding:9px 13px;font-size:12.5px;
+           border:1px solid var(--line);background:var(--panel2);color:var(--dim)}
+  .readout b{color:var(--ink)}
+  .readout.dry{border-color:var(--inert)}
+  .readout.dry b{color:var(--inert)}
+
+  /* ================= STATE-MACHINE SIDE-CAR ================= */
+  .sidecar{position:sticky;top:74px;border:1px solid var(--line);border-radius:var(--radius);
+           background:var(--panel);padding:14px 14px 16px}
+  .sidecar h2{margin:0 0 2px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  .sidecar .sctag{font-size:11px;color:var(--faint);margin-bottom:12px}
+  .sm{display:flex;flex-direction:column;gap:0}
+
+  /* state node */
+  .sn{border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+      padding:8px 11px;color:var(--faint);transition:all .25s;position:relative}
+  .sn .sname{font-weight:600;font-size:12.5px}
+  .sn .snote{font-size:10.5px;color:var(--faint);margin-top:2px}
+  .sn.reached{color:var(--dim);border-color:#2b4055}
+  .sn.reached .sname{color:var(--ink)}
+  .sn.reached::after{content:"✓";position:absolute;top:7px;right:10px;color:var(--read);font-size:12px}
+  .sn.current{border-color:var(--result);color:var(--ink);
+              box-shadow:0 0 0 1px var(--result),0 0 18px rgba(88,166,255,.45);background:var(--panel)}
+  .sn.current .sname{color:var(--result)}
+  .sn.current::after{content:"●";color:var(--result)}
+  .sn.dimmed{opacity:.4}
+
+  /* edge between states */
+  .edge{display:flex;flex-direction:column;align-items:center;padding:3px 0;color:var(--faint)}
+  .edge .cond{font-size:10px;padding:1px 7px;border:1px solid var(--line);border-radius:999px;
+              background:var(--panel2);color:var(--faint);transition:all .25s}
+  .edge .ln{font-size:13px;line-height:1;color:var(--faint);transition:color .25s}
+  .edge.taken .cond{border-color:var(--result);color:var(--result);
+                    box-shadow:0 0 10px rgba(88,166,255,.4)}
+  .edge.taken .ln{color:var(--result)}
+  .edge.write.taken .cond{border-color:var(--write);color:var(--write);box-shadow:0 0 10px rgba(240,136,62,.4)}
+  .edge.write.taken .ln{color:var(--write)}
+  .edge.write.drytaken .cond{border-color:var(--inert);color:var(--inert);box-shadow:0 0 10px rgba(163,113,247,.4)}
+  .edge.write.drytaken .ln{color:var(--inert)}
+
+  /* fork wrapper */
+  .fork{display:flex;gap:8px}
+  .fork > .branch{flex:1;display:flex;flex-direction:column;align-items:stretch}
+  .fork .branch .sn{width:100%}
+  .fork .branch.dead{opacity:.32}
+
+  .sc-trans{margin-top:12px;font-size:11.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px}
+  .sc-trans b{color:var(--ink)}
+  .sc-trans.dry b{color:var(--inert)}
+</style>
+</head>
+<body>
+
+<!-- custom inline topbar -->
+<div class="topbar">
+  <a href="../../index.html">◀ catalog</a>
+  <span class="tnum">B</span>
+  <span class="tname">COMBINED · Step-Through + State-Machine side-car</span>
+  <span class="spacer"></span>
+  <span class="goodbad"><b>good for:</b> watch execution AND the state path it drives, together</span>
+</div>
+
+<div class="wrap">
+  <h1>Runtime step-through with a state-machine side-car</h1>
+  <div class="sub">
+    Technique 03 (runtime step-through) is the centrepiece: Prev / Next / Play over the 8
+    lifecycle stations. Technique 10 (the ticket state machine) rides alongside as a persistent
+    <b>side-car</b> — it does not drive the walkthrough, it <i>tracks</i> it. As you step, the
+    side-car lights the current state and marks the transition just taken. This is the
+    "useful as a side-car when it's not the centrepiece" case, shown literally.
+  </div>
+
+  <div id="legend"></div>
+
+  <div class="cols">
+
+    <!-- ============ LEFT: STEPPER (main) ============ -->
+    <div class="main">
+      <div class="controls">
+        <button class="btn" id="prev">◀ Prev</button>
+        <button class="btn" id="next">Next ▶</button>
+        <button class="btn play" id="play">▶ Play</button>
+        <button class="btn" id="reset">↺ Reset</button>
+        <span class="toggle" id="mode">
+          <button class="live on" data-mode="live">LIVE</button>
+          <button class="dry" data-mode="dry">PREVIEW</button>
+        </span>
+      </div>
+
+      <div class="prog">
+        <span>step <b id="stepn">1</b>/8</span>
+        <span class="bar"><i id="barfill"></i></span>
+        <span id="stlabel"></span>
+      </div>
+
+      <div class="spine" id="spine"></div>
+
+      <div class="cur-card" id="card"></div>
+
+      <div class="readout" id="readout"></div>
+    </div>
+
+    <!-- ============ RIGHT: STATE-MACHINE SIDE-CAR ============ -->
+    <aside class="sidecar">
+      <h2>ticket state machine</h2>
+      <div class="sctag">side-car · tracks the stepper</div>
+      <div class="sm" id="sm"></div>
+      <div class="sc-trans" id="sctrans"></div>
+    </aside>
+
+  </div>
+
+  <div class="kicker">
+    <b>The side-car pattern.</b> A secondary view that tracks the primary one lets one screen
+    answer both questions at once: <b>what runs</b> (the stepper walking the request path) and
+    <b>what state it produces</b> (the machine lighting the path through RECEIVED → CLASSIFYING →
+    CLASSIFIED → AUTO_REPLIED). The state machine is rarely the star, but as a passenger it
+    is cheap and constantly useful — you never lose sight of the state while watching the code.
+  </div>
+</div>
+
+<script src="../_shared.js"></script>
+<script>
+/* ---------- STATE MACHINE model (the ticket) ----------
+   RECEIVED →(claim)→ CLASSIFYING →(classify)→ CLASSIFIED
+        →fork:( confident →(send)→ AUTO_REPLIED | else →(queue)→ HUMAN_QUEUE )
+   Each state notes which stations it spans. */
+const STATES = {
+  SEEN:              { name:"RECEIVED",     note:"row exists, unclaimed" },
+  TRIAGING:          { name:"CLASSIFYING",  note:"lease claimed, LLM running" },
+  TRIAGED:           { name:"CLASSIFIED",   note:"verdict in hand, deciding fork" },
+  HANDED_TO_CLANKER: { name:"AUTO_REPLIED", note:"confident → auto-reply sent" },
+  ESCALATED:         { name:"HUMAN_QUEUE",  note:"else → human owns it" },
+};
+
+/* transitions carry a condition label + whether they are a WRITE (state-write). */
+const TRANS = {
+  claim:    { from:"RECEIVED",    to:"CLASSIFYING",  cond:"claim",    write:true  },
+  triage:   { from:"CLASSIFYING", to:"CLASSIFIED",   cond:"classify", write:true  },
+  fire:     { from:"CLASSIFIED",  to:"AUTO_REPLIED", cond:"confident → send", write:true },
+  escalate: { from:"CLASSIFIED",  to:"HUMAN_QUEUE",  cond:"else → queue",     write:true },
+};
+
+/* per-step: which state the machine is IN, and which transition was just taken to get there.
+   We take the SEND fork for the demo (station ⑧). Station ⑥ walks the row through
+   RECEIVED → CLASSIFYING → CLASSIFIED as claim + classify happen. */
+const STEP_STATE = [
+  { cur:"SEEN",              taken:null,       read:"row not yet touched — ticket is RECEIVED before we start." },
+  { cur:"SEEN",              taken:null,       read:"Intake already wrote the row (state=RECEIVED); we only read it." },
+  { cur:"SEEN",              taken:null,       read:"envelope constructed — still RECEIVED, nothing claimed." },
+  { cur:"SEEN",              taken:null,       read:"handler entered — about to claim the RECEIVED row." },
+  { cur:"SEEN",              taken:null,       read:"deps assembled — still RECEIVED, no write issued yet." },
+  { cur:"TRIAGED",           taken:["claim","triage"], read:"claim then classify fire here: RECEIVED → CLASSIFYING → CLASSIFIED." },
+  { cur:"TRIAGED",           taken:null,       read:"verdict is confident — the fork is deciding, still CLASSIFIED." },
+  { cur:"HANDED_TO_CLANKER", taken:["fire"],   read:"send fork taken: CLASSIFIED → AUTO_REPLIED." },
+];
+
+/* the ordered set of states reached by the END of step i (for ✓ marking). */
+const REACHED_BY_STEP = [
+  ["SEEN"],
+  ["SEEN"],
+  ["SEEN"],
+  ["SEEN"],
+  ["SEEN"],
+  ["SEEN","TRIAGING","TRIAGED"],
+  ["SEEN","TRIAGING","TRIAGED"],
+  ["SEEN","TRIAGING","TRIAGED","HANDED_TO_CLANKER"],
+];
+
+let step = 0;                 // 0-based station index
+let mode = "live";            // 'live' | 'dry'
+let timer = null;
+
+document.getElementById("legend").innerHTML = buildLegend();
+
+function buildLegend(){
+  // reuse shared legend() + append state-node + transition keys
+  const base = legend();
+  const extra = `<div class="legend" style="margin-top:-8px">
+    <span class="k"><span class="dot" style="background:var(--accent)"></span>current state</span>
+    <span class="k"><span class="dot" style="background:var(--read)"></span>state reached ✓</span>
+    <span class="k"><span class="dot" style="background:var(--faint)"></span>not yet reached</span>
+    <span class="k"><span class="dot" style="background:var(--write);border-radius:999px"></span>write transition (live)</span>
+    <span class="k"><span class="dot" style="background:var(--inert);border-radius:999px"></span>would-write transition (preview)</span>
+  </div>`;
+  return base + extra;
+}
+
+/* ---------- render the station spine ---------- */
+function renderSpine(){
+  const html = STATIONS.map((s,i) => {
+    let cls = "stn " + (i < step ? "past" : i === step ? "cur" : "future");
+    const mk = i < step ? "✓" : i === step ? "▶" : "○";
+    return `<div class="${cls}" title="${esc(s.label)}">
+      <span class="stmk">${mk}</span>${esc(s.label)}</div>`;
+  }).join("");
+  document.getElementById("spine").innerHTML = html;
+}
+
+/* ---------- render the current station card ---------- */
+function renderCard(){
+  const s = STATIONS[step];
+  const units = s.units.length
+    ? `<div class="units">${s.units.map(u => renderUnit(u)).join("")}</div>`
+    : `<div class="no-units">No code unit changes at this station — it is part of the path, unchanged by the preview.</div>`;
+  document.getElementById("card").innerHTML =
+    `<div class="ct">${esc(s.label)}</div>
+     <div class="cs">${esc(s.sub)}</div>
+     <div class="cd">${esc(s.detail)}</div>
+     ${units}`;
+}
+
+/* ---------- render the state readout under the stepper ---------- */
+function renderReadout(){
+  const st = STEP_STATE[step];
+  const ro = document.getElementById("readout");
+  if(mode === "dry"){
+    ro.className = "readout dry";
+    ro.innerHTML = `<b>[preview]</b> nothing persisted — the row never leaves RECEIVED. `
+      + `The machine on the right lights the <i>same</i> path (${esc(st.read)}) `
+      + `because the states are computed either way; only the writes are withheld.`;
+  } else {
+    ro.className = "readout";
+    ro.innerHTML = `<b>state:</b> ${esc(STATES[st.cur].name)} — ${esc(st.read)}`;
+  }
+}
+
+/* ---------- render the state-machine side-car ---------- */
+function edgeHTML(key){
+  const t = TRANS[key];
+  const st = STEP_STATE[step];
+  const taken = st.taken && st.taken.includes(key);
+  let cls = "edge";
+  if(t.write) cls += " write";
+  if(taken) cls += (mode === "dry" ? " drytaken" : " taken");
+  const arrow = "▼";
+  return `<div class="${cls}">
+    <span class="ln">${arrow}</span>
+    <span class="cond">${esc(t.cond)}</span>
+    <span class="ln">${arrow}</span>
+  </div>`;
+}
+function nodeHTML(key){
+  const st = STEP_STATE[step];
+  const reached = REACHED_BY_STEP[step];
+  const s = STATES[key];
+  let cls = "sn";
+  if(key === st.cur) cls += " current";
+  else if(reached.includes(key)) cls += " reached";
+  else cls += " dimmed";
+  return `<div class="${cls}">
+    <div class="sname">${esc(s.name)}</div>
+    <div class="snote">${esc(s.note)}</div>
+  </div>`;
+}
+function renderSideCar(){
+  // linear stem SEEN → TRIAGING → TRIAGED, then a fork.
+  const st = STEP_STATE[step];
+  const clankerReached = REACHED_BY_STEP[step].includes("HANDED_TO_CLANKER");
+  const html =
+    nodeHTML("SEEN") +
+    edgeHTML("claim") +
+    nodeHTML("TRIAGING") +
+    edgeHTML("triage") +
+    nodeHTML("TRIAGED") +
+    `<div class="fork">
+       <div class="branch ${clankerReached ? "" : (st.cur==="TRIAGED"?"":"dead")}">
+         ${edgeHTML("fire")}
+         ${nodeHTML("HANDED_TO_CLANKER")}
+       </div>
+       <div class="branch dead">
+         ${edgeHTML("escalate")}
+         ${nodeHTML("ESCALATED")}
+       </div>
+     </div>`;
+  document.getElementById("sm").innerHTML = html;
+
+  // transition footnote
+  const tr = document.getElementById("sctrans");
+  if(!st.taken){
+    tr.className = "sc-trans";
+    tr.innerHTML = `<b>no transition</b> at this station — the machine holds at <b>${esc(STATES[st.cur].name)}</b>.`;
+  } else if(mode === "dry"){
+    tr.className = "sc-trans dry";
+    const parts = st.taken.map(k => {
+      const t = TRANS[k];
+      return `<b>[preview] would set ${esc(t.to)}</b> (not applied)`;
+    }).join("; ");
+    tr.innerHTML = parts + ` — the path lights, the row stays at RECEIVED.`;
+  } else {
+    tr.className = "sc-trans";
+    const parts = st.taken.map(k => {
+      const t = TRANS[k];
+      return `<b>${esc(t.from)} → ${esc(t.to)}</b> (${esc(t.cond)})`;
+    }).join("; ");
+    tr.innerHTML = `transition taken: ` + parts + `.`;
+  }
+}
+
+/* ---------- master render ---------- */
+function render(){
+  document.getElementById("stepn").textContent = step + 1;
+  document.getElementById("barfill").style.width = ((step+1)/STATIONS.length*100) + "%";
+  document.getElementById("stlabel").textContent = STATIONS[step].label;
+  renderSpine();
+  renderCard();
+  renderReadout();
+  renderSideCar();
+  document.getElementById("prev").disabled = (step === 0);
+  document.getElementById("next").disabled = (step === STATIONS.length - 1);
+}
+
+/* ---------- controls ---------- */
+function go(i){ step = Math.max(0, Math.min(STATIONS.length-1, i)); render(); }
+document.getElementById("prev").onclick  = () => { stopPlay(); go(step-1); };
+document.getElementById("next").onclick  = () => { stopPlay(); go(step+1); };
+document.getElementById("reset").onclick = () => { stopPlay(); go(0); };
+
+function stopPlay(){
+  if(timer){ clearInterval(timer); timer = null; }
+  const b = document.getElementById("play");
+  b.textContent = "▶ Play"; b.classList.add("play");
+}
+document.getElementById("play").onclick = function(){
+  if(timer){ stopPlay(); return; }
+  if(step === STATIONS.length - 1) go(0);
+  this.textContent = "❚❚ Pause"; this.classList.remove("play");
+  timer = setInterval(() => {
+    if(step >= STATIONS.length - 1){ stopPlay(); return; }
+    go(step + 1);
+  }, 1400);
+};
+
+/* mode toggle */
+document.querySelectorAll("#mode button").forEach(b => {
+  b.onclick = () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll("#mode button").forEach(x =>
+      x.classList.toggle("on", x.dataset.mode === mode));
+    render();
+  };
+});
+
+render();
+</script>
+</body>
+</html>

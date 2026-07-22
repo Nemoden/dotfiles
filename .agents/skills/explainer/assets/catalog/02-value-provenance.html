@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Value Provenance (code zoom)</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- value pills ---- */
+  .pills{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 8px}
+  .pill{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+        padding:8px 14px;cursor:pointer;color:var(--ink);font:inherit;font-size:13px;
+        transition:border-color .18s ease,background .18s ease,transform .12s ease}
+  .pill:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .pill .ty{font-size:10px;color:var(--faint);margin-left:8px}
+  .pill.on{border-color:var(--accent);background:var(--panel2);
+           box-shadow:0 0 0 1px var(--accent) inset}
+  .hint{font-size:12px;color:var(--faint);margin:2px 0 18px}
+
+  /* ---- lifecycle spine of station chips (shown once) ---- */
+  .spinelab{font-size:11px;color:var(--faint);text-transform:uppercase;
+            letter-spacing:.04em;margin:0 0 7px}
+  .spine{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 24px;align-items:stretch}
+  .chip{border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+        padding:6px 11px;font-size:12px;color:var(--dim);
+        transition:opacity .28s ease,border-color .28s ease,color .28s ease,
+                   background .28s ease,box-shadow .28s ease}
+  .chip .lab{font-weight:600;color:var(--ink);transition:color .28s ease}
+  .chip .badge{display:block;font-size:9px;margin-top:2px;letter-spacing:.03em;
+               opacity:0;transition:opacity .28s ease;height:0;overflow:hidden}
+  /* when a value is active: dim everything, then re-light born + use */
+  .spine.active .chip{opacity:.3}
+  .spine.active .chip.use{opacity:1;border-color:var(--result);
+        background:rgba(88,166,255,.09)}
+  .spine.active .chip.born{opacity:1;border-color:var(--read);
+        background:rgba(63,185,80,.12);box-shadow:0 0 0 1px var(--read) inset}
+  .chip.born .lab{color:var(--read)}
+  .chip.use .lab{color:var(--result)}
+  .chip.born .badge{opacity:1;height:auto;color:var(--read)}
+  .chip.use .badge{opacity:1;height:auto;color:var(--result)}
+
+  /* ---- the star: two side-by-side code panes ---- */
+  .zoom{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  @media (max-width:820px){ .zoom{grid-template-columns:1fr} }
+  .zcol{min-width:0}
+  .zhead{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+  .zhead .tag{position:static;margin:0}
+  .zhead .zst{font-size:12px;font-weight:600;color:var(--ink)}
+  .zborn .zst{color:var(--read)}
+  .zuse  .zst{color:var(--result)}
+
+  /* type + note callout below the panes */
+  .meta{margin-top:20px;display:flex;align-items:baseline;gap:10px}
+  .meta .nm{font-size:16px;font-weight:600;color:var(--ink)}
+  .meta .ty{font-size:12px;color:var(--faint)}
+  .callout{margin-top:10px;border-left:3px solid var(--inert);background:var(--panel2);
+           padding:11px 15px;border-radius:0 8px 8px 0;font-size:13px;color:var(--dim)}
+  .callout b{color:var(--ink)}
+
+  #zoomwrap{animation:fade .28s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Value Provenance <span style="color:var(--faint);font-size:14px">(code zoom)</span></h1>
+  <div class="sub">Pick a value and <b>zoom into the code</b> where it is <b>born</b> and where it is
+    <b>used</b> — side by side, key line highlighted. Provenance you can read, not a trail you have to trust.</div>
+  <div id="legend"></div>
+
+  <div class="pills" id="pills"></div>
+  <div class="hint">Click a value · the spine below re-lights and the two code panes zoom to its birth + use.</div>
+
+  <div class="spinelab">Lifecycle spine (entry → exit)</div>
+  <div class="spine" id="spine"></div>
+
+  <div id="zoomwrap"></div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("top").innerHTML = topbar(
+    "02","Value Provenance",
+    "answering 'where does this value come from / go?' WITH the actual code at each point; building contextual awareness",
+    "control flow; timing; the shape of the code change itself"
+  );
+  document.getElementById("legend").innerHTML = legend();
+
+  document.getElementById("kicker").innerHTML =
+    "<b>The payoff:</b> select <code>channel</code> and read the two panes. It is BORN at " +
+    "<code>store.seen_if_new(... channel=channel)</code> on the Intake's row, and USED at " +
+    "<code>row.get('channel')</code> in <code>process_ticket</code> — <b>not</b> from the event. " +
+    "Seeing both code sites at once makes the 'not from the event' gotcha undeniable, and " +
+    "explains why a preview gets <code>channel</code> right: the read is real.";
+
+  const pillsEl = document.getElementById("pills");
+  const spineEl = document.getElementById("spine");
+  const zoomEl  = document.getElementById("zoomwrap");
+
+  // only the values that carry code panes
+  const CODED = Object.keys(VALUE_CODE);
+
+  // value pills
+  pillsEl.innerHTML = CODED.map(name => {
+    const v = VALUES[name];
+    return `<button class="pill" data-val="${name}">` +
+      `${esc(v.label)}<span class="ty">${esc(v.type)}</span></button>`;
+  }).join("");
+
+  // lifecycle spine of station chips (rendered once)
+  spineEl.innerHTML = STATIONS.map(s =>
+    `<div class="chip" data-st="${s.id}">` +
+      `<span class="lab">${esc(s.label)}</span>` +
+      `<span class="badge"></span>` +
+    `</div>`
+  ).join("");
+
+  const stationLabel = id => {
+    const s = STATIONS.find(x => x.id === id);
+    return s ? s.label : id;
+  };
+
+  let active = null;
+
+  function select(name){
+    active = name;
+    const v  = VALUES[name];
+    const vc = VALUE_CODE[name];
+    const bornSt = vc.born.station;
+    const useSt  = vc.use.station;
+
+    // pills
+    pillsEl.querySelectorAll(".pill").forEach(p =>
+      p.classList.toggle("on", p.getAttribute("data-val") === name));
+
+    // spine: dim all, re-light born (strong) + use
+    spineEl.classList.add("active");
+    spineEl.querySelectorAll(".chip").forEach(c => {
+      const id = c.getAttribute("data-st");
+      c.classList.remove("born","use");
+      const badge = c.querySelector(".badge");
+      if(id === bornSt){ c.classList.add("born"); badge.textContent = "BORN HERE"; }
+      else if(id === useSt){ c.classList.add("use"); badge.textContent = "USED HERE"; }
+      else badge.textContent = "";
+    });
+
+    // the two side-by-side code panes
+    zoomEl.innerHTML =
+      `<div class="zoom">` +
+        `<div class="zcol zborn">` +
+          `<div class="zhead"><span class="tag read">BORN HERE</span>` +
+            `<span class="zst">${esc(stationLabel(bornSt))}</span></div>` +
+          renderValueCodePane(vc.born) +
+        `</div>` +
+        `<div class="zcol zuse">` +
+          `<div class="zhead"><span class="tag result">USED HERE</span>` +
+            `<span class="zst">${esc(stationLabel(useSt))}</span></div>` +
+          renderValueCodePane(vc.use) +
+        `</div>` +
+      `</div>` +
+      `<div class="meta"><span class="nm">${esc(v.label)}</span>` +
+        `<span class="ty">${esc(v.type)}</span></div>` +
+      `<div class="callout"><b>Note:</b> ${esc(v.note)}</div>`;
+    // re-trigger the fade
+    zoomEl.style.animation = "none"; void zoomEl.offsetWidth; zoomEl.style.animation = "";
+  }
+
+  pillsEl.addEventListener("click", e => {
+    const btn = e.target.closest(".pill");
+    if(btn) select(btn.getAttribute("data-val"));
+  });
+
+  // default-select env: sharpest example, page useful immediately
+  select("env");
+</script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 — Runtime Step-Through</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  /* ---- layout ---- */
+  .grid{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+
+  /* ---- stepper controls ---- */
+  .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+       border-radius:7px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line)}
+  .btn.play{border-color:var(--accent);color:var(--accent)}
+  .btn.play.on{background:var(--accent);color:#08111f}
+
+  /* mode toggle */
+  .modeswitch{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin-left:auto}
+  .modeswitch button{background:var(--panel2);color:var(--dim);border:0;padding:6px 13px;
+       font:inherit;font-size:12px;cursor:pointer}
+  .modeswitch button.live.on{background:var(--write);color:#1a0f05;font-weight:600}
+  .modeswitch button.dry.on{background:var(--inert);color:#0d0518;font-weight:600}
+
+  /* progress */
+  .prog{display:flex;align-items:center;gap:10px;margin-bottom:14px;font-size:12px;color:var(--dim)}
+  .progbar{flex:1;height:4px;background:var(--panel2);border-radius:99px;overflow:hidden}
+  .progbar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s ease}
+  .progbar.dry>i{background:var(--inert)}
+  .stepno{font-variant-numeric:tabular-nums}
+  .stepno b{color:var(--ink)}
+
+  /* station rail */
+  .rail{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+  .st{border:1px solid var(--line);border-radius:8px;background:var(--panel2);
+      padding:8px 11px;display:flex;align-items:center;gap:10px;cursor:pointer;
+      transition:transform .18s ease,border-color .18s,opacity .18s,background .18s;
+      transform-origin:left center}
+  .st .mk{width:22px;height:22px;flex:none;border-radius:6px;display:grid;place-items:center;
+      font-size:12px;border:1px solid var(--line);color:var(--faint);background:var(--bg)}
+  .st .lbl{font-size:13px}
+  .st .rl{margin-left:auto;font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em}
+  .st.done{opacity:.72}
+  .st.done .mk{color:var(--read);border-color:var(--read)}
+  .st.future{opacity:.4}
+  .st.current{border-color:var(--accent);background:var(--panel);transform:scale(1.035);
+      box-shadow:0 0 0 1px var(--accent),0 6px 20px -8px rgba(88,166,255,.5)}
+  .st.current .mk{color:var(--accent);border-color:var(--accent);background:#0d1a2b}
+  .st.current .lbl{color:var(--ink);font-weight:600}
+  /* preview recolours the current spotlight */
+  .dry .st.current{box-shadow:0 0 0 1px var(--inert),0 6px 20px -8px rgba(163,113,247,.5);border-color:var(--inert)}
+  .dry .st.current .mk{color:var(--inert);border-color:var(--inert);background:#160a24}
+  .st.untouched .rl::after{content:" · unchanged"}
+
+  /* detail panel */
+  .detail{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:14px 16px}
+  .detail h2{margin:0 0 3px;font-size:15px}
+  .detail .role{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+  .detail .txt{color:var(--dim);font-size:13px;margin:9px 0 4px}
+  .units{margin-top:12px;display:flex;flex-direction:column;gap:14px}
+
+  /* state readout (side) */
+  .state{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+      padding:13px 15px;position:sticky;top:64px}
+  .state h3{margin:0 0 2px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .state .mode-pill{font-size:10px;padding:1px 7px;border-radius:99px;border:1px solid}
+  .state .mode-pill.live{color:var(--write);border-color:var(--write)}
+  .state .mode-pill.dry{color:var(--inert);border-color:var(--inert)}
+  .state .issue{font-size:11px;color:var(--faint);margin-bottom:11px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed var(--line);font-size:12px}
+  .kv:last-child{border-bottom:0}
+  .kv .k{color:var(--faint)}
+  .kv .v{color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+  .kv .v.state-seen{color:var(--dim)}
+  .kv .v.state-active{color:var(--accent)}
+  .kv .v.state-done{color:var(--read)}
+  .actionline{margin-top:11px;font-size:12px;padding:9px 11px;border-radius:8px;line-height:1.5}
+  .actionline.commit{background:var(--add);color:var(--addtx);border-left:3px solid var(--write)}
+  .actionline.inert{background:#180e28;color:#c9a7f7;border-left:3px solid var(--inert)}
+  .actionline .lead{font-weight:600;display:block;margin-bottom:2px}
+  .persisted{margin-top:10px;font-size:11px;color:var(--faint)}
+  .persisted b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Runtime Step-Through</h1>
+  <p class="sub">Execute ONE request down the lifecycle spine, station by station. The cursor is the
+     program counter: watch the ticket state advance and see what each step writes — or, in preview,
+     what it <em>would</em> write.</p>
+  <div id="legend"></div>
+
+  <div class="controls">
+    <button class="btn" id="reset">⏮ Reset</button>
+    <button class="btn" id="prev">◀ Prev</button>
+    <button class="btn" id="next">Next ▶</button>
+    <button class="btn play" id="play">▶▶ Play</button>
+    <span class="modeswitch">
+      <button class="live on" id="mLive">LIVE</button>
+      <button class="dry" id="mDry">PREVIEW</button>
+    </span>
+  </div>
+
+  <div class="prog">
+    <span class="stepno">step <b id="cur">1</b> / <span id="tot">8</span></span>
+    <span class="progbar" id="progbar"><i></i></span>
+    <span id="stname"></span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="rail" id="rail"></div>
+      <div class="detail" id="detail"></div>
+    </div>
+    <aside>
+      <div class="state" id="state"></div>
+    </aside>
+  </div>
+
+  <div class="kicker">
+    <b>Why step through it?</b> Pressing Next makes the one-code-path claim visceral: LIVE and
+    PREVIEW walk the exact same 8 stations in the exact same order — the cursor never forks. Flip the
+    mode toggle at any step and only the <b>right-hand readout changes</b>: LIVE commits, PREVIEW says
+    “[preview] would …” and persists nothing. Same path, different tail.
+  </div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+document.querySelector("#top").outerHTML =
+  topbar("03","Runtime Step-Through",
+         "understanding execution order &amp; what happens when you run it; demos",
+         "static structure; comparing many values at once");
+document.querySelector("#legend").innerHTML = legend();
+
+/* ---- per-station running state, derived from station.detail + preview semantics ----
+   Each entry: the ticket lifecycle state after this step, and the step's ACTION.
+   `writes`  = what the step persists in LIVE.
+   `wouldBe` = the same action phrased as inert in PREVIEW ("[preview] would ...").
+   A null `writes` means the step performs no write in either mode. */
+const STEP = {
+  ddissue:  { issue:"—",        act:"Zendesk surfaces a firing ticket (uuid). Nothing of ours has run yet.",
+              writes:null },
+  monitor:  { issue:"RECEIVED",     act:"Intake writes the ticket ROW (state=RECEIVED) carrying channel + service.",
+              writes:"ticket row → RECEIVED  (channel/service stamped here)" },
+  envelope: { issue:"RECEIVED",     act:"Canonical Event envelope is validated. Preview CONSTRUCTS one synthetically; nothing to persist.",
+              writes:null },
+  sqs:      { issue:"RECEIVED",     act:"Responder Lambda entry. LIVE: queue Records loop. PREVIEW: a direct invoke {preview:true} forks at the top of handler — same process_ticket downstream.",
+              writes:null },
+  deps:     { issue:"RECEIVED",     act:"Deps assembled. THE change: preview_deps swaps every WRITE collaborator for an inert double; reads + reasoning stay real.",
+              writes:null },
+  runworker:{ issue:"CLASSIFYING", act:"process_ticket claims the lease, reads channel from the ROW, classifies via LLM, produces a Verdict.",
+              writes:"lease claim + row → CLASSIFYING",
+              wouldBe:"claim returns True (gate passes); row NOT transitioned" },
+  fork:     { issue:"CLASSIFIED",  act:"Pure fork on the Verdict. Confident → build & send the auto-reply. Else → cut a draft, queue for a human.",
+              writes:"draft created + auto-reply sent",
+              wouldBe:"draft key faked (DRAFT-9999-PREVIEW); auto-reply NOT sent" },
+  result:   { issue:"AUTO_REPLIED", act:"Terminal. LIVE: writes landed, process_ticket returns a RunReport. PREVIEW: writes were inert; RunReport → PreviewPayload, returned for inspection.",
+              writes:"row → AUTO_REPLIED + log write",
+              wouldBe:"nothing persisted; PreviewPayload returned" },
+};
+const ISSUE_ID = "3f9c…a17e";
+
+let i = 0;          // cursor
+let dry = false;    // mode
+let timer = null;   // play interval
+
+const rail    = document.querySelector("#rail");
+const detail  = document.querySelector("#detail");
+const stateEl = document.querySelector("#state");
+const progWrap= document.querySelector("#progbar");
+const progBar = progWrap.querySelector("i");
+const curEl   = document.querySelector("#cur");
+const totEl   = document.querySelector("#tot");
+const stnameEl= document.querySelector("#stname");
+const btnPrev = document.querySelector("#prev");
+const btnNext = document.querySelector("#next");
+const btnReset= document.querySelector("#reset");
+const btnPlay = document.querySelector("#play");
+const mLive   = document.querySelector("#mLive");
+const mDry    = document.querySelector("#mDry");
+
+totEl.textContent = STATIONS.length;
+
+/* build the station rail once; per-step we just toggle classes */
+STATIONS.forEach((s, idx) => {
+  const el = document.createElement("div");
+  el.className = "st";
+  el.dataset.idx = idx;
+  el.innerHTML =
+    `<span class="mk"></span>` +
+    `<span class="lbl">${esc(s.label)}</span>` +
+    `<span class="rl">${esc(s.role)}</span>`;
+  if(!s.touched) el.classList.add("untouched");
+  el.addEventListener("click", () => { stop(); i = idx; render(); });
+  rail.appendChild(el);
+});
+const railEls = [...rail.children];
+
+/* the running state readout for the current step */
+function renderState(){
+  const s = STATIONS[i];
+  const step = STEP[s.id];
+  // lifecycle state so far: current step's issue state, tagged active
+  const kv = [
+    ["ticket.state", step.issue],
+    ["mode", dry ? "PREVIEW" : "LIVE"],
+    ["station", s.label.replace(/^[①-⑧]\s*/, "")],
+  ];
+  const stateClass = step.issue === "—" ? "state-seen"
+                   : (i === STATIONS.length-1 ? "state-done" : "state-active");
+
+  let action;
+  if(step.writes === null){
+    action = `<div class="actionline ${dry?'inert':'commit'}">
+        <span class="lead">${dry?'[preview] ':''}no write this step</span>${esc(step.act)}</div>`;
+  } else if(dry){
+    const would = step.wouldBe || step.writes;
+    action = `<div class="actionline inert">
+        <span class="lead">[preview] would: ${esc(step.writes)}</span>
+        inert double instead → ${esc(would)}</div>`;
+  } else {
+    action = `<div class="actionline commit">
+        <span class="lead">commit: ${esc(step.writes)}</span>${esc(step.act)}</div>`;
+  }
+
+  const persisted = dry
+    ? `<div class="persisted">persisted so far: <b>nothing</b> — reads were real, every write inert</div>`
+    : `<div class="persisted">persisted so far: <b>${writesUpTo()}</b></div>`;
+
+  stateEl.innerHTML =
+    `<h3>Running state
+        <span class="mode-pill ${dry?'dry':'live'}">${dry?'PREVIEW':'LIVE'}</span></h3>
+     <div class="issue">ticket_id = ${ISSUE_ID}</div>` +
+    kv.map(([k,v]) => {
+      const cls = k==="ticket.state" ? stateClass : "";
+      return `<div class="kv"><span class="k">${esc(k)}</span><span class="v ${cls}">${esc(v)}</span></div>`;
+    }).join("") +
+    action + persisted;
+}
+
+/* count real writes committed up to & including current step (LIVE only) */
+function writesUpTo(){
+  let n = 0;
+  for(let k=0;k<=i;k++){ if(STEP[STATIONS[k].id].writes !== null) n++; }
+  return n === 0 ? "nothing yet" : n + " write" + (n>1?"s":"");
+}
+
+function renderDetail(){
+  const s = STATIONS[i];
+  const units = s.units.map(renderUnit).join("");
+  detail.innerHTML =
+    `<div class="role">${esc(s.role)} · station ${i+1} of ${STATIONS.length}</div>
+     <h2>${esc(s.label)}</h2>
+     <div class="txt">${esc(s.detail)}</div>` +
+    (units ? `<div class="units">${units}</div>`
+           : `<div class="txt" style="color:var(--faint)">No changed code units at this station — it is part of the path the request travels, unchanged by the preview work.</div>`);
+}
+
+function render(){
+  railEls.forEach((el, idx) => {
+    el.classList.remove("done","current","future");
+    if(idx < i)       el.classList.add("done");
+    else if(idx === i)el.classList.add("current");
+    else              el.classList.add("future");
+    el.querySelector(".mk").textContent =
+      idx < i ? "✓" : (idx === i ? "▶" : (idx+1));
+  });
+  rail.classList.toggle("dry", dry);
+  curEl.textContent = i+1;
+  progBar.style.width = ((i+1)/STATIONS.length*100) + "%";
+  progWrap.classList.toggle("dry", dry);
+  stnameEl.textContent = STATIONS[i].label;
+  btnPrev.disabled = i === 0;
+  btnNext.disabled = i === STATIONS.length-1;
+  renderDetail();
+  renderState();
+}
+
+/* ---- play / pause ---- */
+function stop(){
+  if(timer){ clearInterval(timer); timer = null; }
+  btnPlay.classList.remove("on");
+  btnPlay.textContent = "▶▶ Play";
+}
+function play(){
+  if(i === STATIONS.length-1) i = 0;          // replay from start
+  btnPlay.classList.add("on");
+  btnPlay.textContent = "⏸ Pause";
+  render();
+  timer = setInterval(() => {
+    if(i >= STATIONS.length-1){ stop(); return; }   // stop on last
+    i++; render();
+  }, 1300);
+}
+
+btnNext.addEventListener("click", () => { stop(); if(i<STATIONS.length-1){i++;render();} });
+btnPrev.addEventListener("click", () => { stop(); if(i>0){i--;render();} });
+btnReset.addEventListener("click",() => { stop(); i=0; render(); });
+btnPlay.addEventListener("click", () => { timer ? stop() : play(); });
+
+function setMode(d){
+  dry = d;
+  mLive.classList.toggle("on", !dry);
+  mDry.classList.toggle("on", dry);
+  render();                                    // same station, readout changes
+}
+mLive.addEventListener("click", () => setMode(false));
+mDry.addEventListener("click",  () => setMode(true));
+
+render();
+</script>
+</body>
+</html>

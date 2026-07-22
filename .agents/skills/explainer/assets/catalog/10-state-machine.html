@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 — State-Machine Map</title>
+<link rel="stylesheet" href="./_shared.css">
+<style>
+  /* ---- mode toggle ---- */
+  .modebar{display:flex;align-items:center;gap:14px;margin:2px 0 18px}
+  .toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;
+          overflow:hidden;background:var(--panel2)}
+  .toggle button{background:none;border:none;color:var(--dim);font:inherit;font-size:12px;
+                 padding:6px 16px;cursor:pointer}
+  .toggle button.on{color:var(--bg);font-weight:700}
+  .toggle button[data-mode="live"].on{background:var(--write)}
+  .toggle button[data-mode="dry"].on{background:var(--inert)}
+  .modenote{font-size:12px;color:var(--dim)}
+  .modenote b{color:var(--ink)}
+  body.dry .modenote b{color:var(--inert)}
+
+  /* ---- the map: nodes hung off an SVG edge layer ---- */
+  .map{position:relative;margin:6px 0 0}
+  .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+  .edges path{fill:none;stroke:var(--line);stroke-width:1.6}
+  .edges path.write{stroke:var(--write);stroke-dasharray:none}
+  body.dry .edges path.write{stroke:var(--inert);stroke-dasharray:5 4}
+  .edges path.stop{stroke:var(--faint);stroke-dasharray:2 3}
+  .edges marker path{stroke:none}
+
+  .nodes{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:0}
+
+  /* a state node */
+  .state{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel2);
+         padding:10px 16px;min-width:210px;text-align:center;position:relative}
+  .state .nm{font-weight:700;letter-spacing:.3px}
+  .state .desc{font-size:11px;color:var(--dim);margin-top:3px}
+  .state.core{border-left:3px solid var(--core)}
+  .state.terminal{border:1px solid var(--result);box-shadow:0 0 0 1px var(--result),0 0 16px -6px var(--result)}
+  .state.terminal.esc{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger),0 0 16px -6px var(--danger)}
+  .state.terminal .nm{color:var(--result)}
+  .state.terminal.esc .nm{color:var(--danger)}
+  .badge{position:absolute;top:-9px;right:10px;font-size:9px;padding:1px 7px;border-radius:999px;
+         background:var(--bg);border:1px solid var(--result);color:var(--result)}
+  .state.terminal.esc .badge{border-color:var(--danger);color:var(--danger)}
+
+  /* a transition: its own row, a labelled clickable pill */
+  .trow{display:flex;justify-content:center;margin:9px 0;min-height:20px}
+  .tr{display:inline-flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;
+      border:1px solid var(--line);background:var(--panel);border-radius:999px;
+      padding:4px 12px;color:var(--dim);transition:border-color .15s,color .15s}
+  .tr:hover{color:var(--ink);border-color:var(--dim)}
+  .tr .cond{color:var(--ink);font-weight:600}
+  .tr .writes{font-size:10px}
+  /* a WRITE transition — recolours by mode, in place */
+  .tr.write{border-color:var(--write);color:var(--write)}
+  .tr.write .cond{color:var(--write)}
+  body.dry .tr.write{border-color:var(--inert);color:var(--inert)}
+  body.dry .tr.write .cond{color:var(--inert)}
+  .tr.open{border-style:solid;border-width:1px}
+  .tr .car{font-size:9px;color:var(--faint)}
+
+  /* the fork: two branches side by side */
+  .forkwrap{display:flex;gap:34px;justify-content:center;align-items:flex-start;
+            width:100%;flex-wrap:wrap;margin-top:4px}
+  .branch{display:flex;flex-direction:column;align-items:center;gap:0;flex:1;
+          min-width:270px;max-width:340px}
+  .forkq{display:inline-flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;
+         border:1px dashed var(--accent);background:var(--panel);border-radius:999px;
+         padding:4px 14px;color:var(--accent);margin:6px 0 10px}
+  .forkq:hover{background:var(--panel2)}
+
+  /* per-transition reveal panel */
+  .panel{width:100%;max-width:760px;margin:2px auto 4px}
+  .writeline{font-size:12px;color:var(--dim);margin:2px 0 8px;
+             border-left:2px solid var(--line);padding-left:10px}
+  .writeline b{color:var(--ink)}
+  .writeline.w{border-left-color:var(--write)}
+  body.dry .writeline.w{border-left-color:var(--inert)}
+  body.dry .writeline.w b{color:var(--inert)}
+
+  /* early-exit stop chips off to the side */
+  .stops{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:8px 0 2px}
+  .stop{font-size:11px;color:var(--faint);border:1px dashed var(--faint);
+        border-radius:8px;padding:5px 11px;background:var(--panel2)}
+  .stop b{color:var(--dim)}
+
+  .verdicthint{font-size:11px;color:var(--faint);text-align:center;margin:14px 0 2px}
+</style>
+</head>
+<body class="live">
+<div id="top"></div>
+<div class="wrap">
+  <h1>State-Machine Map</h1>
+  <div class="sub">
+    The ticket is a state machine. Boxes are the <b>states</b> the row moves through;
+    the pills between them are <b>transitions</b>, each labelled with the condition that
+    fires it (<code>claim</code> / <code>classify</code> / <code>send</code> / <code>queue</code>).
+    Terminal states glow. <b>Click any transition</b> to see the code that drives it and
+    the one line it writes. Flip <b>LIVE ⇄ PREVIEW</b>: every WRITE transition recolours
+    inert in place — same computed path, nothing persisted.
+  </div>
+
+  <div class="modebar">
+    <div class="toggle">
+      <button data-mode="live" class="on">LIVE</button>
+      <button data-mode="dry">PREVIEW</button>
+    </div>
+    <div class="modenote" id="modenote"></div>
+  </div>
+
+  <div id="legend"></div>
+
+  <div class="map">
+    <svg class="edges" id="edges" preserveAspectRatio="none">
+      <defs>
+        <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3"
+                orient="auto" markerUnits="userSpaceOnUse">
+          <path d="M0,0 L6,3 L0,6 Z" fill="var(--faint)"/>
+        </marker>
+      </defs>
+    </svg>
+    <div class="nodes" id="nodes"></div>
+  </div>
+
+  <div id="kicker"></div>
+</div>
+
+<script src="./_shared.js"></script>
+<script>
+/* ---------------------------------------------------------------
+   The ticket state machine. Each transition names its trigger
+   condition, whether it is a WRITE (state-mutating), the unit it
+   maps to, and the one line it writes (live vs preview text).
+   --------------------------------------------------------------- */
+const STATES = {
+  SEEN:      {desc:"row created by Intake (state=RECEIVED)", cls:"core", label:"RECEIVED"},
+  TRIAGING:  {desc:"lease claimed, LLM reasoning underway", cls:"core", label:"CLASSIFYING"},
+  TRIAGED:   {desc:"Verdict computed — fork decided from it", cls:"core", label:"CLASSIFIED"},
+  HANDED:    {desc:"reply_text built, auto-reply sent", cls:"terminal", label:"AUTO_REPLIED", badge:"terminal"},
+  ESCALATED: {desc:"draft cut, routed to a human", cls:"terminal esc", label:"HUMAN_QUEUE", badge:"terminal → human"},
+};
+
+/* transitions on the linear spine (before the fork) */
+const TRANS = {
+  claim: {
+    cond:"claim", write:true, unit:"inertstore",
+    from:"SEEN", to:"TRIAGING",
+    live:"store.claim(ref) → sets row state RECEIVED → CLASSIFYING (lease acquired)",
+    dry:"[preview] would set CLASSIFYING — _NoopStore.claim() returns True, row untouched",
+  },
+  triage: {
+    cond:"classify done", write:true, unit:"inertstore",
+    from:"TRIAGING", to:"TRIAGED",
+    live:"store.transition(ref, CLASSIFIED) after triage_fn returns the Verdict",
+    dry:"[preview] would set CLASSIFIED — _NoopStore.transition() returns True, row untouched",
+  },
+  fire: {
+    cond:"send", write:true, unit:"inertwrite",
+    from:"TRIAGED", to:"HANDED",
+    live:"fire_fn(reply_text) → auto-reply session, then store.transition(ref, AUTO_REPLIED)",
+    dry:"[preview] would set AUTO_REPLIED — _NoopReply returns \"PREVIEW-session\", no auto-reply, no write",
+  },
+  escalate: {
+    cond:"queue", write:true, unit:"inertwrite",
+    from:"TRIAGED", to:"ESCALATED",
+    live:"draft_writer.create(content) → real draft key, then store.transition(ref, HUMAN_QUEUE)",
+    dry:"[preview] would set HUMAN_QUEUE — _NoopDraft returns DRAFT-9999-PREVIEW, no draft, no write",
+  },
+};
+
+const modenote = document.getElementById("modenote");
+function setModeNote(){
+  modenote.innerHTML = document.body.classList.contains("dry")
+    ? `mode <b>PREVIEW</b> — write transitions are inert: the map shows the states <code>process_ticket</code> <i>would</i> drive through, computed from the same Verdict; the row never moves.`
+    : `mode <b>LIVE</b> — write transitions mutate the real ticket row and fire real side effects.`;
+}
+
+/* build one state node */
+function stateNode(key){
+  const s = STATES[key];
+  const badge = s.badge ? `<span class="badge">${esc(s.badge)}</span>` : "";
+  return `<div class="state ${s.cls}" data-state="${key}">
+            ${badge}
+            <div class="nm">${esc(s.label || key)}</div>
+            <div class="desc">${esc(s.desc)}</div>
+          </div>`;
+}
+
+/* build one transition pill + its (empty) reveal + write-line slot */
+function transRow(key){
+  const t = TRANS[key];
+  const wc = t.write ? "write" : "";
+  return `<div class="trow">
+            <span class="tr ${wc}" data-tr="${key}">
+              <span class="car">▶</span>
+              <span class="cond">${esc(t.cond)}</span>
+              <span class="writes" data-writes></span>
+            </span>
+          </div>
+          <div class="reveal" data-rev="${key}">
+            <div class="panel">
+              <div class="writeline w" data-wl></div>
+              <div data-unit></div>
+            </div>
+          </div>`;
+}
+
+/* refresh the little "would set X / sets X" text on every write pill + panel */
+function refreshWriteText(){
+  const dry = document.body.classList.contains("dry");
+  document.querySelectorAll("[data-tr]").forEach(pill => {
+    const t = TRANS[pill.dataset.tr];
+    const slot = pill.querySelector("[data-writes]");
+    if(!t.write){ slot.textContent=""; return; }
+    slot.textContent = dry ? `· would set ${STATES[t.to].label || t.to} · not applied`
+                           : `· sets ${STATES[t.to].label || t.to}`;
+  });
+  document.querySelectorAll("[data-wl]").forEach(wl => {
+    const key = wl.closest("[data-rev]").dataset.rev;
+    const t = TRANS[key];
+    wl.innerHTML = `<b>writes:</b> ${esc(dry ? t.dry : t.live)}`;
+  });
+}
+
+/* ---- assemble the map ---- */
+const nodes = document.getElementById("nodes");
+nodes.innerHTML =
+  stateNode("SEEN") +
+  transRow("claim") +
+  stateNode("TRIAGING") +
+  transRow("triage") +
+  stateNode("TRIAGED") +
+  // the fork
+  `<div class="trow"><span class="forkq" data-tr="__fork">
+     <span class="car">▶</span>fork — pure function of the Verdict</span></div>
+   <div class="reveal" data-rev="__fork">
+     <div class="panel">
+       <div class="writeline"><b>the fork writes nothing itself</b> — it only decides which
+       write transition runs next, from the Verdict alone.</div>
+       <div data-forknote></div>
+     </div>
+   </div>
+   <div class="forkwrap">
+     <div class="branch" id="branchFire"></div>
+     <div class="branch" id="branchEsc"></div>
+   </div>`;
+
+document.getElementById("branchFire").innerHTML =
+  transRow("fire") + stateNode("HANDED");
+document.getElementById("branchEsc").innerHTML =
+  transRow("escalate") + stateNode("ESCALATED");
+
+// fork note text
+document.querySelector("[data-forknote]").innerHTML =
+  `<div class="writeline"><b>left:</b> confident + answerable → <code>send</code>.
+    &nbsp; <b>right:</b> low-confidence / mislabel-with-reason → <code>queue</code>
+    (NO reply_text; a human owns it).</div>`;
+
+// early-exit stops
+const stopsHtml =
+  `<div class="stops">
+     <span class="stop"><b>refused claim</b> (row already leased / dup) → <b>stop</b>, no transition</span>
+     <span class="stop"><b>lost row / lost transition</b> (gate returns falsy) → <b>stop</b>, outcome=None</span>
+   </div>
+   <div class="verdicthint">early exits leave the row where it was — in a preview they were never going to move it anyway</div>`;
+nodes.insertAdjacentHTML("beforeend", stopsHtml);
+
+/* ---- transition click → reveal unit + write-line ---- */
+function wireTransitions(){
+  document.querySelectorAll("[data-tr]").forEach(pill => {
+    pill.addEventListener("click", () => {
+      const key = pill.dataset.tr;
+      const rev = document.querySelector(`[data-rev="${key}"]`);
+      const open = rev.classList.toggle("open");
+      pill.classList.toggle("open", open);
+      pill.querySelector(".car").textContent = open ? "▼" : "▶";
+      // lazy-render the mapped unit once
+      const unitSlot = rev.querySelector("[data-unit]");
+      if(open && unitSlot && !unitSlot.dataset.filled && TRANS[key]){
+        unitSlot.innerHTML = renderUnit(TRANS[key].unit);
+        unitSlot.dataset.filled = "1";
+      }
+    });
+  });
+}
+wireTransitions();
+
+/* ---- edges: draw SVG connectors between state boxes ---- */
+function drawEdges(){
+  const svg = document.getElementById("edges");
+  const map = svg.parentElement;
+  const R = map.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${R.width} ${R.height}`);
+  // clear old paths (keep <defs>)
+  svg.querySelectorAll("path:not(defs path)").forEach(p => p.remove());
+  const dry = document.body.classList.contains("dry");
+
+  const center = el => {
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left - R.left + r.width/2,
+      top: r.top - R.top,
+      bot: r.bottom - R.top,
+    };
+  };
+  function line(aKey, bKey, cls){
+    const a = document.querySelector(`[data-state="${aKey}"]`);
+    const b = document.querySelector(`[data-state="${bKey}"]`);
+    if(!a || !b) return;
+    const ca = center(a), cb = center(b);
+    const p = document.createElementNS("http://www.w3.org/2000/svg","path");
+    // vertical-ish curve from bottom of A to top of B
+    const midY = (ca.bot + cb.top)/2;
+    p.setAttribute("d", `M ${ca.x} ${ca.bot} C ${ca.x} ${midY}, ${cb.x} ${midY}, ${cb.x} ${cb.top-6}`);
+    p.setAttribute("class", cls);
+    p.setAttribute("marker-end","url(#ar)");
+    svg.insertBefore(p, svg.firstChild.nextSibling);
+  }
+  line("SEEN","TRIAGING","write");
+  line("TRIAGING","TRIAGED","write");
+  line("TRIAGED","HANDED","write");
+  line("TRIAGED","ESCALATED","write");
+}
+window.addEventListener("resize", drawEdges);
+// redraw after reveals animate open/closed (height changes move boxes)
+document.querySelectorAll(".reveal").forEach(r =>
+  r.addEventListener("transitionend", drawEdges));
+
+/* ---- mode toggle ---- */
+document.querySelectorAll(".toggle button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const dry = btn.dataset.mode === "dry";
+    document.body.classList.toggle("dry", dry);
+    document.body.classList.toggle("live", !dry);
+    document.querySelectorAll(".toggle button").forEach(b =>
+      b.classList.toggle("on", b === btn));
+    setModeNote();
+    refreshWriteText();
+    drawEdges();
+  });
+});
+
+/* ---- topbar / legend / kicker ---- */
+document.getElementById("top").innerHTML =
+  topbar("10","State-Machine Map",
+    "domains that ARE a state machine; showing transitions + their trigger conditions",
+    "non-stateful logic; data provenance; call sequence detail");
+
+// legend + an extra 'transition: real vs inert' key
+document.getElementById("legend").innerHTML =
+  legend().replace("</div>",
+    `<span class="k"><span class="dot" style="background:var(--write)"></span>transition: real (LIVE)</span>
+     <span class="k"><span class="dot" style="background:var(--inert)"></span>transition: inert (PREVIEW)</span>
+     <span class="k"><span class="dot" style="background:var(--result)"></span>terminal state</span>
+    </div>`);
+
+document.getElementById("kicker").innerHTML =
+  `<div class="kicker">
+     <b>The one takeaway:</b> PREVIEW drives the <b>same state path</b>
+     — <code>RECEIVED → CLASSIFYING → CLASSIFIED → fork</code> — off the <b>same Verdict</b>,
+     but every state write is inert (<code>_NoopStore.claim/transition</code> return
+     <code>True</code> so the gates pass; <code>_NoopReply</code> / <code>_NoopDraft</code>
+     return fakes). You see the <b>outcome state</b> the row <i>would</i> reach without
+     moving the real row. Flip the toggle: the transitions recolour, the map does not change shape.
+   </div>`;
+
+setModeNote();
+refreshWriteText();
+// draw once layout settled
+requestAnimationFrame(() => requestAnimationFrame(drawEdges));
+</script>
+</body>
+</html>

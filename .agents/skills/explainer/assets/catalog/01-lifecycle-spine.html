@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 — Lifecycle Spine</title>
+<link rel="stylesheet" href="./_shared.css">
+<style>
+  /* The spine: a vertical rail with stations hung off it. */
+  .spine{position:relative;margin:8px 0 0;padding:0}
+  .station{border:1px solid var(--line);border-radius:var(--radius);
+           background:var(--panel2);margin:0;padding:0;transition:box-shadow .2s,border-color .2s,opacity .2s}
+
+  /* touched vs untouched: the whole point of the view */
+  .station.dim{opacity:.5}
+  .station.touched{border-color:var(--accent);
+                   box-shadow:0 0 0 1px var(--accent), 0 0 18px -4px var(--accent)}
+
+  .st-head{display:flex;align-items:center;gap:10px;cursor:pointer;
+           padding:12px 14px;user-select:none}
+  .st-head:hover{background:var(--panel)}
+  .st-label{font-weight:600}
+  .st-sub{color:var(--dim);font-size:12px;margin-top:2px}
+  .st-caret{color:var(--faint);font-size:12px;transition:transform .2s;flex-shrink:0}
+  .station.open .st-caret{transform:rotate(90deg)}
+  .st-meta{flex:1}
+  .st-role{font-size:10px;padding:1px 7px;border-radius:999px;border:1px solid var(--faint);
+           color:var(--faint);flex-shrink:0}
+  .station.touched .st-role{border-color:var(--accent);color:var(--accent)}
+
+  .st-body{padding:0 14px}
+  .station.open .st-body{padding:0 14px 14px}
+  .st-detail{color:var(--ink);font-size:12.5px;line-height:1.6;
+             border-left:2px solid var(--line);padding:2px 0 2px 12px;margin:2px 0 12px}
+  .station.touched .st-detail{border-left-color:var(--accent)}
+  .st-unit{margin-top:12px}
+  .st-unit-title{font-size:12px;color:var(--dim);margin-bottom:5px}
+  .st-unit-title b{color:var(--ink)}
+  .st-nounit{color:var(--faint);font-size:12px;font-style:italic}
+
+  /* arrow between stations, sitting on the spine */
+  .spine-arrow{text-align:center;color:var(--faint);font-size:16px;line-height:1;
+               margin:5px 0;height:14px}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Lifecycle Spine</h1>
+  <div class="sub">
+    The whole request path, top to bottom: an error <b>enters</b> at ①, an actionable
+    signal <b>exits</b> at ⑧. Each station is one stage of the flow. Stations the preview
+    change <b>touches glow</b> with an accent border; untouched stations are dimmed.
+    <b>Click any station</b> to expand its role plus the code it owns. This answers
+    "where in the end-to-end flow does the change sit, and what feeds it?"
+  </div>
+  <div id="legend"></div>
+  <div id="spine" class="spine"></div>
+  <div id="kicker"></div>
+</div>
+
+<script src="./_shared.js"></script>
+<script>
+  // topbar + legend from shared renderers
+  document.getElementById("top").innerHTML =
+    topbar("01","Lifecycle Spine",
+      "seeing where a change sits in the end-to-end flow; onboarding",
+      "fine-grained control flow; timing/sequence order");
+  document.getElementById("legend").innerHTML = legend();
+
+  // Build the spine: station, arrow, station, arrow, ...
+  const spine = document.getElementById("spine");
+  STATIONS.forEach((s, i) => {
+    const el = document.createElement("div");
+    el.className = "station " + (s.touched ? "touched" : "dim");
+    el.dataset.id = s.id;
+
+    const units = s.units.length
+      ? s.units.map(id =>
+          `<div class="st-unit">
+             <div class="st-unit-title"><b>${esc(unitTitle(id))}</b></div>
+             ${renderUnit(id)}
+           </div>`).join("")
+      : `<div class="st-nounit">No code owned by this station — it is on the path but the change does not touch it.</div>`;
+
+    el.innerHTML =
+      `<div class="st-head">
+         <span class="st-caret">▶</span>
+         <div class="st-meta">
+           <div class="st-label">${esc(s.label)}</div>
+           <div class="st-sub">${esc(s.sub)}</div>
+         </div>
+         <span class="st-role">${esc(s.role)}</span>
+       </div>
+       <div class="reveal">
+         <div class="st-body">
+           <div class="st-detail">${esc(s.detail)}</div>
+           ${units}
+         </div>
+       </div>`;
+
+    // toggle this station independently (multiple can be open)
+    const head = el.querySelector(".st-head");
+    const reveal = el.querySelector(".reveal");
+    head.addEventListener("click", () => {
+      const open = el.classList.toggle("open");
+      reveal.classList.toggle("open", open);
+    });
+
+    spine.appendChild(el);
+    if (i < STATIONS.length - 1) {
+      const a = document.createElement("div");
+      a.className = "spine-arrow";
+      a.textContent = "↓";
+      spine.appendChild(a);
+    }
+  });
+
+  document.getElementById("kicker").innerHTML =
+    `<div class="kicker">
+       <b>The one takeaway:</b> the preview change touches only stations
+       ③ ④ ⑤ ⑥ ⑧ — and the core ⑥ <code>process_ticket</code> is
+       <b>unchanged</b>. The whole change lives at ⑤ <code>Deps</code>:
+       swap every WRITE collaborator for a no-op double, keep the reads and
+       reasoning real. The one code path runs end-to-end and persists nothing.
+     </div>`;
+</script>
+</body>
+</html>

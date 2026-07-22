@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 — Before/After Split</title>
+<link rel="stylesheet" href="_shared.css">
+<style>
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}}
+  .col > h2{font-size:14px;margin:0 0 3px;display:flex;align-items:center;gap:8px}
+  .col > h2 .badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid}
+  .col.before > h2 .badge{color:var(--danger);border-color:var(--danger)}
+  .col.after  > h2 .badge{color:var(--addln);border-color:var(--addln)}
+  .col .colsub{color:var(--faint);font-size:11px;margin:0 0 12px}
+
+  /* clickable node affordance — must be OBVIOUS */
+  .znode{cursor:zoom-in;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}
+  .znode:hover{transform:translateY(-2px);
+               box-shadow:0 6px 18px rgba(0,0,0,.45),0 0 0 1px var(--accent);
+               border-color:var(--accent)}
+  .znode.open{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .zbadge{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:7px;
+          display:flex;align-items:center;justify-content:center;font-size:12px;
+          background:var(--panel);border:1px solid var(--line);color:var(--dim);
+          transition:transform .14s ease,color .14s ease,border-color .14s ease}
+  .znode:hover .zbadge{color:var(--accent);border-color:var(--accent);transform:scale(1.12)}
+  .znode.open .zbadge{color:var(--accent);border-color:var(--accent)}
+  .znode .t{padding-right:28px}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>Before / After Split</h1>
+  <div class="sub">Two columns, same conceptual flow in each — read left, read right, diff them by eye. The classic architecture before/after.</div>
+
+  <div class="kicker" style="margin-top:0">
+    Side effects were <b>already</b> behind injected collaborators, so the only real change is:
+    <b>return a <code>RunReport</code> instead of a bare string</b>, and <b>provide inert doubles</b> for the write collaborators.
+    Everything else in <code>process_ticket</code> is untouched.
+  </div>
+
+  <div id="legend"></div>
+
+  <div class="cols">
+    <!-- ============ BEFORE ============ -->
+    <div class="col before">
+      <h2><span class="badge">BEFORE</span> single queue path, bare-string exit</h2>
+      <p class="colsub">the shape before the preview change</p>
+      <div id="beforeCol"></div>
+    </div>
+
+    <!-- ============ AFTER ============ -->
+    <div class="col after">
+      <h2><span class="badge">AFTER</span> two entries, inert doubles, RunReport</h2>
+      <p class="colsub">same flow — plus a preview fork that writes nothing</p>
+      <div id="afterCol"></div>
+    </div>
+  </div>
+</div>
+
+<script src="_shared.js"></script>
+<script>
+  document.getElementById("top").outerHTML =
+    topbar("06","Before/After Split",
+           "direct A/B structural comparison of a change",
+           "end-to-end flow context; runtime/timing; large N of nodes");
+  document.getElementById("legend").innerHTML = legend();
+
+  /* Each side is a list of steps. A step is either an arrow (label only)
+     or a clickable node bound to a unit id. */
+  const BEFORE = [
+    { node:"handler",  cls:"core",   label:"queue Records only", title:"handler(event, context)" },
+    { arrow:"loops over Records" },
+    { node:"runworker",cls:"core",   label:"claim → classify → verdict → fork", title:"process_ticket(...)" },
+    { arrow:"side effects via injected collaborators" },
+    { node:"inertstore", cls:"write", label:"real writes fire", title:"Dynamo / Zendesk / draft / auto-reply / S3",
+      unit:false, staticFace:{
+        f:"store.claim · status · draft_writer.create · reply_fn — all real, all persisted",
+      } },
+    { arrow:"returns" },
+    { node:"oldret",   cls:"danger", label:"bare string, nothing to inspect", title:"return \"AUTO_REPLIED\"" },
+  ];
+
+  const AFTER = [
+    { node:"handler",  cls:"core",   label:"queue live  ·  preview direct-invoke", title:"handler(event, context)" },
+    { arrow:"fork at the top: preview? → preview_deps(deps)" },
+    { node:"drdeps",   cls:"inert",  label:"swap every WRITE for an inert double", title:"preview_deps(real) → Deps" },
+    { arrow:"the doubles" },
+    { node:"inertstore", cls:"read", label:"reads pass through · claim() → True", title:"_NoopStore (real read)" },
+    { node:"inertwrite", cls:"inert",label:"no Zendesk write · no send · fake draft key", title:"_NoopStatus / _NoopReply / _NoopDraft" },
+    { arrow:"same one path — process_ticket never learns it is a preview" },
+    { node:"runworker",cls:"core",   label:"claim → classify → verdict → fork", title:"process_ticket(...) → RunReport" },
+    { arrow:"packs what it computed" },
+    { node:"runresult",cls:"result", label:"inspectable: verdict · reply_text · missing_fields", title:"RunReport (new dataclass)" },
+    { arrow:"rendered to a boundary payload" },
+    { node:"payload",  cls:"result", label:"fixed-shape Pydantic model, returned to caller", title:"PreviewPayload" },
+  ];
+
+  function renderStep(step, idx, side){
+    if(step.arrow){
+      return `<div class="arrow">↓ <span class="l">${esc(step.arrow)}</span></div>`;
+    }
+    const id = `${side}-${idx}`;
+    const face =
+      `<div class="t">${esc(step.title)}</div>` +
+      `<div class="f">${esc(step.label)}</div>`;
+    const badge = `<span class="zbadge" aria-hidden="true">🔍</span>`;
+    return `<div class="node znode ${step.cls}" id="${id}"
+                 data-unit="${step.unit === false ? "" : step.node}"
+                 role="button" tabindex="0"
+                 aria-expanded="false">
+              ${badge}${face}
+              <div class="reveal" id="${id}-r"></div>
+            </div>`;
+  }
+
+  function build(list, side, mount){
+    mount.innerHTML = list.map((s,i)=>renderStep(s,i,side)).join("");
+    list.forEach((s,i)=>{
+      if(s.arrow) return;
+      const el = document.getElementById(`${side}-${i}`);
+      const toggle = ()=>expand(el, s);
+      el.addEventListener("click", toggle);
+      el.addEventListener("keydown", ev=>{
+        if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); toggle(); }
+      });
+    });
+  }
+
+  function expand(el, step){
+    const rev = el.querySelector(".reveal");
+    const badge = el.querySelector(".zbadge");
+    const isOpen = el.classList.contains("open");
+    if(isOpen){
+      el.classList.remove("open");
+      rev.classList.remove("open");
+      el.setAttribute("aria-expanded","false");
+      badge.textContent = "🔍";
+      return;
+    }
+    if(!rev.dataset.filled){
+      // real-write BEFORE node has no unit; render a small static face instead
+      rev.innerHTML = step.unit === false
+        ? `<div class="diff"><span class="row del"><span class="gut">-</span>${esc(step.staticFace.f)}</span></div>`
+          + `<div class="why"><b>Why:</b> These are the real collaborators. In the live path they persist to Dynamo / Zendesk / draft / auto-reply / S3 — that is exactly what a preview must NOT do.</div>`
+        : renderUnit(step.node);
+      rev.dataset.filled = "1";
+    }
+    el.classList.add("open");
+    rev.classList.add("open");
+    el.setAttribute("aria-expanded","true");
+    badge.textContent = "×";
+  }
+
+  build(BEFORE, "b", document.getElementById("beforeCol"));
+  build(AFTER,  "a", document.getElementById("afterCol"));
+</script>
+</body>
+</html>

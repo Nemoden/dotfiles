@@ -1,6 +1,7 @@
 tap "hashicorp/tap"
 tap "ankitpokhrel/jira-cli"
 
+brew "age"
 brew "awscli"
 brew "bat"
 brew "btop"

@@ -8,5 +8,6 @@ ralph.e2e.yml
 ralph.pi.yml
 ralph.roo.yml
 ralph.m.yml
+.lavish/
 
 **/.claude/settings.local.json

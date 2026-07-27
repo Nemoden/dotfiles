@@ -4,17 +4,22 @@ set -euo pipefail
 
 usage() {
 	cat <<'EOF'
-usage: ktlo (--for DURATION | --forever) [-- CAFFEINATE_FLAGS...]
+usage: ktlo (--for DURATION | --forever) [--display] [-- CAFFEINATE_FLAGS...]
 
-DURATION  6h | 30m | 5h30m | 5:30 | 0:30   (h:m form, m defaults to 0)
---forever run until Ctrl-C
+DURATION   6h | 30m | 5h30m | 5:30 | 0:30   (h:m form, m defaults to 0)
+--forever  run until Ctrl-C ('--for ever' works too)
+--display  also keep the display awake (adds caffeinate -d)
 
 Default caffeinate flags: -i -m (no idle sleep, no disk sleep).
 A '--' replaces the defaults with whatever follows; bare '--' means no flags,
-which caffeinate treats as prevent-idle-sleep.
+which caffeinate treats as prevent-idle-sleep. --display appends -d either way.
+
+Note: -d stops the display sleeping, but it does not override a screen-lock
+policy — macOS may still lock the screen per your Lock Screen settings.
 
   ktlo --for 6h
-  ktlo --for 5h30m -- -i -m -d
+  ktlo --for 5h30m --display
+  ktlo --for ever --display
   ktlo --forever -- -d
 EOF
 }
@@ -38,6 +43,7 @@ parse_duration() { # -> seconds on stdout
 
 secs=""
 forever=0
+display=0
 flags=(-i -m)
 
 while (($#)); do
@@ -47,11 +53,20 @@ while (($#)); do
 			echo "ktlo: --for needs a duration" >&2
 			exit 1
 		}
-		secs=$(parse_duration "$2")
+		# '--for ever' is a spelling of --forever; 'ever' can never be a duration.
+		if [[ $2 == ever ]]; then
+			forever=1
+		else
+			secs=$(parse_duration "$2")
+		fi
 		shift 2
 		;;
 	--forever)
 		forever=1
+		shift
+		;;
+	--display)
+		display=1
 		shift
 		;;
 	-h | --help)
@@ -70,6 +85,15 @@ while (($#)); do
 		;;
 	esac
 done
+
+# Append after '--' handling so --display works with defaults or explicit flags.
+if ((display)); then
+	want_d=1
+	for f in ${flags[@]+"${flags[@]}"}; do
+		[[ $f == -d ]] && want_d=0
+	done
+	((want_d)) && flags+=(-d)
+fi
 
 if ((forever)) && [[ $secs ]]; then
 	echo "ktlo: --for and --forever are mutually exclusive" >&2

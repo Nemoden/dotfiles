@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# ktlo — keep the lights on. Wraps caffeinate with a duration and a countdown.
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+usage: ktlo (--for DURATION | --forever) [-- CAFFEINATE_FLAGS...]
+
+DURATION  6h | 30m | 5h30m | 5:30 | 0:30   (h:m form, m defaults to 0)
+--forever run until Ctrl-C
+
+Default caffeinate flags: -i -m (no idle sleep, no disk sleep).
+A '--' replaces the defaults with whatever follows; bare '--' means no flags,
+which caffeinate treats as prevent-idle-sleep.
+
+  ktlo --for 6h
+  ktlo --for 5h30m -- -i -m -d
+  ktlo --forever -- -d
+EOF
+}
+
+parse_duration() { # -> seconds on stdout
+	local d=$1 h=0 m=0
+	if [[ $d =~ ^([0-9]+):([0-9]{1,2})$ ]]; then
+		h=${BASH_REMATCH[1]} m=${BASH_REMATCH[2]}
+	elif [[ $d =~ ^([0-9]+)h([0-9]+)m?$ ]]; then
+		h=${BASH_REMATCH[1]} m=${BASH_REMATCH[2]}
+	elif [[ $d =~ ^([0-9]+)h$ ]]; then
+		h=${BASH_REMATCH[1]}
+	elif [[ $d =~ ^([0-9]+)m$ ]]; then
+		m=${BASH_REMATCH[1]}
+	else
+		echo "ktlo: bad duration '$d' (want 6h, 30m, 5h30m, 5:30)" >&2
+		return 1
+	fi
+	echo $((10#$h * 3600 + 10#$m * 60))
+}
+
+secs=""
+forever=0
+flags=(-i -m)
+
+while (($#)); do
+	case $1 in
+	--for)
+		[[ ${2-} ]] || {
+			echo "ktlo: --for needs a duration" >&2
+			exit 1
+		}
+		secs=$(parse_duration "$2")
+		shift 2
+		;;
+	--forever)
+		forever=1
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		flags=("$@")
+		break
+		;;
+	*)
+		echo "ktlo: unknown arg '$1'" >&2
+		usage >&2
+		exit 1
+		;;
+	esac
+done
+
+if ((forever)) && [[ $secs ]]; then
+	echo "ktlo: --for and --forever are mutually exclusive" >&2
+	exit 1
+fi
+if ! ((forever)) && [[ -z $secs ]]; then
+	echo "ktlo: need --for DURATION or --forever" >&2
+	usage >&2
+	exit 1
+fi
+if [[ $secs == 0 ]]; then
+	echo "ktlo: duration is zero, nothing to do" >&2
+	exit 1
+fi
+
+fmt() { # seconds -> 5h30m / 30m / 45s
+	local s=$1
+	if ((s >= 3600)); then
+		printf '%dh%02dm' $((s / 3600)) $(((s % 3600) / 60))
+	elif ((s >= 60)); then
+		printf '%dm' $((s / 60))
+	else
+		printf '%ds' "$s"
+	fi
+}
+
+if ((forever)); then
+	echo "ktlo: caffeinate ${flags[*]-} — forever (Ctrl-C to stop)"
+	exec caffeinate "${flags[@]}"
+fi
+
+echo "ktlo: caffeinate ${flags[*]-} -t $secs — $(fmt "$secs") (Ctrl-C to stop)"
+caffeinate "${flags[@]}" -t "$secs" &
+pid=$!
+
+left=$secs
+interrupted=0
+
+# EXIT covers every path out of here, so the assertion can never outlive us.
+cleanup() {
+	kill "$pid" 2>/dev/null || true
+	wait "$pid" 2>/dev/null || true
+	if ((interrupted)); then
+		printf '\rktlo: stopped early, %s remained. Lights off.\033[K\n' "$(fmt "$left")"
+	fi
+}
+trap cleanup EXIT
+trap 'interrupted=1; exit 130' INT TERM HUP
+
+while kill -0 "$pid" 2>/dev/null && ((left > 0)); do
+	printf '\rktlo: %s left\033[K' "$(fmt "$left")"
+	sleep 1
+	((left--)) || true
+done
+wait "$pid" 2>/dev/null || true
+printf '\rktlo: done, lights off.\033[K\n'

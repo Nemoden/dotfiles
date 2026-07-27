@@ -128,6 +128,10 @@ This matters because:
 - **Workflow for any dotfile change:** `dot add -f <path>` → `dot commit -m "..."` → `dot pull --rebase` → `dot push`. Never `pull` before `commit` (rebase refuses with unstaged changes).
 - **Skills live at `~/.agents/skills/<name>/` and are symlinked into `~/.claude/skills/<name>` with RELATIVE symlinks** (`../../.agents/skills/<name>`). Absolute symlinks break across machines (home dir differs).
 
+# Reference
+
+- My Slack voice model (how I write Slack messages: style rules, lexicon, registers) lives in Notion: page "Kirill's Slack voice model" under the top-level "Reference" page. If the notion skill is available, find it via title search (`query:"Kirill's Slack voice model"`). Use it whenever drafting Slack messages as me.
+
 # Vendor documentation snapshots
 
 If `~/Projects/_llms` exists, it holds local snapshots of LLM-oriented vendor docs. Consult it before guessing at vendor APIs. `ls ~/Projects/_llms/` to see which technologies are covered.

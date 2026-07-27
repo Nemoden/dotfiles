@@ -24,4 +24,20 @@ once judged not worth a technique.
 
 ## Candidates
 
-_None yet._
+## interleaving-lanes — surfaced 2026-07-27
+
+- **Subject/question that had no home:** PR fixing a lost-update race on
+  `matter.cards` (two concurrent writers, full-body PUTs, loser's append
+  silently erased). Reader's question: "how do two CONCURRENT writers
+  interleave on shared state, and where exactly is the update lost?"
+- **What was stretched:** shipped runtime-step (`.when`: "understand execution
+  order and what happens on a run") with a before/after mode toggle. It models
+  ONE program counter; two writers had to be flattened into a single merged
+  timeline, actor identity carried in prose labels ("Writer A…", "Writer B…")
+  instead of structure. No lanes, no per-actor cursor, no way to REARRANGE the
+  interleaving to see which orderings lose and which are safe — the defining
+  affordance of a race explainer.
+- **Candidate stub:**
+  { id: "interleaving-lanes", family: "flow",
+    when: "two+ concurrent actors racing on shared state; lost-update / dirty-read / deadlock intuition; step or reorder an interleaving and watch the shared resource",
+    weak: "single-threaded flow; static structure; value provenance; A/B mode compare" }

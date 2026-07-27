@@ -129,6 +129,8 @@ echo "ktlo: caffeinate ${flags[*]-} -t $secs — $(fmt "$secs") (Ctrl-C to stop)
 caffeinate "${flags[@]}" -t "$secs" &
 pid=$!
 
+start=$SECONDS
+deadline=$((start + secs))
 left=$secs
 interrupted=0
 
@@ -143,10 +145,19 @@ cleanup() {
 trap cleanup EXIT
 trap 'interrupted=1; exit 130' INT TERM HUP
 
-while kill -0 "$pid" 2>/dev/null && ((left > 0)); do
+# Drive off the wall clock, not a count of sleeps: a suspended or descheduled
+# loop must not report a full run, and we must know WHY we stopped.
+while ((left > 0)); do
+	kill -0 "$pid" 2>/dev/null || break
 	printf '\rktlo: %s left\033[K' "$(fmt "$left")"
 	sleep 1
-	((left--)) || true
+	left=$((deadline - SECONDS))
 done
 wait "$pid" 2>/dev/null || true
+
+if ((left > 0)); then
+	# caffeinate exited before its own -t expired: the assertion is gone.
+	printf '\rktlo: caffeinate exited early with %s left — sleep NOT prevented.\033[K\n' "$(fmt "$left")" >&2
+	exit 1
+fi
 printf '\rktlo: done, lights off.\033[K\n'

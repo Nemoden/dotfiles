@@ -50,6 +50,9 @@ One map per effort. The map is a low-resolution index: it names boxes, shows sta
 ## Decisions so far
 - [<box name>](<link>): <one-line gist of the decision>
 
+## Heading
+<1-2 lines: where the effort points next; sharpest open unknowns gisted from their boxes, links only>
+
 ## Out of scope
 - [<box name>](<link>): <gist + why it is past the destination>
 ```

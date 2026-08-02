@@ -1,9 +1,9 @@
 ---
-name: whitebox-v1
+name: whitebox
 description: Use when work carries unknowns that need explicit tracking, at any task size: decisions that must outlive the conversation (interruption, resume, handoff, a why-record worth auditing later), or open questions too entangled to hold in working memory. Triggers: "whitebox", "chart a map", "resume the map". Box-record frontmatter is the source of truth for state and edges; the mermaid diagram is a regenerated view.
 ---
 
-# Whitebox v1
+# Whitebox
 
 Whiteboxing turns one opaque idea into a graph of small, decidable pieces. Systems view: every system is a composition of subsystems, each with inputs and outputs. A fresh idea is a system nobody has decomposed yet: a single black box. The process opens it box by box until every box is white and the route from idea to action is visible.
 

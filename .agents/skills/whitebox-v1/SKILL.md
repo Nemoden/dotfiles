@@ -1,6 +1,6 @@
 ---
 name: whitebox-v1
-description: Use when work carries unknowns that need explicit tracking, at any task size: decisions that must outlive the conversation (interruption, resume, handoff, a why-record worth auditing later), or open questions too entangled to hold in working memory, and the user asks for the v1 variant. Triggers: "whitebox-v1", "whitebox v1", "chart a v1 map", "resume the v1 map". Differs from whitebox: box-record frontmatter is the source of truth for state and edges; the mermaid diagram is a regenerated view.
+description: Use when work carries unknowns that need explicit tracking, at any task size: decisions that must outlive the conversation (interruption, resume, handoff, a why-record worth auditing later), or open questions too entangled to hold in working memory. Triggers: "whitebox", "chart a map", "resume the map". Box-record frontmatter is the source of truth for state and edges; the mermaid diagram is a regenerated view.
 ---
 
 # Whitebox v1

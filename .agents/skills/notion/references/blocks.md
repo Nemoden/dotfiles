@@ -1,6 +1,8 @@
 # Notion shapes: rich_text, blocks, property values, DB filters
 
-Source: developers.notion.com/reference (block, rich-text, property-value-object). Four hand-built shapes below.
+Source: developers.notion.com/reference (block, rich-text, property-value-object). Four hand-built shapes below. Pinned to `Notion-Version: 2026-03-11`.
+
+**Prefer markdown.** These shapes are for when you genuinely need typed blocks — block ids, exact structure, or a type enhanced markdown can't express. For ordinary read/write use `GET`/`PATCH /v1/pages/{id}/markdown` and skip this file entirely.
 
 ## rich_text
 
@@ -73,10 +75,11 @@ In `POST /v1/pages` / `PATCH /v1/pages/{id}`. Key = property name, must match DB
 - `select`/`multi_select` auto-create missing options; `status` options must pre-exist.
 - `date.start`: `YYYY-MM-DD` or full ISO 8601.
 - Read-only, omit on write: `formula`, `rollup`, `created_time`, `last_edited_time`, `created_by`, `last_edited_by`.
+- Trash a page: `{"in_trash": true}` on `PATCH /v1/pages/{id}`. The old `archived` field was removed in `2026-03-11`.
 
 ## Database filters
 
-`query` body `filter`. Inner key = property type. Single: `{"property":"Status","select":{"equals":"Done"}}`.
+`POST /v1/data_sources/{data_source_id}/query` body `filter` (get the data source id from `GET /v1/databases/{id}` → `.data_sources[].id`). Inner key = property type. Single: `{"property":"Status","select":{"equals":"Done"}}`.
 
 | Type | Operators |
 |---|---|

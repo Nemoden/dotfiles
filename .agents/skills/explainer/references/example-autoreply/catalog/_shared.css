@@ -3,16 +3,69 @@
    Every technique demo links this file. The diff renderer here is the
    fix for the "flattened indentation" bug: diff lines use white-space:pre
    and real leading spaces are preserved (never collapsed by HTML).
+
+   THEMING — two themes, dark + light, both defined here and nowhere else.
+   Components reference vars ONLY. Tints use color-mix() over var(--bg)
+   so a hover/active wash self-corrects per theme instead of assuming a
+   dark base. Adding a third theme = one more var block below.
+
+   Resolution order (no JS needed for first paint, so no theme flash):
+     1. :root                          -> dark (default)
+     2. @media (prefers-color-scheme:light) -> light, unless data-theme=dark
+     3. [data-theme=light|dark]        -> explicit user override wins
    ============================================================ */
-:root{
+
+/* ---------- THEME: dark (default) ---------- */
+:root,
+:root[data-theme="dark"]{
   --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2b3444;
   --ink:#e6edf3; --dim:#8b98a9; --faint:#5b6675;
   --read:#3fb950; --write:#f0883e; --inert:#a371f7; --result:#58a6ff;
   --danger:#f85149; --core:#c9d1d9; --accent:#58a6ff;
   --add:#0f2417; --addln:#3fb950; --addtx:#7ee2a0;
   --del:#2d1416; --delln:#f85149; --deltx:#ff9ea2;
+  --code-bg:#0a0e14;        /* code panes sit BELOW --bg in dark, above in light */
+  --code-ink:#a9d1ff;       /* inline `code` chip ink */
+  --on-accent:#08111f;      /* ink placed ON a filled --accent surface */
+  --on-write:#1a0f05;       /* ink placed ON a filled --write surface */
+  --on-inert:#0d0518;       /* ink placed ON a filled --inert surface */
+  --shadow:#000a;           /* drop-shadow colour incl. alpha */
   --radius:10px;
 }
+
+/* ---------- THEME: light ---------- */
+/* GitHub Light — same semantic roles as the dark set, contrast-validated. */
+:root[data-theme="light"]{
+  --bg:#ffffff; --panel:#f6f8fa; --panel2:#f6f8fa; --line:#d1d9e0;
+  --ink:#1f2328; --dim:#59636e; --faint:#818b98;
+  --read:#1a7f37; --write:#bc4c00; --inert:#8250df; --result:#0969da;
+  --danger:#cf222e; --core:#424a53; --accent:#0969da;
+  --add:#dafbe1; --addln:#1a7f37; --addtx:#116329;
+  --del:#ffebe9; --delln:#cf222e; --deltx:#82071e;
+  --code-bg:#f6f8fa;
+  --code-ink:#0550ae;
+  --on-accent:#ffffff;
+  --on-write:#ffffff;
+  --on-inert:#ffffff;
+  --shadow:#1f23281f;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#ffffff; --panel:#f6f8fa; --panel2:#f6f8fa; --line:#d1d9e0;
+    --ink:#1f2328; --dim:#59636e; --faint:#818b98;
+    --read:#1a7f37; --write:#bc4c00; --inert:#8250df; --result:#0969da;
+    --danger:#cf222e; --core:#424a53; --accent:#0969da;
+    --add:#dafbe1; --addln:#1a7f37; --addtx:#116329;
+    --del:#ffebe9; --delln:#cf222e; --deltx:#82071e;
+    --code-bg:#f6f8fa;
+    --code-ink:#0550ae;
+    --on-accent:#ffffff;
+    --on-write:#ffffff;
+    --on-inert:#ffffff;
+    --shadow:#1f23281f;
+  }
+}
+
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
      font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -20,7 +73,10 @@ a{color:var(--accent)}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 24px 80px}
 h1{margin:0 0 4px;font-size:20px}
 .sub{color:var(--dim);font-size:13px;margin-bottom:16px}
-code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
+code{background:color-mix(in srgb,var(--accent) 12%,var(--bg));color:var(--code-ink);
+     padding:1px 5px;border-radius:4px;font-size:.92em}
+/* code PANES set their own colour and must not inherit the inline-chip look */
+code.fx-code,code.as-code{background:none;color:inherit;padding:0;border-radius:0}
 
 /* back-to-catalog bar every demo gets */
 .topbar{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);
@@ -32,6 +88,12 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
 .topbar .spacer{flex:1}
 .topbar .goodbad{font-size:11px;color:var(--faint)}
 .topbar .goodbad b{color:var(--dim)}
+
+/* theme toggle — injected by topbar() in _shared.js */
+.themetoggle{flex:none;background:var(--panel2);color:var(--dim);cursor:pointer;
+             border:1px solid var(--line);border-radius:999px;
+             font:inherit;font-size:11px;padding:3px 10px;line-height:1.4}
+.themetoggle:hover{color:var(--ink);border-color:var(--accent)}
 
 /* legend row */
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 18px;font-size:12px;color:var(--dim)}
@@ -63,7 +125,7 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
 .arrow .l{font-size:11px;color:var(--dim)}
 
 /* ---------- DIFF RENDERER (indentation-safe) ---------- */
-.diff{background:#0a0e14;border:1px solid var(--line);border-radius:8px;
+.diff{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;
       padding:8px 0;overflow-x:auto;font-size:12.5px;line-height:1.5}
 .diff .row{display:block;white-space:pre;padding:1px 12px}      /* pre => indentation kept */
 .diff .row.add{color:var(--addtx);background:var(--add)}
@@ -84,27 +146,37 @@ code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
 
 /* ---------- PRIMITIVE: annotated source (shared) ---------- */
 .as-file{font-size:11px;color:var(--faint);margin:0 0 4px}
-.as-listing{background:#0a0e14;border:1px solid var(--line);border-radius:8px;
+.as-listing{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;
             padding:6px 0;overflow-x:auto;font-size:12.5px;line-height:1.55}
 .as-line{display:flex;white-space:pre;padding:0 10px}
 .as-line.has-note{cursor:pointer}
-.as-line.has-note:hover{background:rgba(88,166,255,.07)}
-.as-line.active{background:rgba(88,166,255,.12)}
+.as-line.has-note:hover{background:color-mix(in srgb,var(--accent) 7%,var(--code-bg))}
+.as-line.active{background:color-mix(in srgb,var(--accent) 12%,var(--code-bg))}
 .as-gutter{flex:none;width:3.2em;color:var(--faint);user-select:none;text-align:right;padding-right:10px}
 .as-mark{display:inline-block;width:1em;color:var(--result)}
 .as-mark.as-empty{color:transparent}
 .as-num{opacity:.7}
 .as-code{color:var(--ink);white-space:pre}
-.as-note{max-height:0;overflow:hidden;transition:max-height .25s ease;
-         color:var(--dim);font-size:12px;background:rgba(88,166,255,.06);
+.as-note{max-height:0;overflow:hidden;transition:max-height .28s ease;
+         color:var(--dim);font-size:12px;
+         background:color-mix(in srgb,var(--accent) 6%,var(--bg));
          border-left:2px solid var(--result);margin:0 10px;padding:0 12px;white-space:normal}
-.as-note.open{max-height:200px;padding:8px 12px;margin-bottom:4px}
-.as-note b{color:var(--result)}
+.as-note.open{max-height:340px;padding:8px 12px;margin-bottom:4px;overflow:auto}
+.as-note b{color:var(--ink)}
+/* note-severity palette (from noteSeverity) — red dots read first */
+.as-mark.sev-danger{color:var(--danger)}
+.as-mark.sev-warn{color:var(--write)}
+.as-mark.sev-info{color:var(--accent)}
+.as-mark.sev-dim{color:var(--faint)}
+.as-note.sev-danger{border-left-color:var(--danger)}
+.as-note.sev-warn{border-left-color:var(--write)}
+.as-note.sev-info{border-left-color:var(--accent)}
+.as-note.sev-dim{border-left-color:var(--faint)}
 
 /* ---------- provenance zoom code panes (shared) ---------- */
-.pz-pane{background:#0a0e14;border:1px solid var(--line);border-radius:8px;
+.pz-pane{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;
          padding:8px 0;overflow-x:auto;font-size:12.5px;line-height:1.5}
 .pz-pane .row{display:block;white-space:pre;padding:1px 12px;color:var(--dim)}
-.pz-pane .row.hi{color:var(--ink);background:rgba(88,166,255,.14);
+.pz-pane .row.hi{color:var(--ink);background:color-mix(in srgb,var(--accent) 14%,var(--code-bg));
                  border-left:2px solid var(--result)}
 .pz-file{font-size:11px;color:var(--faint);margin:0 0 4px}

@@ -27,7 +27,7 @@
   .mm-chip .mm-dot{width:7px;height:7px;border-radius:50%;flex:none;
                    background:var(--faint)}
   .mm-chip.touched .mm-dot{background:var(--write)}
-  .mm-chip.focus{border-color:var(--accent);background:rgba(88,166,255,.10);
+  .mm-chip.focus{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--bg));
                  color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
   .mm-chip.focus .mm-lbl{font-weight:600}
   .mm-hint{font-size:10.5px;color:var(--faint);margin-top:10px;line-height:1.5}
@@ -67,7 +67,7 @@
   /* focused: full card */
   .fs[data-weight="focus"]{padding:14px 15px;opacity:1;
                            border-color:var(--accent);background:var(--panel);
-                           box-shadow:0 0 0 1px rgba(88,166,255,.20)}
+                           box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 20%,var(--bg))}
 
   /* role accents on the left border */
   .fs.core{border-left:3px solid var(--core)}

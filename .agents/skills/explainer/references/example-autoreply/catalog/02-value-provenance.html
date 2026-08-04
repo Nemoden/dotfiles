@@ -31,9 +31,9 @@
   /* when a value is active: dim everything, then re-light born + use */
   .spine.active .chip{opacity:.3}
   .spine.active .chip.use{opacity:1;border-color:var(--result);
-        background:rgba(88,166,255,.09)}
+        background:color-mix(in srgb,var(--accent) 9%,var(--bg))}
   .spine.active .chip.born{opacity:1;border-color:var(--read);
-        background:rgba(63,185,80,.12);box-shadow:0 0 0 1px var(--read) inset}
+        background:color-mix(in srgb,var(--read) 12%,var(--bg));box-shadow:0 0 0 1px var(--read) inset}
   .chip.born .lab{color:var(--read)}
   .chip.use .lab{color:var(--result)}
   .chip.born .badge{opacity:1;height:auto;color:var(--read)}

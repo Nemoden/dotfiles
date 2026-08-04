@@ -46,6 +46,12 @@ broken explainer is worse than none.
       blended into static nodes. (Learned the hard way — see anti-patterns.)
 - [ ] **Data-swap only.** A new subject reused the technique template by
       swapping data, not by rewriting the renderer.
+- [ ] **Readable in BOTH themes.** Hit the `◑ light` / `◐ dark` toggle in the
+      topbar and re-check: no invisible ink on filled buttons, code panes and
+      hover washes still legible, SVG edges repainted. Any colour literal added
+      to a technique file is a bug — `grep -rnE '#[0-9a-fA-F]{3,8}\b|rgba?\([0-9]'`
+      over the output dir must return nothing but `elk.bundled.js`. Theme-safe
+      CSS rules: `html-tier.md` → Theming.
 
 ## Fit-check — self-reflection (all tiers, after gate, before offering)
 

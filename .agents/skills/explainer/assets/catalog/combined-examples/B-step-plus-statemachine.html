@@ -37,10 +37,10 @@
   .stn{flex:1;min-width:56px;text-align:center;border:1px solid var(--line);
        border-radius:8px;padding:6px 4px;font-size:10.5px;color:var(--faint);
        background:var(--panel2);transition:all .2s}
-  .stn.past{color:var(--dim);border-color:#264;}
+  .stn.past{color:var(--dim);border-color:color-mix(in srgb,var(--read) 45%,var(--line));}
   .stn.past .stmk{color:var(--read)}
   .stn.cur{color:var(--ink);border-color:var(--accent);
-           box-shadow:0 0 0 1px var(--accent),0 0 16px rgba(88,166,255,.35);background:var(--panel)}
+           box-shadow:0 0 0 1px var(--accent),0 0 16px color-mix(in srgb,var(--accent) 35%,var(--bg));background:var(--panel)}
   .stn.future{opacity:.45}
   .stmk{display:block;font-size:12px;margin-bottom:2px}
 
@@ -73,11 +73,11 @@
       padding:8px 11px;color:var(--faint);transition:all .25s;position:relative}
   .sn .sname{font-weight:600;font-size:12.5px}
   .sn .snote{font-size:10.5px;color:var(--faint);margin-top:2px}
-  .sn.reached{color:var(--dim);border-color:#2b4055}
+  .sn.reached{color:var(--dim);border-color:color-mix(in srgb,var(--result) 35%,var(--line))}
   .sn.reached .sname{color:var(--ink)}
   .sn.reached::after{content:"✓";position:absolute;top:7px;right:10px;color:var(--read);font-size:12px}
   .sn.current{border-color:var(--result);color:var(--ink);
-              box-shadow:0 0 0 1px var(--result),0 0 18px rgba(88,166,255,.45);background:var(--panel)}
+              box-shadow:0 0 0 1px var(--result),0 0 18px color-mix(in srgb,var(--accent) 45%,var(--bg));background:var(--panel)}
   .sn.current .sname{color:var(--result)}
   .sn.current::after{content:"●";color:var(--result)}
   .sn.dimmed{opacity:.4}
@@ -88,11 +88,11 @@
               background:var(--panel2);color:var(--faint);transition:all .25s}
   .edge .ln{font-size:13px;line-height:1;color:var(--faint);transition:color .25s}
   .edge.taken .cond{border-color:var(--result);color:var(--result);
-                    box-shadow:0 0 10px rgba(88,166,255,.4)}
+                    box-shadow:0 0 10px color-mix(in srgb,var(--accent) 40%,var(--bg))}
   .edge.taken .ln{color:var(--result)}
-  .edge.write.taken .cond{border-color:var(--write);color:var(--write);box-shadow:0 0 10px rgba(240,136,62,.4)}
+  .edge.write.taken .cond{border-color:var(--write);color:var(--write);box-shadow:0 0 10px color-mix(in srgb,var(--write) 40%,var(--bg))}
   .edge.write.taken .ln{color:var(--write)}
-  .edge.write.drytaken .cond{border-color:var(--inert);color:var(--inert);box-shadow:0 0 10px rgba(163,113,247,.4)}
+  .edge.write.drytaken .cond{border-color:var(--inert);color:var(--inert);box-shadow:0 0 10px color-mix(in srgb,var(--inert) 40%,var(--bg))}
   .edge.write.drytaken .ln{color:var(--inert)}
 
   /* fork wrapper */

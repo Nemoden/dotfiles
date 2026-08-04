@@ -258,6 +258,32 @@ const VALUES = {
 /* ---------- RENDERERS ---------- */
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
+/* Escape HTML, then render inline code from BOTH authoring conventions data
+   uses interchangeably: literal <code>x</code> tags and `backtick` spans.
+   Everything else stays escaped (safe). Use for PROSE fields that may embed
+   identifiers (notes, purpose, rationale) — NOT for code panes, which preserve
+   indentation via <pre>/white-space:pre and must show backticks verbatim. */
+function richText(s){
+  let out = esc(String(s == null ? "" : s));
+  out = out.replace(/&lt;code&gt;([\s\S]*?)&lt;\/code&gt;/g, (_, c) => `<code>${c}</code>`);
+  out = out.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+  return out;
+}
+
+/* Rank a line-note's importance from its prose (annotated-source has no
+   severity field). Drives the note dot's colour so a reader hits the
+   highest-signal lines first. Heuristic — tune the word lists per corpus. */
+function noteSeverity(note){
+  const t = String(note || "");
+  if(/\bFINDING\b|\bthe gap\b|\bgap\b|never (?:reads?|checks?|consults?|verif|asserts?|scopes?)|unchecked|no (?:auth|ownership|firm|tenant)|unauthenticated|exfiltrat|hardcoded|plaintext|leak/i.test(t))
+    return "danger";
+  if(/\bDEBUG\b|no-op|testable|vestigial|dead code|context only|\bunused\b|for reference/i.test(t))
+    return "dim";
+  if(/\bshould\b|\bwould\b|\bcaveat\b|mandatory|load-bearing|non-obvious|watch|careful|gotcha/i.test(t))
+    return "warn";
+  return "info";
+}
+
 /* indentation-safe diff: each line on its own white-space:pre row */
 function renderDiff(unitId){
   const u = UNITS[unitId]; if(!u) return "";
@@ -277,6 +303,49 @@ function renderUnit(unitId){
 function unitTitle(unitId){ return UNITS[unitId] ? UNITS[unitId].title : unitId; }
 
 /* topbar every demo includes */
+/* ============================================================
+   THEME (dark | light) — see the var blocks at the top of _shared.css.
+   First paint needs NO JS: _shared.css defaults to dark and honours
+   prefers-color-scheme:light on its own, so there is no theme flash from
+   this file loading at end-of-body. JS only applies an EXPLICIT override
+   (data-theme on <html>) and remembers it in localStorage.
+   ============================================================ */
+const THEME_KEY = "explainer-theme";
+
+/* What the reader is looking at right now: stored choice, else OS pref. */
+function currentTheme(){
+  const stored = document.documentElement.getAttribute("data-theme");
+  if(stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  try{ localStorage.setItem(THEME_KEY, theme); }catch(e){ /* file:// with storage off */ }
+  document.querySelectorAll(".themetoggle").forEach(b => {
+    b.textContent = theme === "light" ? "◐ dark" : "◑ light";
+    b.setAttribute("aria-label", `switch to ${theme === "light" ? "dark" : "light"} theme`);
+  });
+}
+
+function toggleTheme(){ applyTheme(currentTheme() === "light" ? "dark" : "light"); }
+
+/* Restore a previous explicit choice. Runs at parse time (before any technique
+   script injects its chrome); without a stored value we leave data-theme unset
+   so the CSS prefers-color-scheme branch stays in charge. */
+(function restoreTheme(){
+  let stored = null;
+  try{ stored = localStorage.getItem(THEME_KEY); }catch(e){ /* ignore */ }
+  if(stored === "light" || stored === "dark") document.documentElement.setAttribute("data-theme", stored);
+})();
+
+/* Renders its own label, because topbar() is injected AFTER this file parses. */
+function themeToggle(){
+  const next = currentTheme() === "light" ? "dark" : "light";
+  return `<button class="themetoggle" type="button" onclick="toggleTheme()"
+    aria-label="switch to ${next} theme">${next === "light" ? "◑ light" : "◐ dark"}</button>`;
+}
+
 function topbar(num, name, good, bad){
   return `<div class="topbar">
     <a href="../index.html">◀ catalog</a>
@@ -284,6 +353,7 @@ function topbar(num, name, good, bad){
     <span class="tname">${name}</span>
     <span class="spacer"></span>
     <span class="goodbad"><b>good for:</b> ${good} &nbsp;·&nbsp; <b>weak for:</b> ${bad}</span>
+    ${themeToggle()}
   </div>`;
 }
 function legend(){
@@ -374,10 +444,11 @@ function renderAnnotatedSource(key, opts){
   const idp = (opts && opts.idPrefix) || ("as_" + key);
   const rows = s.lines.map((ln,i) => {
     const hasNote = !!ln.note;
-    const marker = hasNote ? `<span class="as-mark">●</span>` : `<span class="as-mark as-empty"></span>`;
+    const sev = hasNote ? noteSeverity(ln.note) : "";
+    const marker = hasNote ? `<span class="as-mark sev-${sev}">●</span>` : `<span class="as-mark as-empty"></span>`;
     const noteRow = hasNote
-      ? `<div class="as-note" id="${idp}_n${i}"><b>note:</b> ${esc(ln.note)}</div>` : "";
-    const cls = hasNote ? "as-line has-note" : "as-line";
+      ? `<div class="as-note sev-${sev}" id="${idp}_n${i}"><b>note:</b> ${richText(ln.note)}</div>` : "";
+    const cls = hasNote ? `as-line has-note sev-${sev}` : "as-line";
     const onclick = hasNote ? `onclick="asToggle('${idp}_n${i}',this)"` : "";
     return `<div class="${cls}" ${onclick}>
       <span class="as-gutter">${marker}<span class="as-num">${i+1}</span></span>

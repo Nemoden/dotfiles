@@ -44,7 +44,7 @@
   .mm .chip .cdot{flex:none;width:7px;height:7px;border-radius:2px;background:transparent}
   .mm .chip.touched .cdot{background:var(--result)}
   .mm .chip.touched .clab{color:var(--ink)}
-  .mm .chip.current{border-color:var(--accent);background:rgba(88,166,255,.12);color:var(--ink)}
+  .mm .chip.current{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg));color:var(--ink)}
   .mm .chip.current .cix{color:var(--accent)}
   .mm .mmnote{font-size:10px;color:var(--faint);margin-top:6px;line-height:1.35}
 
@@ -58,7 +58,7 @@
   .snode .sn:hover{border-color:var(--accent)}
   .snode.dim .sn{opacity:.5}
   .snode.touched .sn{border-left:3px solid var(--result)}
-  .snode.current .sn{border-color:var(--accent);background:rgba(88,166,255,.14);
+  .snode.current .sn{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--bg));
        box-shadow:0 0 0 1px var(--accent) inset}
   .snode .sn .sl{font-size:11px;font-weight:600;color:var(--ink);white-space:nowrap;
        overflow:hidden;text-overflow:ellipsis}
@@ -81,8 +81,8 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .seg button{font:inherit;font-size:11px;background:var(--panel2);color:var(--dim);
        border:0;padding:5px 12px;cursor:pointer}
-  .seg button.on{background:var(--accent);color:#04121f;font-weight:600}
-  .seg button.on.dry{background:var(--inert);color:#120a1f}
+  .seg button.on{background:var(--accent);color:var(--on-accent);font-weight:600}
+  .seg button.on.dry{background:var(--inert);color:var(--on-inert)}
   .modebar .persist{font-size:11px;color:var(--faint);display:inline-flex;align-items:center;gap:6px}
   .modebar .persist .pdot{width:8px;height:8px;border-radius:50%;background:var(--write)}
   .modebar .persist.inert .pdot{background:var(--inert)}
@@ -107,7 +107,7 @@
        background:var(--faint);border:2px solid var(--panel)}
   .sm .sstate .snm{font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.03em}
   .sm .sstate .sds{font-size:10px;color:var(--faint);margin-top:2px;line-height:1.35}
-  .sm .sstep.active .sstate{border-color:var(--accent);background:rgba(88,166,255,.12)}
+  .sm .sstep.active .sstate{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--bg))}
   .sm .sstep.active .sstate .snm{color:var(--ink)}
   .sm .sstep.active .dotm{background:var(--accent)}
   .sm .sstep.done .dotm{background:var(--result)}
@@ -123,7 +123,7 @@
        border:1px solid var(--result);border-radius:999px;padding:3px 10px;cursor:pointer;
        opacity:.82;transition:opacity .15s,background .15s}
   .prov .pill:hover{opacity:1}
-  .prov .pill.sel{background:rgba(88,166,255,.16);opacity:1;font-weight:600}
+  .prov .pill.sel{background:color-mix(in srgb,var(--accent) 16%,var(--bg));opacity:1;font-weight:600}
   .prov .ptype{color:var(--faint);font-size:9.5px}
 
   /* provenance drawer at the bottom of the right rail */

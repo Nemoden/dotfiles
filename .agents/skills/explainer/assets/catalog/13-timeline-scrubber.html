@@ -15,8 +15,8 @@
   .modeswitch{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
   .modeswitch button{background:var(--panel2);color:var(--dim);border:0;padding:6px 13px;
        font:inherit;font-size:12px;cursor:pointer}
-  .modeswitch button.live.on{background:var(--write);color:#1a0f05;font-weight:600}
-  .modeswitch button.dry.on{background:var(--inert);color:#0d0518;font-weight:600}
+  .modeswitch button.live.on{background:var(--write);color:var(--on-write);font-weight:600}
+  .modeswitch button.dry.on{background:var(--inert);color:var(--on-inert);font-weight:600}
   .modehint{font-size:12px;color:var(--faint)}
 
   /* ---- the scrubber timeline ---- */
@@ -31,9 +31,9 @@
   /* the draggable handle, positioned by JS */
   .handle{position:absolute;top:11px;width:22px;height:22px;border-radius:50%;
          background:var(--accent);border:3px solid var(--bg);
-         box-shadow:0 0 0 1px var(--accent),0 2px 8px #000a;
+         box-shadow:0 0 0 1px var(--accent),0 2px 8px var(--shadow);
          transform:translateX(-50%);transition:left .12s ease;pointer-events:none}
-  .track.dry ~ .handle,.scrubwrap.dry .handle{background:var(--inert);box-shadow:0 0 0 1px var(--inert),0 2px 8px #000a}
+  .track.dry ~ .handle,.scrubwrap.dry .handle{background:var(--inert);box-shadow:0 0 0 1px var(--inert),0 2px 8px var(--shadow)}
 
   /* the real range input, laid transparent over the track for native drag/keyboard */
   input[type=range].timeline{
@@ -97,7 +97,7 @@
   .accum li .eff{display:block;margin-top:2px;font-size:11.5px}
   .accum li .eff.live{color:var(--write)}
   .accum li .eff.dry{color:var(--inert)}
-  .accum li.current{background:linear-gradient(90deg,#ffffff08,transparent)}
+  .accum li.current{background:linear-gradient(90deg,color-mix(in srgb,var(--ink) 5%,transparent),transparent)}
   .accum li.current .n{color:var(--accent)}
 </style>
 </head>

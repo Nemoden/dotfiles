@@ -32,7 +32,7 @@
   /* the depth-of-interest accent: focused glows, near border warms, far stays flat */
   .st.doi-focus{border-color:var(--accent);
                 box-shadow:0 0 0 1px var(--accent), 0 0 26px -6px var(--accent);
-                background:linear-gradient(180deg,var(--panel2),#131a27)}
+                background:linear-gradient(180deg,var(--panel2),color-mix(in srgb,var(--panel2) 70%,var(--bg)))}
   .st.doi-near {border-color:var(--line)}
   .st.doi-focus .lab{color:var(--accent)}
 

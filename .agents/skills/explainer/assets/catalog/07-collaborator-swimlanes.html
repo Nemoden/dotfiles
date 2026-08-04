@@ -64,9 +64,9 @@
   body.dry .msg.ret .mline, body:not(.dry) .msg.ret .mline{}
 
   /* hover affordance on clickable messages */
-  .msg.clickable:hover .hitbox{fill:rgba(88,166,255,.07)}
+  .msg.clickable:hover .hitbox{fill:color-mix(in srgb,var(--accent) 7%,var(--bg))}
   .msg.clickable .hitbox{fill:transparent;transition:fill .14s ease}
-  .msg.clickable.open .hitbox{fill:rgba(88,166,255,.12)}
+  .msg.clickable.open .hitbox{fill:color-mix(in srgb,var(--accent) 12%,var(--bg))}
   .msg.clickable .zbadge-t{fill:var(--faint);font-size:11px;transition:fill .14s ease}
   .msg.clickable:hover .zbadge-t{fill:var(--accent)}
   .msg.clickable.open .zbadge-t{fill:var(--accent)}

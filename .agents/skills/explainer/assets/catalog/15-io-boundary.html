@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15 — I/O Boundary</title>
+<link rel="stylesheet" href="./_shared.css">
+<style>
+  /* The box, drawn as a box. Everything hangs off which side of it a
+     value was born on and which direction it crosses. */
+  .bx{border:2px dashed var(--accent);border-radius:14px;margin:6px 0 0;
+      padding:0;background:color-mix(in srgb,var(--accent) 3.5%,var(--bg));position:relative}
+  .bx-lab{position:absolute;top:-11px;left:18px;background:var(--bg);padding:0 10px;
+          font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.02em}
+  .bx-in{padding:22px 20px 18px;display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+  .bx-node{border:1px solid var(--line);border-radius:8px;background:var(--panel);
+           padding:7px 12px;font-size:12.5px;color:var(--ink);min-width:0}
+  .bx-node .s{display:block;font-size:10px;color:var(--faint);margin-top:2px}
+
+  /* the two rails outside the box */
+  .rail{display:flex;flex-wrap:wrap;gap:8px;min-width:0;margin:0 0 4px}
+  .rail-lab{font-size:11px;color:var(--faint);text-transform:uppercase;
+            letter-spacing:.05em;margin:0 0 7px}
+  .ext{border:1px dashed var(--faint);border-radius:8px;background:var(--panel2);
+       padding:7px 12px;font-size:12.5px;color:var(--dim);min-width:0}
+  .ext .s{display:block;font-size:10px;color:var(--faint);margin-top:2px}
+  .ext.third{border-color:var(--write);color:var(--write)}
+  .ext.third .s{color:var(--write);opacity:.75}
+
+  /* crossings table — the actual payload of this view */
+  .xs{margin:26px 0 0}
+  .x{display:grid;grid-template-columns:74px minmax(0,1fr) 128px;gap:12px;
+     align-items:start;border:1px solid var(--line);border-radius:9px;
+     background:var(--panel);padding:11px 13px;margin:0 0 8px;min-width:0}
+  .x.in{border-left:3px solid var(--danger)}
+  .x.thru{border-left:3px solid var(--write)}
+  .x.out{border-left:3px solid var(--result)}
+  .x.loc{border-left:3px solid var(--faint)}
+  .x-cls{font-size:9.5px;font-weight:700;letter-spacing:.6px;text-align:center;
+         padding:3px 6px;border-radius:4px;border:1px solid;align-self:start}
+  .c-in{color:var(--danger);border-color:var(--danger);background:color-mix(in srgb,var(--danger) 10%,var(--bg))}
+  .c-thru{color:var(--write);border-color:var(--write);background:color-mix(in srgb,var(--write) 10%,var(--bg))}
+  .c-out{color:var(--result);border-color:var(--result);background:color-mix(in srgb,var(--accent) 10%,var(--bg))}
+  .c-loc{color:var(--faint);border-color:var(--line);background:var(--panel2)}
+  .x-nm{font-size:13px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+  .x-ty{font-size:10.5px;color:var(--faint);margin-top:1px}
+  .x-arc{font-size:11px;color:var(--dim);margin-top:5px;overflow-wrap:anywhere}
+  .x-arc b{color:var(--ink)}
+  .x-why{font-size:11.5px;color:var(--dim);line-height:1.55;margin-top:5px;
+         overflow-wrap:anywhere}
+  .x-trust{font-size:11px;color:var(--danger);line-height:1.5;margin-top:6px;
+           border-left:2px solid var(--danger);padding-left:9px;overflow-wrap:anywhere}
+  .x-gate{font-size:10.5px;text-align:center;padding:4px 7px;border-radius:5px;
+          border:1px solid var(--line);background:var(--panel2);color:var(--dim);
+          align-self:start;overflow-wrap:anywhere}
+  .x-gate.none{border-color:var(--danger);color:var(--danger)}
+
+  .tal{display:flex;flex-wrap:wrap;gap:9px;margin:20px 0 0}
+  .tal span{border:1px solid var(--line);border-radius:8px;padding:7px 12px;
+            background:var(--panel2);font-size:11.5px;color:var(--dim)}
+  .tal b{color:var(--ink)}
+  .h3{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;
+      margin:26px 0 10px}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>I/O Boundary</h1>
+  <div class="sub">
+    A system is a <b>box with a surface</b>. This view draws the surface, then lists
+    every value that <b>crosses</b> it and in which direction. Values are not peers:
+    one born <b>outside</b> and consumed here is <b>untrusted input</b>; one born
+    <b>inside</b> that leaves is a <b>commitment</b> to another party. This answers
+    "what enters, what leaves, and what is trusted?" — the question you ask before
+    you can reason about safety at all.
+  </div>
+
+  <div class="rail-lab">Outside — another party's system</div>
+  <div class="rail" id="railOut"></div>
+
+  <div class="bx">
+    <div class="bx-lab" id="boxlab">▣ the box</div>
+    <div class="bx-in" id="boxin"></div>
+  </div>
+
+  <div class="h3">Crossings — every value on the surface</div>
+  <div class="xs" id="xs"></div>
+  <div class="tal" id="tal"></div>
+
+  <div class="kicker" id="kicker"></div>
+</div>
+
+<script src="./_shared.js"></script>
+<script>
+  document.getElementById("top").innerHTML =
+    topbar("15","I/O Boundary",
+      "what enters this box, what leaves it, which values are trusted; sizing a subsystem",
+      "the code at each point; control flow; timing");
+  // no legend(): its colours describe diff roles (read/write/no-op), which this
+  // view does not use. The class badges are self-labelling instead.
+
+  const B = BOUNDARY;
+  const stLabel = id => {
+    if (id === null || id === undefined) return "nowhere — value does not exist in this system";
+    const s = (typeof STATIONS !== "undefined" ? STATIONS : []).find(x => x.id === id);
+    return s && s.label ? s.label.replace(/^[①-⑳]\s*/, "") : id;
+  };
+  const stSub = id => {
+    const s = (typeof STATIONS !== "undefined" ? STATIONS : []).find(x => x.id === id);
+    return s && s.sub ? s.sub : "";
+  };
+
+  document.getElementById("boxlab").innerHTML = "▣ " + esc(B.box || "the box");
+  document.getElementById("boxin").innerHTML = (B.inside || []).map(id =>
+    `<div class="bx-node">${esc(stLabel(id))}<span class="s">${esc(stSub(id))}</span></div>`
+  ).join("");
+
+  // third-party rail: a vendor is marked, because "outside" and "someone
+  // else's company" are different degrees of outside.
+  const third = new Set(B.third_party || []);
+  document.getElementById("railOut").innerHTML = (B.outside || []).map(id =>
+    `<div class="ext ${third.has(id) ? "third" : ""}">${esc(stLabel(id))}` +
+    `<span class="s">${third.has(id) ? "third party · " : ""}${esc(stSub(id))}</span></div>`
+  ).join("");
+
+  // classify each value from the boundary + its own born/uses
+  const out = new Set(B.outside || []);
+  const CM = {
+    input:   ["in",   "c-in",   "IN",      "untrusted — validate/authorise before use"],
+    through: ["thru", "c-thru", "THROUGH", "relayed onward — did we sanitise or authorise it?"],
+    output:  ["out",  "c-out",  "OUT",     "our commitment to another party"],
+    local:   ["loc",  "c-loc",  "LOCAL",   "private to this box"],
+  };
+  const RANK = { input: 0, through: 1, output: 2, local: 3 };
+  const cls = (v, key) => {
+    if (B.classes && key && B.classes[key]) return B.classes[key];
+    const bornOut = out.has(v.born);
+    const leaves = (v.uses || []).some(u => out.has(u));
+    return bornOut ? (leaves ? "through" : "input") : (leaves ? "output" : "local");
+  };
+
+  const rows = Object.entries(VALUES)
+    .map(([k, v]) => ({ k, v, c: cls(v, k) }))
+    .sort((a, b) => RANK[a.c] - RANK[b.c]);
+
+  document.getElementById("xs").innerHTML = rows.map(({ k, v, c }) => {
+    const [kcls, badge, lab, hint] = CM[c];
+    const sinks = (v.uses || []).filter(u => out.has(u)).map(stLabel);
+    const arc = `<b>${esc(stLabel(v.born))}</b> → ` +
+      (sinks.length ? sinks.map(esc).join(", ") : "stays inside");
+    const gate = v.gate
+      ? `<div class="x-gate ${/^(none|nothing)/i.test(v.gate) ? "none" : ""}">${esc(v.gate)}</div>`
+      : "";
+    return `<div class="x ${kcls}">
+        <div class="x-cls ${badge}">${lab}</div>
+        <div>
+          <div class="x-nm">${esc(v.label || k)}</div>
+          <div class="x-ty">${esc(v.type || "")}</div>
+          <div class="x-arc">${arc}</div>
+          <div class="x-why">${esc(hint)}</div>
+          ${(v.trust_note || (B.trust_notes||{})[k]) ? `<div class="x-trust">${esc(v.trust_note || B.trust_notes[k])}</div>` : ""}
+        </div>
+        ${gate}
+      </div>`;
+  }).join("");
+
+  const n = c => rows.filter(r => r.c === c).length;
+  document.getElementById("tal").innerHTML =
+    `<span><b style="color:var(--danger)">${n("input")}</b> input</span>` +
+    `<span><b style="color:var(--write)">${n("through")}</b> pass-through</span>` +
+    `<span><b style="color:var(--result)">${n("output")}</b> output</span>` +
+    `<span><b>${n("local")}</b> local</span>` +
+    `<span><b>${(B.outside || []).length}</b> external parties` +
+    (third.size ? `, <b style="color:var(--write)">${third.size}</b> third-party` : "") + `</span>`;
+
+  if (B.note) document.getElementById("kicker").innerHTML = B.note;
+</script>
+</body>
+</html>

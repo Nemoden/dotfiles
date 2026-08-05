@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 — System Topology</title>
+<link rel="stylesheet" href="./_shared.css">
+<style>
+  /* Systems theory as a NODE-LINK diagram, not a card grid. Domains are
+     horizontal swimlane bands; dataflow runs left-to-right ACROSS them.
+     Arrows CARRY the data (label on the arrow). Long payload lives behind a
+     click, never on the canvas. Care level shows as visual WEIGHT (dashed +
+     faded for what we do not own), never spelled out as the word "care".
+     Layout is a hybrid: bands + dataflow ranks are computed here; ELK
+     (vendored, offline) only ROUTES the edges around the pinned nodes and
+     places labels collision-free — the one job no free layout lib does for
+     swimlanes. Falls back to a hand-rolled router if ELK fails to load. */
+
+  .tf-wrap{margin:6px 0 0;min-width:0}
+  .tf-lead{font-size:12.5px;color:var(--dim);line-height:1.6;margin:0 0 13px}
+  .tf-lead b{color:var(--ink)}
+  .tf-trace{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:0 0 12px;font-size:10.5px;
+            color:var(--faint);text-transform:uppercase;letter-spacing:.05em;min-width:0}
+  .tf-vchip{border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:20px;
+            padding:3px 11px;font:inherit;font-size:11.5px;text-transform:none;letter-spacing:0;
+            cursor:pointer;font-family:ui-monospace,monospace}
+  .tf-vchip:hover{border-color:var(--accent);color:var(--ink)}
+  .tf-vchip.on{border-color:var(--accent);color:var(--ink);background:color-mix(in srgb,var(--accent) 14%,var(--bg))}
+  .tf-scroll{overflow-x:auto;overflow-y:hidden;min-width:0;padding:2px 0 6px}
+  .tf-canvas{position:relative}
+  .tf-svg{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+  .tf-svg path.hit{pointer-events:stroke;cursor:pointer}
+  .tf-lane{position:absolute;left:0;border-radius:12px}
+  .tf-lane.ours{background:color-mix(in srgb,var(--accent) 5%,var(--bg));outline:1px dashed color-mix(in srgb,var(--accent) 22%,var(--bg))}
+  .tf-lane.external{background:color-mix(in srgb,var(--ink) 3%,var(--bg))}
+  .tf-lanelab{position:absolute;top:6px;left:10px;font-size:9.5px;letter-spacing:.07em;
+              text-transform:uppercase;color:var(--faint)}
+  .tf-lane.ours .tf-lanelab{color:var(--accent);opacity:.75}
+  .tf-node{position:absolute;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;
+           background:var(--panel);padding:9px 11px;cursor:pointer;
+           transition:opacity .18s,border-color .18s,box-shadow .18s}
+  .tf-node:hover{border-color:var(--accent)}
+  .tf-node.ext{border-style:dashed;background:var(--panel2)}
+  .tf-node.soft{opacity:.6}
+  .tf-node.sel{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 20%,var(--bg))}
+  .tf-node.lit{border-color:var(--accent);opacity:1}
+  .tf-node.fade{opacity:.14}
+  .tf-nm{font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.35;overflow-wrap:anywhere}
+  .tf-ess{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
+  .tf-kind{display:inline-block;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;
+           color:var(--faint);border:1px solid var(--line);border-radius:3px;padding:0 5px;margin-top:7px}
+  .tf-more{font-size:10px;color:var(--accent);margin-top:5px;opacity:.85}
+  .tf-elab{position:absolute;background:var(--bg);border:1px solid var(--line);
+           border-radius:14px;padding:2px 9px;font-size:10.5px;color:var(--dim);cursor:pointer;
+           white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;transition:opacity .18s}
+  .tf-elab:hover{border-color:var(--accent);color:var(--ink)}
+  .tf-elab.sel{border-color:var(--accent);color:var(--ink);background:color-mix(in srgb,var(--accent) 16%,var(--bg))}
+  .tf-elab.lit{border-color:var(--accent);color:var(--ink);background:color-mix(in srgb,var(--accent) 14%,var(--bg))}
+  .tf-elab.hot{border-color:var(--danger)}
+  .tf-elab.hot .dot{color:var(--danger);margin-right:4px}
+  .tf-elab.fade{opacity:.12}
+  .tf-legend{display:flex;gap:15px;flex-wrap:wrap;font-size:10.5px;color:var(--faint);margin:4px 0 0}
+  .tf-insp{border:1px solid var(--line);border-radius:10px;background:var(--panel);margin:13px 0 0;
+           min-width:0;overflow:hidden}
+  .tf-iempty{padding:11px 14px;font-size:11.5px;color:var(--faint)}
+  .tf-ihd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:9px 14px;
+          border-bottom:1px solid var(--line);background:var(--panel2);min-width:0}
+  .tf-ipath{font-size:12.5px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+  .tf-ipath .ar{color:var(--faint);margin:0 3px}
+  .tf-ikind{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);
+            border:1px solid var(--line);border-radius:3px;padding:1px 6px;flex-shrink:0}
+  .tf-ibody{padding:11px 14px 13px;min-width:0}
+  .tf-plab{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:0 0 6px}
+  .tf-params{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+  .tf-p{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--ink);background:var(--panel2);
+        border:1px solid var(--line);border-radius:5px;padding:2px 8px;overflow-wrap:anywhere}
+  .tf-p.key{border-color:var(--accent);color:var(--accent)}
+  .tf-xbtn,.tf-xbtn2{margin-top:8px;background:none;border:1px dashed var(--line);color:var(--accent);
+        border-radius:6px;padding:3px 10px;font:inherit;font-size:11px;cursor:pointer}
+  .tf-xbtn:hover,.tf-xbtn2:hover{border-color:var(--accent)}
+  .tf-xtra{margin-top:8px}
+  .tf-iwhy{font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:11px;overflow-wrap:anywhere}
+  .tf-inote{font-size:11.5px;color:var(--dim);line-height:1.6;overflow-wrap:anywhere}
+  .tf-inote b{color:var(--ink)}
+  .tf-ibr{font-size:11.5px;color:var(--danger);line-height:1.55;margin-top:11px;
+          border-left:2px solid var(--danger);padding-left:10px;overflow-wrap:anywhere}
+  .tf-ibr b{color:var(--danger);text-transform:uppercase;font-size:9.5px;letter-spacing:.07em;display:block;margin-bottom:2px}
+  .tf-sub{font-size:11.5px;color:var(--dim);line-height:1.5;border:1px solid var(--line);
+          background:var(--panel2);border-radius:7px;padding:6px 10px;margin:0 0 5px;overflow-wrap:anywhere}
+  .tf-sub b{color:var(--ink)}
+  .tf-subwhy{color:var(--faint);font-size:10.5px;font-style:italic;margin-top:2px}
+  .tf-kick{margin:13px 0 0;border-left:3px solid var(--accent);background:var(--panel2);padding:12px 15px;
+           border-radius:0 8px 8px 0;font-size:12.5px;color:var(--dim);line-height:1.65;overflow-wrap:anywhere}
+  .tf-kick b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div class="wrap">
+  <h1>System Topology</h1>
+  <div class="sub">
+    The whole flow as a <b>node-link diagram over swimlanes</b>: each domain (the outside world, our
+    backend, a vendor) is a horizontal band; dataflow runs left-to-right across them. <b>Arrows carry
+    the data</b> — the label on each arrow is what rides it. Long payloads live behind a click, not on
+    the canvas. What we do not own is drawn faded + dashed. Follow one value's chip to light its path
+    through every system; a value that never crosses an auth check lights the whole chain unbroken.
+  </div>
+
+  <div id="topology"></div>
+</div>
+
+<script src="./_shared.js"></script>
+<!-- ELK is vendored (not CDN) so the page opens offline from file://. ~1.6MB;
+     one shared sibling file, referenced by every topology page. -->
+<script src="./elk.bundled.js"></script>
+<script>
+  document.getElementById("top").innerHTML =
+    topbar("16","System Topology",
+      "how systems compose across trust domains; what data rides each hop, whether it leaves us, and the blast radius of what is on the wire; following one value end-to-end",
+      "line-by-line code; a single function's control flow; precise call timing");
+
+  /* =========================================================================
+     DEMO DATA — a fictional support auto-responder webhook. Swap this whole
+     TOPOLOGY const for your real subject; the renderer below never changes.
+     Contract: see _data.template.js → TOPOLOGY.
+     ========================================================================= */
+  const TOPOLOGY = {
+    lead: "Follow <code>customer_email</code>: it enters on a public webhook, is stored, and is sent on to a third-party sentiment vendor. Click a hop for its payload; click a system to open it.",
+    domains: [
+      { id:"world", label:"Outside world", kind:"external", systems:[
+        { id:"inbox", label:"Customer mailbox", kind:"email sender", care:"high", essence:"Anyone who can email support@. Untrusted.",
+          note:"The origin of the message. We do not control who sends, or what the body contains — treat every field as untrusted input.",
+          subsystems:[ {name:"raw email", role:"subject + body + from-address", why:"all attacker-controllable; the from-address is spoofable without DKIM checks", care:"high"} ] } ] },
+      { id:"ours", label:"Our backend", kind:"ours", systems:[
+        { id:"webhook", label:"inbound webhook", kind:"our lambda", care:"high", essence:"Parses the mail, classifies, stores.",
+          note:"The entry handler. Reads the raw message, derives a <code>ticket_id</code>, writes a row, then asks the vendor for a sentiment score.",
+          subsystems:[
+            {name:"parse + classify", role:"extract subject/body/from", why:"the trust boundary — everything downstream treats these as given", care:"high"},
+            {name:"retry/backoff", role:"re-queues on vendor 5xx", why:"reliability plumbing, not part of the trust story", care:"low"} ] },
+        { id:"tickets", label:"tickets table", kind:"datastore", care:"high", essence:"One row per message.",
+          note:"Stores the ticket. The row key is derived from the inbound message, so a crafted subject can influence which ticket a write lands on.",
+          subsystems:[] } ] },
+      { id:"vendor", label:"Third party", kind:"external", systems:[
+        { id:"sentiment", label:"Sentiment API", kind:"3rd-party API", care:"high", essence:"Scores tone. Sees the full body.",
+          note:"An external company's API. We POST the message body to it with our API key and get back a tone score. The customer's words leave our trust domain here.",
+          subsystems:[ {name:"scoring model", role:"returns positive/neutral/negative", why:"opaque; we only care THAT the body crosses to them", care:"high"} ] } ] }
+    ],
+    flows: [
+      { from:"inbox", to:"webhook", label:"customer email", kind:"HTTPS webhook",
+        main:["subject","body","from_address"], carries:["customer_email"], wire_flag:true,
+        why:"The mail provider POSTs the parsed message to our public webhook. No sender authentication — the from-address is whatever the mail claims.",
+        wire_note:"An unauthenticated from-address is trusted downstream; a spoofed sender rides straight into our ticket store." },
+      { from:"webhook", to:"tickets", label:"store row", kind:"datastore write",
+        main:["ticket_id","subject","from_address"], carries:["customer_email"],
+        why:"Writes one ticket row. The key is derived from the inbound subject." },
+      { from:"webhook", to:"sentiment", label:"message body", kind:"HTTPS POST",
+        main:["body","api_key"], extra:["locale","request_id"], carries:["customer_email"],
+        leaves:true, wire_flag:true,
+        why:"Sends the body to the vendor for a tone score, authenticated with our API key.",
+        wire_note:"The customer's raw words leave our trust domain to a third party every message; our API key is on the wire on each call." }
+    ],
+    kicker: "One untrusted value — <b>customer_email</b> — enters on a public webhook and, without an authentication check, is stored and shipped to a third party. Follow its chip: it lights the whole chain, because nothing on the path re-checks who sent it."
+  };
+
+  /* =========================================================================
+     RENDERER — data-agnostic. Do not edit when swapping subjects.
+     ========================================================================= */
+  const NS="http://www.w3.org/2000/svg";
+  const NODEW=176;
+
+  (function renderTopoFlow(elId){
+    const el=document.getElementById(elId);
+    if(!el || !TOPOLOGY) return;
+    const T=TOPOLOGY;
+
+    const sys=[];
+    (T.domains||[]).forEach(d=>(d.systems||[]).forEach(s=>
+      sys.push(Object.assign({},s,{_dom:d.id,_domKind:d.kind}))));
+    if(!sys.length){ el.innerHTML=""; return; }
+    const byId=new Map(sys.map(s=>[s.id,s]));
+    const flows=(T.flows||[]).filter(f=>byId.has(f.from)&&byId.has(f.to))
+                             .map((f,i)=>Object.assign({},f,{_i:i}));
+    const vals=[]; const vseen=new Set();
+    flows.forEach(f=>(f.carries||[]).forEach(v=>{ if(!vseen.has(v)){ vseen.add(v); vals.push(v); } }));
+
+    el.className="tf-wrap";
+    el.innerHTML=
+      `<div class="tf-lead">${T.lead || "Click a hop to see what it carries. Click a system to open it up."}</div>
+       ${vals.length?`<div class="tf-trace"><span>follow a value</span>${
+          vals.map(v=>`<button class="tf-vchip" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`:""}
+       <div class="tf-scroll"><div class="tf-canvas" id="${elId}-cv"><svg class="tf-svg" id="${elId}-svg"></svg></div></div>
+       <div class="tf-legend">
+         <span>solid line — stays inside our systems</span>
+         <span>dashed line — leaves our systems</span>
+         <span style="color:var(--danger)">● red — widens blast radius</span>
+       </div>
+       <div class="tf-insp" id="${elId}-insp"><div class="tf-iempty">Nothing open yet — click a hop or a system above.</div></div>
+       ${T.kicker?`<div class="tf-kick">${T.kicker}</div>`:""}`;
+
+    const cv=document.getElementById(elId+"-cv");
+    const svg=document.getElementById(elId+"-svg");
+    const insp=document.getElementById(elId+"-insp");
+
+    const nodeEls=new Map();
+    sys.forEach(s=>{
+      const d=document.createElement("div");
+      d.className="tf-node"+(s._domKind==="external"?" ext":"")+(s.care==="low"?" soft":"");
+      d.dataset.id=s.id;
+      d.style.width=NODEW+"px"; d.style.left="0px"; d.style.top="0px"; d.style.visibility="hidden";
+      const nsub=(s.subsystems||[]).length;
+      d.innerHTML=`<div class="tf-nm">${esc(s.label)}</div>`
+        + (s.essence?`<div class="tf-ess">${esc(s.essence)}</div>`:"")
+        + (s.kind?`<div class="tf-kind">${esc(s.kind)}</div>`:"")
+        + (nsub?`<div class="tf-more">${nsub} inside →</div>`:"");
+      cv.appendChild(d); nodeEls.set(s.id,d);
+    });
+
+    /* Kept as var() references, not resolved hex, so a theme switch repaints
+       edges without re-running layout. Set via .style (resolves vars);
+       setAttribute("stroke",...) would NOT. */
+    const cFaint="var(--faint)", cDanger="var(--danger)", cAcc="var(--accent)";
+
+    svg.innerHTML=
+      `<defs>
+         <marker id="tf-ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+           <path d="M0,0 L8,4 L0,8 z" style="fill:${cFaint}"></path></marker>
+         <marker id="tf-ah-hot" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+           <path d="M0,0 L8,4 L0,8 z" style="fill:${cDanger}"></path></marker>
+       </defs>`;
+
+    const pathEls=new Map(), labEls=new Map();
+
+    function labelSize(f){
+      const probe=document.createElement("div");
+      probe.className="tf-elab"+(f.wire_flag?" hot":"");
+      probe.style.cssText="position:absolute;visibility:hidden;left:-9999px;top:0";
+      probe.innerHTML=(f.wire_flag?`<span class="dot">●</span>`:"")+esc(f.label||f.kind||"");
+      cv.appendChild(probe); const w=probe.offsetWidth,h=probe.offsetHeight; probe.remove(); return {w,h};
+    }
+    function makeEdgeEls(f){
+      const hit=document.createElementNS(NS,"path");
+      hit.setAttribute("fill","none"); hit.setAttribute("stroke","transparent");
+      hit.setAttribute("stroke-width","16"); hit.setAttribute("class","hit"); hit.dataset.i=f._i;
+      svg.appendChild(hit);
+      const p=document.createElementNS(NS,"path");
+      p.setAttribute("fill","none"); p.style.stroke = f.wire_flag?cDanger:cFaint;
+      p.setAttribute("stroke-width", f.wire_flag?"1.9":"1.4");
+      if(f.leaves) p.setAttribute("stroke-dasharray","5 4");
+      p.setAttribute("marker-end", f.wire_flag?"url(#tf-ah-hot)":"url(#tf-ah)");
+      svg.appendChild(p); pathEls.set(f._i,p);
+      const lab=document.createElement("div");
+      lab.className="tf-elab"+(f.wire_flag?" hot":""); lab.dataset.i=f._i; lab.style.visibility="hidden";
+      lab.innerHTML=(f.wire_flag?`<span class="dot">●</span>`:"")+esc(f.label||f.kind||"");
+      cv.appendChild(lab); labEls.set(f._i,lab); return {hit,p,lab};
+    }
+    function orthPath(pts, r){
+      if(pts.length<2) return "";
+      let d=`M${pts[0].x},${pts[0].y}`;
+      for(let i=1;i<pts.length-1;i++){
+        const a=pts[i-1], b=pts[i], c=pts[i+1];
+        const in1=Math.hypot(b.x-a.x,b.y-a.y), out1=Math.hypot(c.x-b.x,c.y-b.y);
+        const rr=Math.min(r, in1/2, out1/2);
+        const p1={x:b.x-(b.x-a.x)/(in1||1)*rr, y:b.y-(b.y-a.y)/(in1||1)*rr};
+        const p2={x:b.x+(c.x-b.x)/(out1||1)*rr, y:b.y+(c.y-b.y)/(out1||1)*rr};
+        d+=` L${p1.x},${p1.y} Q${b.x},${b.y} ${p2.x},${p2.y}`;
+      }
+      const last=pts[pts.length-1]; d+=` L${last.x},${last.y}`; return d;
+    }
+    function placeCanvas(w,h){ cv.style.width=w+"px"; cv.style.height=h+"px"; svg.setAttribute("width",w); svg.setAttribute("height",h); }
+    function drawEdge(f, pts){ const {hit,p}=makeEdgeEls(f); const d=orthPath(pts,12); hit.setAttribute("d",d); p.setAttribute("d",d); return pathEls.get(f._i); }
+    function placeLabel(f, x, y){ const lab=labEls.get(f._i); lab.style.left=x+"px"; lab.style.top=y+"px"; lab.style.visibility=""; }
+    function drawLane(dm, x, y, w, h){
+      const L=document.createElement("div");
+      L.className="tf-lane "+(dm.kind==="ours"?"ours":"external");
+      L.style.left=x+"px"; L.style.top=y+"px"; L.style.width=w+"px"; L.style.height=h+"px";
+      L.innerHTML=`<div class="tf-lanelab">${esc(dm.label)}</div>`; cv.insertBefore(L, cv.firstChild);
+    }
+
+    const BANDS={LANE_LABEL_H:20, LANE_PAD:16, COLGAP:96, ROWGAP:18, BANDGAP:20};
+    function bandPositions(){
+      const doms=(T.domains||[]).filter(dm=>sys.some(s=>s._dom===dm.id));
+      const rank=new Map(sys.map(s=>[s.id,0]));
+      for(let it=0; it<sys.length+1; it++){ let ch=false;
+        for(const f of flows){ const nr=rank.get(f.from)+1;
+          if(nr>rank.get(f.to) && nr<=sys.length){ rank.set(f.to,nr); ch=true; } } if(!ch) break; }
+      let widestLab=0; flows.forEach(f=>{ const lz=labelSize(f); if(lz.w>widestLab) widestLab=lz.w; });
+      const colGap=Math.max(BANDS.COLGAP, widestLab+34);
+      const maxR=Math.max.apply(null, sys.map(s=>rank.get(s.id)));
+      const colW=[]; for(let r=0;r<=maxR;r++) colW[r]=0;
+      sys.forEach(s=>{ const w=nodeEls.get(s.id).offsetWidth; const r=rank.get(s.id); if(w>colW[r])colW[r]=w; });
+      const colX=[]; let x=0; for(let r=0;r<=maxR;r++){ colX[r]=x; x+=colW[r]+colGap; }
+      const laneW=Math.max(0, x-colGap)+BANDS.LANE_PAD;
+      const pos=new Map(); const laneBoxes=[]; let y=0;
+      doms.forEach(dm=>{
+        const mem=sys.filter(s=>s._dom===dm.id);
+        const byRank=new Map();
+        mem.forEach(s=>{ const r=rank.get(s.id); if(!byRank.has(r)) byRank.set(r,[]); byRank.get(r).push(s); });
+        let bandH=0;
+        byRank.forEach(list=>{ let hh=0; list.forEach((s,k)=>{ hh+=nodeEls.get(s.id).offsetHeight+(k?BANDS.ROWGAP:0); }); bandH=Math.max(bandH,hh); });
+        const bandTop=y+BANDS.LANE_LABEL_H;
+        byRank.forEach(list=>{ let off=0; list.forEach(s=>{ const e=nodeEls.get(s.id);
+          pos.set(s.id,{x:colX[rank.get(s.id)], y:bandTop+off, w:e.offsetWidth, h:e.offsetHeight}); off+=e.offsetHeight+BANDS.ROWGAP; }); });
+        const h=BANDS.LANE_LABEL_H+bandH+BANDS.LANE_PAD;
+        laneBoxes.push({dm, y, h}); y+=h+BANDS.BANDGAP;
+      });
+      return {pos, laneBoxes, laneW, totalH:Math.max(0,y-BANDS.BANDGAP)};
+    }
+
+    async function elkLayout(){
+      if(typeof ELK==="undefined") throw new Error("ELK not loaded");
+      const {pos, laneBoxes, laneW, totalH}=bandPositions();
+      const elk=new ELK();
+      const children=sys.map(s=>{ const p=pos.get(s.id); return { id:s.id, x:p.x, y:p.y, width:p.w, height:p.h }; });
+      const edges=flows.map(f=>{ const lz=labelSize(f);
+        return { id:"edge_"+f._i, sources:[f.from], targets:[f.to], labels:[{ id:"lbl_"+f._i, width:lz.w, height:lz.h }] }; });
+      const graph={ id:"root",
+        layoutOptions:{ "elk.algorithm":"org.eclipse.elk.fixed", "elk.edgeRouting":"SPLINES",
+                        "elk.spacing.edgeLabel":"6", "elk.spacing.edgeNode":"14" },
+        children, edges };
+      let g; try { g=await elk.layout(graph); } catch(e){ g=null; }
+
+      sys.forEach(s=>{ const p=pos.get(s.id); const e=nodeEls.get(s.id); e.style.left=p.x+"px"; e.style.top=p.y+"px"; e.style.visibility=""; });
+      laneBoxes.forEach(b=>drawLane(b.dm, 0, b.y, laneW, b.h));
+
+      const routed=new Map();
+      if(g) (g.edges||[]).forEach(ed=>{ const sec=(ed.sections||[])[0]; routed.set(+ed.id.replace(/^edge_/,""), {sec, lb:(ed.labels||[])[0]}); });
+      flows.forEach(f=>{
+        const r=routed.get(f._i); let pts, labX, labY;
+        if(r && r.sec){ pts=[r.sec.startPoint, ...(r.sec.bendPoints||[]), r.sec.endPoint]; if(r.lb){ labX=r.lb.x; labY=r.lb.y; } }
+        else { const a=pos.get(f.from), b=pos.get(f.to);
+          const p0={x:a.x+a.w, y:a.y+a.h/2}, p3={x:b.x, y:b.y+b.h/2};
+          if(b.x < a.x){ p0.x=a.x; p3.x=b.x+b.w; }
+          const mid={x:(p0.x+p3.x)/2, y:(p0.y+p3.y)/2}; pts=[p0,mid,p3]; }
+        drawEdge(f, pts);
+        if(labX==null){ const m=pts[Math.floor(pts.length/2)]; const lz=labelSize(f); labX=m.x-lz.w/2; labY=m.y-lz.h/2; }
+        placeLabel(f, labX, labY);
+      });
+      placeCanvas(laneW+4, totalH+4);
+    }
+
+    function handRoll(){
+      const {pos, laneBoxes, laneW, totalH}=bandPositions();
+      sys.forEach(s=>{ const p=pos.get(s.id); const e=nodeEls.get(s.id); e.style.left=p.x+"px"; e.style.top=p.y+"px"; e.style.visibility=""; });
+      laneBoxes.forEach(b=>drawLane(b.dm, 0, b.y, laneW, b.h));
+      flows.forEach(f=>{ const a=pos.get(f.from), b=pos.get(f.to);
+        const p0={x:a.x+a.w, y:a.y+a.h/2}, p3={x:b.x, y:b.y+b.h/2};
+        if(b.x < a.x){ p0.x=a.x; p3.x=b.x+b.w; }
+        const mid={x:(p0.x+p3.x)/2, y:(p0.y+p3.y)/2};
+        drawEdge(f,[p0,mid,p3]); const lz=labelSize(f); placeLabel(f, mid.x-lz.w/2, mid.y-lz.h/2); });
+      placeCanvas(laneW+4, totalH+4);
+    }
+
+    (async()=>{
+      try { await elkLayout(); }
+      catch(err){ if(typeof console!=="undefined") console.warn("topo-flow: ELK failed, hand-rolled routing —", err && err.message); handRoll(); }
+      wireInteractions();
+    })();
+
+    function wireInteractions(){
+      function clearSel(){
+        labEls.forEach(l=>l.classList.remove("sel")); nodeEls.forEach(n=>n.classList.remove("sel"));
+        pathEls.forEach((p,i)=>{ const f=flows[i]; p.style.stroke = f.wire_flag?cDanger:cFaint; p.setAttribute("stroke-width", f.wire_flag?"1.9":"1.4"); });
+      }
+      function inspEdge(f){
+        clearSel(); labEls.get(f._i).classList.add("sel");
+        nodeEls.get(f.from).classList.add("sel"); nodeEls.get(f.to).classList.add("sel");
+        const p=pathEls.get(f._i); p.style.stroke = f.wire_flag?cDanger:cAcc; p.setAttribute("stroke-width","2.6");
+        const a=byId.get(f.from), b=byId.get(f.to);
+        const main=(f.main&&f.main.length)?f.main:(f.data?[f.data]:[]);
+        const extra=f.extra||[]; const carries=new Set(f.carries||[]);
+        const chip=x=>`<code class="tf-p${carries.has(x)?" key":""}">${esc(x)}</code>`;
+        insp.innerHTML=
+          `<div class="tf-ihd"><span class="tf-ipath">${esc(a.label)}<span class="ar">→</span>${esc(b.label)}</span>
+             ${f.kind?`<span class="tf-ikind">${esc(f.kind)}</span>`:""}
+             ${f.leaves?`<span class="tf-ikind" style="color:var(--write);border-color:var(--write)">leaves us</span>`:""}
+             ${f.transformed?`<span class="tf-ikind" style="color:var(--read);border-color:var(--read)">${esc(f.transformed)}</span>`:""}</div>
+           <div class="tf-ibody">
+             <div class="tf-plab">what is on this hop</div>
+             <div class="tf-params">${main.map(chip).join("")}</div>
+             ${extra.length?`<button class="tf-xbtn">+ ${extra.length} more field${extra.length>1?"s":""} on the wire</button>
+                <div class="tf-params tf-xtra" hidden>${extra.map(chip).join("")}</div>`:""}
+             ${f.why?`<div class="tf-iwhy">${esc(f.why)}</div>`:""}
+             ${f.wire_note?`<div class="tf-ibr"><b>blast radius</b>${esc(f.wire_note)}</div>`:""}
+           </div>`;
+        const xb=insp.querySelector(".tf-xbtn"); if(xb) xb.addEventListener("click",()=>{ insp.querySelector(".tf-xtra").hidden=false; xb.remove(); });
+      }
+      function inspNode(s){
+        clearSel(); nodeEls.get(s.id).classList.add("sel");
+        const subs=s.subsystems||[]; const hi=subs.filter(x=>x.care!=="low"), lo=subs.filter(x=>x.care==="low");
+        const row=x=>`<div class="tf-sub"><b>${esc(x.name)}</b>${x.role?" — "+esc(x.role):""}${x.why?`<div class="tf-subwhy">${esc(x.why)}</div>`:""}</div>`;
+        insp.innerHTML=
+          `<div class="tf-ihd"><span class="tf-ipath">${esc(s.label)}</span>
+             ${s.kind?`<span class="tf-ikind">${esc(s.kind)}</span>`:""}
+             ${s._domKind==="external"?`<span class="tf-ikind" style="color:var(--write);border-color:var(--write)">not ours</span>`:""}</div>
+           <div class="tf-ibody">
+             ${s.note?`<div class="tf-inote">${s.note}</div>`:""}
+             ${hi.length?`<div class="tf-plab" style="margin-top:11px">inside this system</div>${hi.map(row).join("")}`:""}
+             ${lo.length?`<button class="tf-xbtn2">+ ${lo.length} more part${lo.length>1?"s":""}, not load-bearing here</button>
+                <div class="tf-lo" hidden style="margin-top:8px">${lo.map(row).join("")}</div>`:""}
+           </div>`;
+        const xb=insp.querySelector(".tf-xbtn2"); if(xb) xb.addEventListener("click",()=>{ insp.querySelector(".tf-lo").hidden=false; xb.remove(); });
+      }
+      cv.addEventListener("click",ev=>{
+        const lab=ev.target.closest(".tf-elab"); if(lab){ inspEdge(flows[+lab.dataset.i]); return; }
+        const nd=ev.target.closest(".tf-node"); if(nd){ inspNode(byId.get(nd.dataset.id)); return; }
+      });
+      svg.addEventListener("click",ev=>{ const h=ev.target.closest("path.hit"); if(h) inspEdge(flows[+h.dataset.i]); });
+
+      let active=null; const chips=[...el.querySelectorAll(".tf-vchip")];
+      function restorePath(p,f){ p.style.stroke = f.wire_flag?cDanger:cFaint; p.setAttribute("stroke-width", f.wire_flag?"1.9":"1.4"); p.style.opacity=""; }
+      function clearTrace(){
+        chips.forEach(c=>c.classList.remove("on")); nodeEls.forEach(n=>n.classList.remove("fade","lit"));
+        labEls.forEach(l=>l.classList.remove("fade","lit")); pathEls.forEach((p,i)=>restorePath(p,flows[i])); active=null;
+      }
+      chips.forEach(c=>c.addEventListener("click",()=>{
+        const v=c.dataset.v; if(active===v){ clearTrace(); return; }
+        clearTrace(); active=v; c.classList.add("on");
+        const keepN=new Set(), keepF=new Set();
+        flows.forEach(f=>{ if((f.carries||[]).indexOf(v)>=0){ keepF.add(f._i); keepN.add(f.from); keepN.add(f.to); } });
+        nodeEls.forEach((n,id)=>{ n.classList.toggle("fade",!keepN.has(id)); n.classList.toggle("lit",keepN.has(id)); });
+        labEls.forEach((l,i)=>{ l.classList.toggle("fade",!keepF.has(i)); l.classList.toggle("lit",keepF.has(i)); });
+        pathEls.forEach((p,i)=>{ if(keepF.has(i)){ p.style.stroke = flows[i].wire_flag?cDanger:cAcc; p.setAttribute("stroke-width","2.8"); p.style.opacity="1"; }
+          else { restorePath(p,flows[i]); p.style.opacity="0.09"; } });
+      }));
+    }
+  })("topology");
+</script>
+</body>
+</html>

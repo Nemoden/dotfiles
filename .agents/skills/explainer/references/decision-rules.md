@@ -77,6 +77,92 @@ Combining primitives can beat a single view, but restraint matters. Rule:
 Annotated-source is a PRIMITIVE, not a standalone: prefer embedding it inside
 whatever technique shows code, rather than as its own page.
 
+## Model systems as a node-link diagram over swimlanes
+
+When a flow spans several systems across trust domains, draw it as a
+**node-link diagram**, not a grid of cards. `system-topology` implements this;
+four rules make it legible instead of a wall:
+
+1. **Swimlane by trust domain.** One horizontal band per domain (outside world,
+   our backend, a vendor). Dataflow runs left-to-right ACROSS the bands. The
+   band a node sits in IS its trust zone — that placement is load-bearing, not
+   decoration.
+2. **Arrows carry the data; payload is click-to-reveal.** The label on an arrow
+   is what rides it (a short tag: "session token", "L2L"). The full field list
+   lives in a click-open inspector — a few `main` fields, the rest behind
+   "+N more on the wire". NEVER dump the payload onto the canvas; a diagram you
+   have to read like prose has failed. The reader should SEE the shape and
+   click for detail, the way an infographic shifts focus to what matters.
+3. **Care is visual weight, not a word.** What you don't own is drawn faded +
+   dashed (black-box a browser, a vendor, a pool — you care THAT data crosses
+   it, not how it works inside). Low-care subsystems (rate-limiting, retry) hide
+   in the inspector behind "+N more". Do not write the word "care" on the view;
+   imply it. Scope is contextual — not too broad, not too narrow; when genuinely
+   unclear which subsystems matter, ask.
+4. **Follow one value end-to-end.** Each value that crosses ≥1 hop gets a chip;
+   clicking it lights every system + arrow that value touches and fades the
+   rest. A value that never crosses an auth check lights the WHOLE chain
+   unbroken — that is the finding made visible, not asserted in prose.
+
+What is on the wire is a security property. A password enqueued to SQS so an
+email can echo it widens the blast radius of any queue/log leak to every reset;
+a `{user_id, datetime}` event does not. Name what each edge carries (`carries`)
+and flag the ones that widen blast radius (`wire_flag` + `wire_note`, drawn
+red). You cannot see that from a call graph.
+
+**Layout is a hybrid, and this is deliberate.** No free auto-layout engine does
+swimlanes — they rank along one axis and never reserve perpendicular bands
+(only paid tools like GoJS/yFiles do). So the renderer computes the bands +
+dataflow ranks itself, and hands the one genuinely hard job — routing edges +
+placing labels without collisions — to **ELK** (`elk.bundled.js`, vendored so
+pages open offline from `file://`; a hand-rolled router is the fallback if ELK
+is absent). If you build a new technique that needs graph layout, reuse this
+hybrid rather than reaching for a full layout dependency or hand-rolling
+collision math from scratch.
+
+`io-boundary` is the flat one-box surface (every crossing of ONE box at once);
+`system-topology` is the multi-system node-link view. Reach for topology when
+the flow spans 3+ systems across 2+ trust domains and the composition — who
+talks to whom, what rides each hop, what leaves us — is the question.
+
+## Rank by boundary crossing — values are not peers
+
+A system is a **box with a surface**, and subsystems nest. Before an explainer
+can say anything true about safety or correctness, it must establish which side
+of the surface each value came from and which way it crosses:
+
+|  | stays inside | goes outside |
+|---|---|---|
+| **born outside** | **INPUT** — untrusted | **THROUGH** — relay |
+| **born inside** | LOCAL — private | **OUTPUT** — our commitment |
+
+Why this is a routing rule and not a footnote: a flat value list renders
+`matter_id` (caller-supplied, selects the tenant) and `created_at` (a server
+stamp) as equals. The reader gets no cue which one decides anything. Sort by
+crossing and the trust story orders itself — inputs first, locals last.
+
+Apply it whenever the subject has a trust or ownership edge (any HTTP handler,
+any vendor integration, any multi-tenant path):
+
+- **Reading one value's journey** → `value-provenance` + a `BOUNDARY` block.
+- **Sizing the box / seeing every crossing at once** → `io-boundary`.
+- **Both asked together** → `io-boundary` as the side-car: it is the frame,
+  provenance is the zoom.
+
+Three traps, each of which has already produced a wrong explainer:
+
+1. **`born` is where a value is READ, not where it originates.** A querystring
+   parsed at `load_input_data` looks locally-born and classifies as LOCAL when
+   it is untrusted INPUT. Classify from where the data came from, not from where
+   the code first touched it.
+2. **The response crosses out.** A value assembled inside and returned to the
+   caller is OUTPUT even when the "response" station sits inside the box.
+3. **Direction of call says nothing about ownership.** A vendor API is outside
+   even when WE call IT. Prove ownership from a base URL, a credential we
+   present, or a vendored SDK — never from the arrow direction. Mark another
+   company's system as `third_party`, distinct from merely `outside`: conflating
+   the two is how a vendor gets explained as one of our subsystems.
+
 ## Quick routing table (subject × size × target → build)
 
 | Subject | Size | Target | Build |

@@ -7,6 +7,7 @@
   "thinking": {
     "type": "adaptive"
   },
+  "outputStyle": "terse-explainer",
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
@@ -15,7 +16,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "PreToolUse": [
       {

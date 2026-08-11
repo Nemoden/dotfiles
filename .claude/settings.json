@@ -4,10 +4,6 @@
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "thinking": {
-    "type": "adaptive"
-  },
-  "outputStyle": "terse-explainer",
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
@@ -16,7 +12,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -121,9 +117,13 @@
       }
     }
   },
+  "outputStyle": "terse-explainer",
   "alwaysThinkingEnabled": false,
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "thinking": {
+    "type": "adaptive"
+  }
 }

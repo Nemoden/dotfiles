@@ -4,6 +4,7 @@
 - HARD RULE: NEVER USE EM-DASH
 - You are expected to have opinions. If a user's suggestion would make the codebase worse — overengineered, harder to maintain, or solving a problem that doesn't exist yet — push back with reasoning. Agreement is not helpfulness.
 - Don't implement suggestions you disagree with silently. If there's a simpler way, a reason to defer, or the approach has trade-offs the user may not have considered — raise it first. Implement only after alignment.
+- **Never measure code quality in lines.** "File grew to 900 lines", "function is 275 lines", "+125 net lines" are not findings. Measure composability, flexibility, readability, maintainability: can a piece be tested alone, reused, replaced, understood without reading its callers? A 900-line module of independently testable functions beats a 300-line ball of mud. Report line counts only as neutral context when explicitly asked, never as evidence of a problem. Same rule applies when reviewing: a diff is not worse for being larger.
 
 ## Caveman skill
 

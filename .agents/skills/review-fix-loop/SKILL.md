@@ -64,12 +64,17 @@ Rule: hats must be **disjoint**. Overlap wastes the round. Tell each hat what th
 
 ```
 propose hats -> user confirms or adjusts
+context = {fixed: [], refuted: [], out_of_scope: [], gotchas: []}
 round = 1
 while round <= cap:
-    findings = run hats (inline or fanout)
+    findings = run hats (inline or fanout), injecting context
     verify each finding yourself      # never act on an unverified claim
+    for f in findings:
+        if false: context.refuted += (f, why)      # record the reason
+        if deferred: context.out_of_scope += (f, boundary)
     if no major findings: stop        # dry round = done
-    fix them
+    fix the real ones -> context.fixed += them
+    context.gotchas += anything learned that is not in the code
     re-verify: tests + compile + baseline diff
     commit round with what it found
     round += 1
@@ -78,6 +83,32 @@ while round <= cap:
 **Stop on the dry round, not the cap.** Cap only guards runaway.
 
 "Major" = wrong behavior, a leak, or a runtime break. Style and naming do not extend the loop.
+
+## Never fabricate a finding or a verification
+
+The loop's output is only worth what its weakest claim is worth. A confident wrong finding costs more than a missed one, because it gets acted on.
+
+- **Report only what you observed.** A finding needs a file you read or a command you ran. "This pattern usually means X" is not a finding.
+- **Never invent a round's results.** If a hat produced nothing, say it produced nothing. If a fan-out agent went silent, that is NO SIGNAL — never write up what it "would have found", and never let silence stand in for clean.
+- **Never claim a verification you did not run.** No "tests pass" without the run. No "no regressions" without the baseline. If you skipped it, say which check you skipped.
+- **Separate observed from inferred.** State plainly which findings you confirmed by reading/executing and which are suspicions worth a look. Both are useful; conflating them is not.
+- **Do not pad a dry round.** Downgrading style nits into "findings" to make a round look productive corrupts the stop condition — the loop exists to end when the code is clean.
+- **Uncertainty is a real answer.** "I could not determine whether this path is reachable" beats a guess in either direction.
+
+## Carry context forward between rounds
+
+Each round starts fresh reviewers who lack everything the loop has learned. Without a handoff they re-report fixed bugs, re-raise findings you already refuted, and burn the round. **Maintain a running context block and inject it into every subsequent round** (into agent prompts in fan-out; into your own framing inline).
+
+Keep four lists:
+
+1. **Fixed** — what earlier rounds already fixed. "Do not re-report these."
+2. **Refuted, with the reason** — findings that looked real and were not. The reason matters more than the verdict: *"`paralegal_name` is a firm brand persona, not a person"*, *"L2L calls inside the account are trusted"*. Without the why, the next round rediscovers it and you re-adjudicate.
+3. **Out of scope, with the boundary** — deliberate deferrals and why. Stops re-litigation of a decision already made.
+4. **Gotchas** — domain facts learned mid-loop that are not in the code: real record shapes from the live datastore, which fields are customer-visible, what a suite's pre-existing failures are.
+
+You have context reviewers do not — ticket scope, prior rounds, live data, the user's decisions. **Refuting a finding on that basis is correct and expected.** But refute explicitly and record it; do not silently drop it. A finding you ignore without a reason comes back every round.
+
+Feed the block forward verbatim rather than summarising it away — the reason for each refutation is the load-bearing part.
 
 ## Rules that make it work
 
@@ -96,10 +127,13 @@ while round <= cap:
 
 Per round:
 - what each hat found (or that it found nothing)
-- what you verified vs. took on trust
+- what you verified by reading/executing vs. what is still a suspicion
+- what you refuted and **why** — the reason is the useful part
 - what you fixed, what you deferred and why
-- test/compile state vs. baseline
+- test/compile state vs. baseline, naming any check you skipped
 
 At the end: rounds run, why you stopped (dry vs. cap), what remains open.
 
 Be straight about a hat that produced nothing. "Round 3 dry" is a real result. Do not pad it.
+
+Surface a systematically unproductive hat. If fan-out agents return nothing across several rounds, say so plainly and recommend inline — a review process that silently produces no signal is worse than none, because it reads as assurance.

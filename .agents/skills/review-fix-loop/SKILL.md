@@ -18,13 +18,15 @@ Review AND fix in one loop. Each round: run hats, verify findings, fix, re-verif
 | rounds | 3 | `rounds=N` |
 | hats | proposed per-change (see below) | `hats=a,b,c` |
 | agents | 3 | `agents=N` |
-| mode | inline | `mode=fanout` |
+| mode | fanout | `mode=inline` |
 | model | inherit | `model=NAME` |
 | stop | first dry round | cap is backstop only |
 
-**Default mode is inline — run each hat yourself, sequentially.** Fan-out is opt-in because subagent review has a poor track record: agents frequently idle without returning findings, and a silent agent reads as "clean" when it means "no signal". Inline costs wall-clock but always produces output.
+**Default mode is fanout — one agent per hat, in parallel.** Hats are independent by construction, so they parallelise cleanly, and keeping each hat's file-reading in its own context leaves the main thread free to judge findings instead of drowning in greps and diffs. Context pollution is the main cost of running hats inline.
 
-Use `mode=fanout` when the surface genuinely exceeds one context (30+ files, or hats needing separate repos). Then treat silence as NO SIGNAL, never as clean, and verify every returned claim before acting.
+Use `mode=inline` when the diff is small enough that spawning costs more than it saves, or when a hat needs conversation context an agent cannot be handed.
+
+Either way: **a silent agent is NO SIGNAL, not a clean bill.** If one returns nothing, say so and either re-run it or cover that hat yourself — never record an empty return as "found nothing". Agents also die for reasons unrelated to the code (machine sleeps, session ends); treat that as a lost round for that hat, not as a result.
 
 ## Propose the hats first
 
@@ -113,6 +115,7 @@ Feed the block forward verbatim rather than summarising it away — the reason f
 ## Rules that make it work
 
 - **Verify before acting.** Reviewer claims (bot, human, agent) are leads, not facts. Read the code. Where cheap, execute it.
+- **Keep the fan-out's context benefit.** Ask hats for findings, not transcripts — a hat that pastes back the files it read defeats the point. Verify by re-reading the specific lines a finding names, not by re-running its whole search.
 - **Execute over read.** For shared helpers, write throwaway scripts hitting edge cases. Most real bugs surface from inputs you were NOT targeting.
 - **Check the blast radius before changing a value.** A field feeding a log may also be a dict key, a filename, or customer-visible text. Grep consumers before swapping it — a "log-only" change that alters an invoice is worse than the leak.
 - **A log line must never raise.** Prefer `.get()` over subscript for anything newly referenced in logging.
@@ -136,4 +139,4 @@ At the end: rounds run, why you stopped (dry vs. cap), what remains open.
 
 Be straight about a hat that produced nothing. "Round 3 dry" is a real result. Do not pad it.
 
-Surface a systematically unproductive hat. If fan-out agents return nothing across several rounds, say so plainly and recommend inline — a review process that silently produces no signal is worse than none, because it reads as assurance.
+Surface any hat that returned nothing, and say whether it found nothing or never reported. Those are different results. A hat that died mid-round leaves that angle uncovered — re-run it or cover it yourself before calling the round dry, because an empty return reads as assurance when it is absence.

@@ -100,6 +100,38 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Name the shape — `dict` is worse for LLMs than for humans
+
+**A bare `dict`/`map`/`object` annotation is a dead end for an agent. A named structure is a lookup.**
+
+`record: dict` tells a reader nothing, and tells *me* less than that. I mostly infer a field's meaning by pattern-matching the surrounding code, not by reading a definition — so when the type is `dict`, there is no definition to find and nothing to grep. `record: ShareRecord` puts a symbol at every use site: one hop to the fields, their types, and whatever the docstring warns about. The gain is **retrieval**, not comprehension.
+
+This asymmetry is why it matters more for me than for you: you read a definition once and hold it for the session; I re-derive from whatever is in context on this turn. A name in the signature is what survives that.
+
+Prefer, in order: a real class/struct (`@dataclass`, pydantic model, `TypedDict`, `NamedTuple`, TS `interface`) → a type alias → `dict[str, Any]` + docstring → bare `dict`. Pick the flavour by contract strength (untrusted input → validating model; must-stay-a-dict at runtime → `TypedDict`).
+
+**Docstrings travel; `#` comments don't.** Verified against `pyright-langserver` via `textDocument/hover`: a class documenting its fields in the **class docstring** hovers as the full text; the identical class using a trailing `# comment` hovers as bare `(class) Name`. At runtime, same split — `__doc__` holds the docstring, and is `None` for the comment version. Any tool that reads symbols (LSP hover, `help()`, generated API docs, an agent following a definition) sees one and not the other.
+
+So put non-obvious field knowledge in the **class docstring**, not in trailing comments:
+
+```python
+class ShareRecord(t.TypedDict):
+    """Row written to the shares table on create.
+
+    Fields whose names don't carry their meaning:
+
+    created_by      Cognito sub, NOT a username or email.
+    last_batch_ts   Equal to created_at at create, then moves on every
+                    add-items while created_at stays put.
+    """
+```
+
+Document only the fields whose names lie or hide a constraint (an opaque ID behind a human-sounding name, a field mutated by something outside this code path, a value that doubles as a key seed). `share_id: str` needs nothing — a comment there is restating the code, which the no-comments rule already bans.
+
+**One honest limit:** hovering a *field use* (`r["created_by"]`) returns nothing; the docstring surfaces when the **type name** is hovered — in the signature, the annotation, the import. Verified, same probe. So the payoff depends on the type name being visible near the use site, which is the argument for naming it in the first place.
+
+With an LSP or treesitter in the loop this stops being decoration and becomes the mechanism: the docs arrive with the symbol instead of only when someone chooses to open the defining file. Don't bet on "a better model will just infer it" — a local convention like `created_by` = Cognito sub is not inferable at any capability level. Better inference makes a model better at *using* documented facts, not at guessing undocumented ones.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.

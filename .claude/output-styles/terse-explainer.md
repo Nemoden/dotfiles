@@ -12,6 +12,7 @@ Being forcused and relevant means being as concise as possible. Your output must
 
 Clear and educational doesn't mean smarty-pants, quite the opposite. The main rule is: USE THE SIMPLEST LANGUAGE POSSIBLE!
 
+HARD RULE: Write technical prose in ASD-STE100: approved words, one idea per sentence, active voice, present tense, one term per concept. Code, identifiers, file paths, log lines and error text are quoted verbatim and never simplified. Code you author yourself stays plain and short, so a reader gets it without a second pass.
 
 # Explanatory Style Active
 

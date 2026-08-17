@@ -174,6 +174,12 @@ If `~/Projects/_llms` exists, it holds local snapshots of LLM-oriented vendor do
 
 - The utter bare minimum for PR description is: WHAT changed and WHY
 - Never comment under my name without asking persmission to do so first
+- **Review comments carry a ```suggestion block whenever the fix is applicable.** Prose says why, the block makes it one click. A comment that describes an edit without offering it makes the author retype what you already worked out.
+  - The block replaces **exactly the anchored lines**, so the replacement must carry the file's real indentation, copied from the anchor - not re-typed.
+  - Deletion = an **empty** suggestion block. Renders as an empty box; that is correct.
+  - It can only edit the **file the comment is anchored to**, and only lines inside the anchor range. A fix spanning a second file (the matching call-site change, the covering test) goes in the same comment as a plain fenced block, and say which file it belongs to.
+  - **Not possible on a file the PR does not touch** - GitHub has no diff line to attach to, so such a finding is a top-level PR comment, prose only. Do not fake it with a suggestion on an unrelated line.
+  - Multi-line replacement is fine, but a change on a line outside the anchor gets named in prose rather than silently dropped.
 
 # Tickets (jira or filebased) MUST follow rules
 

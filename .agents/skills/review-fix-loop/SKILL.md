@@ -213,6 +213,10 @@ Python ladder, strongest contract first. Pick by contract needed, not by habit:
 | `t.NewType` alias | the value must stay a primitive at runtime (DynamoDB sort key, wire format, byte-derived id) but its grammar is unstated. `IsoTimestamp = t.NewType("IsoTimestamp", str)`. Zero runtime change, and every use site becomes greppable. The safe rung for strings, as `TypedDict` is for dicts |
 | `dict[str, Any]` + docstring | genuinely ad-hoc or heterogeneous shape |
 
+**A serialisation layer refusing `datetime` is not a blocker, it is a conversion site.** `boto3`'s `put_item` and `update_item` both raise `TypeError: Unsupported type` on a `datetime`, and a DynamoDB read returns `str` no matter what was written. Neither fact forces the field to be typed `str`: the answer is to serialise at the write seam and parse at the read seam. Find those seams before concluding the format is forced, and prefer a codebase that already has one named seam (a single `persist_*` or `to_item` function) over scattering conversions.
+
+The format is genuinely forced only when **the type IS the wire shape**: a `TypedDict` fed straight into `put_item`, or one describing a row exactly as read back. Typing `datetime` there is false at runtime in both directions. The honest move is then a pair, not a compromise: `NewType` on the storage shape, plus a domain type carrying real `datetime`, converted once at the boundary. A `str` everywhere is what you get by skipping the pair.
+
 Other languages: same principle, their own idiom. TypeScript: `interface`/`type` over inline object literals, `unknown` + narrowing over `any`, a validating parse (zod or equivalent) at the API edge over an `as` cast. Go: a struct over `map[string]interface{}`. For date and time in any language, prefer the standard library type over a string. Read what the file already does and match it.
 
 **Document the fields that lie.** Non-obvious field knowledge goes in the **class docstring**, not a trailing `#` comment. Docstrings reach LSP hover, `help()`, and generated docs; comments reach none of them. Only document fields whose names hide something: an opaque ID behind a human-sounding name, a value mutated outside this code path, a field that doubles as a key seed. `share_id: str` needs nothing.
@@ -226,8 +230,8 @@ Types are a readability tool here, not a compliance target. The gate is the same
 - Anything outside the diff. Untyped code the diff merely touches is pre-existing; note it, do not retrofit
 - A dict that stays inside one short function and never crosses a boundary
 - Introducing pydantic to a service that does not already depend on it. Propose that, do not do it. Same for `shared/`: CLAUDE.md forbids new deps there outright
-- A datetime string the code only passes through and never compares, sorts or formats. Parsing a value nothing reasons about adds a failure mode and buys nothing
-- A datetime string that must stay a string at the storage or wire edge. Do not fight the format, name it with a `NewType` alias instead
+- A datetime string inside one short function that never crosses a boundary. Once it crosses one, "nothing compares it today" is NOT a reason to skip: the next caller re-derives the grammar from a producer's docstring, which is the cost this rung exists to remove. Weigh the parse's real failure modes, not the current absence of arithmetic
+- A datetime string that must stay a string at the storage or wire edge. Name it with a `NewType` alias. Confirm the edge really forces it first: see the serialisation note under the ladder, because a storage layer refusing `datetime` is usually a conversion site, not a forced format
 
 ### Reuse and altitude
 
@@ -272,6 +276,7 @@ Feed it the quality diff, the pre-quality state, and the trades each finding dec
 | `str` → `datetime` | a string that never raised now raises on any row whose format differs. Legacy rows rarely all match |
 | `str` → `datetime` | naive/aware mismatch: comparing an aware value to a naive one raises `TypeError` at runtime, not at parse |
 | `str` → `datetime` | a value written straight back to storage or a response body now serializes differently. `str(dt)` is not the input string |
+| `str` → `datetime` | the round trip is lossy wherever the format is narrower than `datetime`. A house format with millisecond precision returns `123000` microseconds for an input of `123456`, so `parsed == original` is False. Any test, cache key or dedup check comparing the two silently flips |
 
 Treat every dict-to-model swap and every string-to-datetime parse as **behavior-changing until proven otherwise**. Prove it by finding every construction site and every read site, or do not apply it. Propose it instead. `TypedDict` and `NewType` are the safe rungs of the ladder precisely because they are zero runtime change; prefer them when the only goal is naming the shape.
 

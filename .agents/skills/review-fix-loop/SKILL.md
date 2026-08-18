@@ -26,9 +26,18 @@ Then one **quality pass** over the settled code: two simplification lenses and a
 | stop | first dry round | cap is backstop only |
 | quality pass | on, after loop goes dry | `quality=off` |
 
-**Default mode is fanout: one agent per hat, in parallel.** Hats are independent by construction, so they parallelise cleanly, and keeping each hat's file-reading in its own context leaves the main thread free to judge findings instead of drowning in greps and diffs. Context pollution is the main cost of running hats inline.
+**Default mode is fanout: one agent per hat, in parallel.** Each hat asks a different question, so they parallelise cleanly, and keeping each hat's file-reading in its own context leaves the main thread free to judge findings instead of drowning in greps and diffs. Context pollution is the main cost of running hats inline.
 
 Use `mode=inline` when the diff is small enough that spawning costs more than it saves, or when a hat needs conversation context an agent cannot be handed.
+
+**Hats are independent in what they look for, NOT in what they touch.** Any hat that mutates the source to test it (`test-quality` breaking code to see which test fires, `adversarial` editing a helper, anyone reverting a line to check coverage) must get its own worktree (`isolation: "worktree"`). Without that, every concurrent hat reads a tree that is briefly, invisibly wrong, and reports on code nobody wrote:
+
+- A mutation caught mid-flight reads as a genuine bug, and it is expensive to disprove.
+- A hat measuring before a mutation and asserting after gets a contradiction it cannot explain.
+- Stale bytecode outlives the restore. Anything that imports the mutated module can keep seeing it after the file is correct again, so tell hats to clear caches before measuring.
+- A test run that writes or deletes tracked build artifacts makes every sibling's `git status` dirty, and "the tree is dirty" then stops being a signal anyone trusts.
+
+If a mutating hat has to share a tree, run it alone in its own round. A round where one hat mutates and three read is not one round of four results, it is one result and three that need re-running.
 
 Either way: **a silent agent is NO SIGNAL, not a clean bill.** If one returns nothing, say so and either re-run it or cover that hat yourself. Never record an empty return as "found nothing". Agents also die for reasons unrelated to the code (machine sleeps, session ends); treat that as a lost round for that hat, not as a result.
 
@@ -83,7 +92,7 @@ while round <= cap:
     if no major findings: stop        # dry round = done
     fix the real ones -> context.fixed += them
     context.gotchas += anything learned that is not in the code
-    re-verify: tests + compile + baseline diff
+    re-verify: the repo's own gate (see below) + baseline diff
     commit round with what it found
     round += 1
 ```
@@ -102,6 +111,8 @@ The loop's output is only worth what its weakest claim is worth. A confident wro
 - **Never invent a round's results.** If a hat produced nothing, say it produced nothing. If a fan-out agent went silent, that is NO SIGNAL. Never write up what it "would have found", and never let silence stand in for clean.
 - **Never claim a verification you did not run.** No "tests pass" without the run. No "no regressions" without the baseline. If you skipped it, say which check you skipped.
 - **Separate observed from inferred.** State plainly which findings you confirmed by reading/executing and which are suspicions worth a look. Both are useful; conflating them is not.
+- **A reproduction that never imports the code proves nothing about the code.** Retyping a suspect expression into a scratch script and watching it misbehave demonstrates a fact about the language, not a defect in the system. Before claiming a live bug, name the function that evaluates the bad expression and read it. The trap is that the scratch version genuinely fails, which feels like proof: a `str` comparison really does mis-sort, so the only remaining question, whether any caller actually compares strings, is the one that gets skipped. Import the real module, call the real entry point, or downgrade the claim to a hazard.
+- **"Fixes a bug" and "removes a hazard" are different claims, and the weaker one is often the true one.** A change can be worth making because the current shape *permits* a defect, with no defect present. That is a real justification; say it that way. Asserting a live bug that never existed sends the next reader hunting for a fixed comparison they will not find, and it survives in the commit message long after the code is settled. When both readings fit, claim the hazard and let the reader upgrade it.
 - **Do not pad a dry round.** Downgrading style nits into "findings" to make a round look productive corrupts the stop condition: the loop exists to end when the code is clean.
 - **Uncertainty is a real answer.** "I could not determine whether this path is reachable" beats a guess in either direction.
 
@@ -112,7 +123,7 @@ Each round starts fresh reviewers who lack everything the loop has learned. With
 Keep four lists:
 
 1. **Fixed**: what earlier rounds already fixed. "Do not re-report these."
-2. **Refuted, with the reason**: findings that looked real and were not. The reason matters more than the verdict: *"`paralegal_name` is a firm brand persona, not a person"*, *"L2L calls inside the account are trusted"*. Without the why, the next round rediscovers it and you re-adjudicate.
+2. **Refuted, with the reason**: findings that looked real and were not. The reason matters more than the verdict: *"that field holds a product name, not a person's name, so it is not PII"*, *"calls on this path sit inside the trust boundary and are not re-authorised by design"*. Without the why, the next round rediscovers it and you re-adjudicate.
 3. **Out of scope, with the boundary**: deliberate deferrals and why. Stops re-litigation of a decision already made.
 4. **Gotchas**: domain facts learned mid-loop that are not in the code: real record shapes from the live datastore, which fields are customer-visible, what a suite's pre-existing failures are.
 
@@ -210,16 +221,27 @@ Python ladder, strongest contract first. Pick by contract needed, not by habit:
 | `@dataclass` | trusted internal value object. Attribute access, free `__eq__`/`__repr__`. `frozen=True` when it must not mutate |
 | `t.NamedTuple` | small immutable value you would otherwise make a 2-3 element tuple. Unpacking is a feature |
 | `t.TypedDict` | must stay a dict at runtime (forwarded to an API expecting dict, JSON-serialized, Lambda event). Static checks, zero runtime cost |
-| `t.NewType` alias | the value must stay a primitive at runtime (DynamoDB sort key, wire format, byte-derived id) but its grammar is unstated. `IsoTimestamp = t.NewType("IsoTimestamp", str)`. Zero runtime change, and every use site becomes greppable. The safe rung for strings, as `TypedDict` is for dicts |
+| `t.NewType` alias | the value must stay a primitive at runtime (a sort key, a wire format, an id derived from the value's exact bytes) but its grammar is unstated. `IsoTimestamp = t.NewType("IsoTimestamp", str)`. Zero runtime change, every use site greppable, and the checker rejects a bare `str` in the slot. The safe rung for strings, as `TypedDict` is for dicts |
 | `dict[str, Any]` + docstring | genuinely ad-hoc or heterogeneous shape |
 
-**A serialisation layer refusing `datetime` is not a blocker, it is a conversion site.** `boto3`'s `put_item` and `update_item` both raise `TypeError: Unsupported type` on a `datetime`, and a DynamoDB read returns `str` no matter what was written. Neither fact forces the field to be typed `str`: the answer is to serialise at the write seam and parse at the read seam. Find those seams before concluding the format is forced, and prefer a codebase that already has one named seam (a single `persist_*` or `to_item` function) over scattering conversions.
+**A serialisation layer refusing `datetime` is not a blocker, it is a conversion site.** Plenty of database and RPC clients raise on a `datetime` and hand back a string on read, so the stored form has to be a string. That constrains the **wire**, not the domain: serialise at the write seam, parse at the read seam. Name the seam before you accept the constraint. If you can point at the function that would convert, the objection is discharged and does not belong in the field's docstring; if you cannot find one, that missing seam is itself the finding.
 
-The format is genuinely forced only when **the type IS the wire shape**: a `TypedDict` fed straight into `put_item`, or one describing a row exactly as read back. Typing `datetime` there is false at runtime in both directions. The honest move is then a pair, not a compromise: `NewType` on the storage shape, plus a domain type carrying real `datetime`, converted once at the boundary. A `str` everywhere is what you get by skipping the pair.
+**Do not let a wire fact become a typing argument.** These are all statements about serialisation, and none of them decides the domain type:
+
+| Objection | What it actually constrains |
+|---|---|
+| "the client raises on this type" | the write seam. Convert there |
+| "reads come back as a string" | the read seam. Parse there |
+| "it is a sort key, width must be constant" | the stored bytes. Serialise with the one canonical formatter |
+| "another value is derived from its exact bytes" | the serialiser's stability, testable in one assertion |
+
+The format is genuinely forced only when **the type IS the wire shape**: a `TypedDict` fed straight into a storage call, or one describing a row exactly as read back. Typing `datetime` there is false at runtime in both directions. The honest move is then a pair, not a compromise: `NewType` on the storage shape, plus a domain type carrying real `datetime`, converted once at the boundary. A `str` everywhere is what you get by skipping the pair.
+
+**Semantics come from the producer, not the consumer.** A value's type is what it *is*, not what its readers happen to need. If a consumer would behave identically on a hash, a counter, or a timestamp, that consumer's indifference is a fact about the consumer and is evidence of nothing about the value. Counting call sites that compare, sort or subtract answers the safety question ("what breaks if I change this?"), not the typing question ("what is this?"). Do not report the first as an answer to the second.
 
 Other languages: same principle, their own idiom. TypeScript: `interface`/`type` over inline object literals, `unknown` + narrowing over `any`, a validating parse (zod or equivalent) at the API edge over an `as` cast. Go: a struct over `map[string]interface{}`. For date and time in any language, prefer the standard library type over a string. Read what the file already does and match it.
 
-**Document the fields that lie.** Non-obvious field knowledge goes in the **class docstring**, not a trailing `#` comment. Docstrings reach LSP hover, `help()`, and generated docs; comments reach none of them. Only document fields whose names hide something: an opaque ID behind a human-sounding name, a value mutated outside this code path, a field that doubles as a key seed. `share_id: str` needs nothing.
+**Document the fields that lie.** Non-obvious field knowledge goes in the **class docstring**, not a trailing `#` comment. Docstrings reach LSP hover, `help()`, and generated docs; comments reach none of them. Only document fields whose names hide something: an opaque ID behind a human-sounding name, a value mutated outside this code path, a field that doubles as a key seed. A field whose name already says it (`email: str`) needs nothing.
 
 ### Typing restraint
 
@@ -244,7 +266,7 @@ Two more angles, distributed across the simplify agents (`simplify-A` takes reus
 ### Applying quality fixes
 
 - **Behavior must not change.** A quality fix that alters behavior is out of scope. Skip it and say so.
-- **Verify against the same baseline** the correctness rounds used. Tests, compile, lint.
+- **Verify against the same baseline** the correctness rounds used: the repo's own gate, not a generic triple.
 - **Read every line of a scripted rewrite.** Renames and reshapes over-reach. This is where quality passes cause outages.
 - **Commit separately** from correctness rounds, so a revert is surgical.
 - **Report what you proposed but did not apply**: single-agent findings and contested sites. That list is the pass's real output as much as the diff is.
@@ -292,6 +314,8 @@ Same trap in the simplify angles, smaller: short-circuit order (`and`/`or` reord
 - **Check the blast radius before changing a value.** A field feeding a log may also be a dict key, a filename, or customer-visible text. Grep consumers before swapping it. A "log-only" change that alters an invoice is worse than the leak.
 - **A log line must never raise.** Prefer `.get()` over subscript for anything newly referenced in logging.
 - **Watch for fix-induced bugs.** A fix to load-bearing code frequently introduces a new bug its own test does not catch. Each round, re-attack what the previous round changed.
+- **A fix can reintroduce the defect it just removed, one layer out.** Deleting a tautological assertion and replacing it with a call that compares a function against itself does not fix anything: it relocates the same emptiness where it is harder to see. After writing a replacement test, mutate the code it claims to cover and watch it fail. A test that cannot fail is worse than a missing one, because it reads as coverage. Same shape in a guard: a check whose condition no reachable input can violate.
+- **Run the repo's actual gate, not a generic triple.** "Tests + compile" is not the check: Python has no compile step, and a green pytest says nothing about a type checker or linter the CI requires. Find what CI enforces (its workflow files, and any per-directory allow-list a ratchet uses), then run exactly that. A branch can pass every test and still be unmergeable, and an untyped value the typing lens would have named is often what the checker catches first. Note also which parts of the tree the gate does NOT cover: an annotation in an ungated directory is documentation, and worth less than one a checker verifies.
 - **Test both directions.** Not just "is the bad thing caught" but "does the good thing survive". Over-correction is a real defect, just quieter.
 - **Baseline before blaming.** Failing tests may predate the branch. Run the same suite on the base ref in a scratch worktree before calling it a regression.
 - **Sweep, don't spot-fix.** A reviewer names 2 instances; find all N. The bug class usually recurs.

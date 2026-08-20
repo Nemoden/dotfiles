@@ -140,7 +140,15 @@ With an LSP or treesitter in the loop this stops being decoration and becomes th
 # My personal setup I'm running:
 
 - fish shell
-- dotfiles use git bare repo pattern - aliased using `dot` - a fish function that wraps `git`, so it is a git alias that is specific for working with my dotfiles. In my dotfiles root the .gitignore ignores EVERYTHING (asterisk), so to add files, you must use `-f`
+- dotfiles use git bare repo pattern, wrapped by fish functions that call `git` with an explicit `--git-dir`. In my dotfiles root the .gitignore ignores EVERYTHING (asterisk), so to add files, you must use `-f`
+- **TWO dotfiles repos exist. Check both before concluding a file is untracked:**
+
+  | Wrapper | Bare repo | Holds |
+  |---|---|---|
+  | `dot` | `~/.dot` | public dotfiles |
+  | `dotp` | `~/.dotp` | private dotfiles |
+
+  Both are `--work-tree=$HOME`, so the same relative path can live in either. `dot ls-files <path>` returning empty proves nothing on its own — run `dotp status <path>` too. A file staged in the wrong repo is a real mistake, not a cosmetic one.
 
 This matters because:
 

@@ -150,10 +150,14 @@ With an LSP or treesitter in the loop this stops being decoration and becomes th
 
   Both are `--work-tree=$HOME`, so the same relative path can live in either. `dot ls-files <path>` returning empty proves nothing on its own — run `dotp status <path>` too. A file staged in the wrong repo is a real mistake, not a cosmetic one.
 
+  **Routing a NEW file: default to `dot`. Use `dotp` when the content is work-specific** — employer URLs, AWS account IDs, internal service or repo names, ticket-tracker projects, tokens, or a skill that only makes sense inside my job. When unsure, ask before the first commit. Moving a file after it reaches a public remote does not unpublish it.
+
+  Both wrappers take the same subcommands, so every dotfiles command below works with either name. Pick the wrapper first, then run the sequence.
+
 This matters because:
 
 1. whenever you give me any commands, give them in FISH, not BASH/ZSH.
-2. When I ask you to work with my dotfiles, you should use `dot` via `fish -c "dot ..."`
+2. When I ask you to work with my dotfiles, use the wrapper for the repo the file belongs to, via `fish -c "dot ..."` or `fish -c "dotp ..."`
 
 ### Fish gotchas (learned the hard way)
 
@@ -164,10 +168,13 @@ This matters because:
 
 ### Dotfiles gotchas (learned the hard way)
 
-- **`.gitignore` is `*`** — every file looks "untracked" to standard checks. Do NOT infer "not tracked" from `git status`, `git ls-files | grep ...` returning empty for a relative path, or similar. Always verify with `dot log <path>` or `dot ls-files <path>` run **from `~`** (the dotfiles work-tree root).
-- **Paths in `dot` output are relative to current cwd**, not to `~`. If you run `dot ls-files` from `~/.claude/skills/`, you get paths like `caveman/SKILL.md`, not `.agents/skills/caveman/SKILL.md`. `cd ~` before greppings paths, or pass explicit paths.
-- **I push individual subdirs**, not whole trees. Don't `dot add -A`. Use `dot add -f <specific-path>`.
-- **Workflow for any dotfile change:** `dot add -f <path>` → `dot commit -m "..."` → `dot pull --rebase` → `dot push`. Never `pull` before `commit` (rebase refuses with unstaged changes).
+Below, `<wrapper>` means `dot` or `dotp`. Both accept the same subcommands, so pick the repo first and keep the same wrapper for the whole sequence.
+
+- **`.gitignore` is `*`** — every file looks "untracked" to standard checks. Do NOT infer "not tracked" from `git status`, `git ls-files | grep ...` returning empty for a relative path, or similar. Always verify with `<wrapper> log <path>` or `<wrapper> ls-files <path>` run **from `~`** (the shared work-tree root). Check BOTH wrappers before you call a file untracked.
+- **`~/.gitignore` itself is untracked in both repos.** It is a work-tree file, not a committed one. Do not expect `<wrapper> show HEAD:.gitignore` to work, and do not "fix" it by committing it without asking.
+- **Paths in `<wrapper>` output are relative to current cwd**, not to `~`. If you run `dot ls-files` from `~/.claude/skills/`, you get paths like `caveman/SKILL.md`, not `.agents/skills/caveman/SKILL.md`. `cd ~` before greppings paths, or pass explicit paths.
+- **I push individual subdirs**, not whole trees. Don't `<wrapper> add -A`. Use `<wrapper> add -f <specific-path>`.
+- **Workflow for any dotfile change:** `<wrapper> add -f <path>` → `<wrapper> commit -m "..."` → `<wrapper> pull --rebase` → `<wrapper> push`. Never `pull` before `commit` (rebase refuses with unstaged changes).
 - **Skills live at `~/.agents/skills/<name>/` and are symlinked into `~/.claude/skills/<name>` with RELATIVE symlinks** (`../../.agents/skills/<name>`). Absolute symlinks break across machines (home dir differs).
 
 # Reference

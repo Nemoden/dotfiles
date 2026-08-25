@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code Notification hook: mark pane state and send desktop notification.
-# Handles permission prompts, elicitation dialogs, and idle-waiting-for-input.
+# Handles permission prompts, agent questions, and idle-waiting-for-input.
 set -u
 
 PAYLOAD=$(cat 2>/dev/null || true)
@@ -8,10 +8,18 @@ TYPE=$(printf '%s' "$PAYLOAD" | jq -r '.notification_type // empty' 2>/dev/null 
 CWD=$(printf '%s' "$PAYLOAD" | jq -r '.cwd // empty' 2>/dev/null || echo "")
 CWD="${CWD:-$PWD}"
 
+# Values below are the notificationType strings Claude Code actually emits.
+# Anything unlisted is informational (auth, quota, computer-use) and must not
+# touch pane state.
 case "$TYPE" in
-  permission_prompt) STATE='blocked'; TITLE='claude needs permission';;
-  elicitation_dialog) STATE='blocked'; TITLE='claude asking question';;
-  idle) STATE='waiting'; TITLE='claude waiting for input';;
+  permission_prompt|worker_permission_prompt)
+    STATE='blocked'; TITLE='claude needs permission';;
+  agent_needs_input)
+    STATE='waiting'; TITLE='claude asking question';;
+  idle_prompt)
+    STATE='waiting'; TITLE='claude waiting for input';;
+  agent_completed)
+    STATE='waiting'; TITLE='background agent done';;
   *) exit 0;;
 esac
 

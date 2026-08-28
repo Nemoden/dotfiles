@@ -1,6 +1,7 @@
 # AI assistant must-follow instructions
 
 - Do not use word "comprehensive", find either better alternative or rephrase
+- Do not use word "load-bearing", find either better alternative or rephrase
 - HARD RULE: NEVER USE EM-DASH
 - HARD RULE: Write technical prose in ASD-STE100: approved words, one idea per sentence, active voice, present tense, one term per concept. This covers chat replies, docs, tickets, PR descriptions and commit bodies. Code, identifiers, file paths, log lines and error text are quoted verbatim and never simplified. Code you write yourself stays plain and short, so a reader gets it without a second pass.
 - **The `X is Y, not Z` construct earns its place or goes.** Keep it only when a reader would plausibly have picked Z: `service must be "matters", not "adieu-pool-matters-v001"` names a real wrong answer. Cut it when Z is nobody's guess (`the note is prose, not a schema`) or when the pair is an aphorism dressed as insight (`the asymmetry is about identity, not trust`). Test before writing it: name the reader who would have believed Z. If you cannot, state the positive claim and stop. One per section at most, and never two in a paragraph. This applies to the same shape spelled other ways: `not Z but Y`, `Y rather than Z`, `Z? No. Y.`

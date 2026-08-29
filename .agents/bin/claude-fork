@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Fork the current Claude Code session into a new tmux target.
+# Usage: claude-fork <right|left|top|bottom|window|session> [prompt...]
+set -euo pipefail
+
+target="${1:-right}"; shift || true
+prompt="${*:-}"
+
+[ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || { echo "no CLAUDE_CODE_SESSION_ID; run inside Claude Code" >&2; exit 1; }
+[ -n "${TMUX:-}" ] || { echo "not inside tmux" >&2; exit 1; }
+
+sid="$CLAUDE_CODE_SESSION_ID"
+me="${TMUX_PANE:?}"
+cwd="$(pwd)"
+cmd="claude --resume $sid --fork-session"
+
+case "$target" in
+  right)  pane=$(tmux split-window -h        -t "$me" -c "$cwd" -P -F '#{pane_id}' "$cmd") ;;
+  left)   pane=$(tmux split-window -h -b     -t "$me" -c "$cwd" -P -F '#{pane_id}' "$cmd") ;;
+  bottom) pane=$(tmux split-window -v        -t "$me" -c "$cwd" -P -F '#{pane_id}' "$cmd") ;;
+  top)    pane=$(tmux split-window -v -b     -t "$me" -c "$cwd" -P -F '#{pane_id}' "$cmd") ;;
+  window) pane=$(tmux new-window             -c "$cwd" -P -F '#{pane_id}' "$cmd") ;;
+  session)
+    name="fork-$(date +%H%M%S)"
+    tmux new-session -d -s "$name" -c "$cwd" "$cmd"
+    pane=$(tmux list-panes -t "$name" -F '#{pane_id}' | head -1) ;;
+  *) echo "unknown target: $target (right|left|top|bottom|window|session)" >&2; exit 1 ;;
+esac
+
+if [ -n "$prompt" ]; then
+  # The TUI needs time to boot, and Enter must be a separate send or it
+  # arrives before the input box is ready and the text sits unsubmitted.
+  for _ in $(seq 40); do
+    tmux capture-pane -p -t "$pane" | grep -q '│\|❯\|>' && break
+    sleep 0.5
+  done
+  sleep 3
+  tmux send-keys -t "$pane" "$prompt"
+  sleep 1
+  tmux send-keys -t "$pane" Enter
+fi
+
+echo "forked $sid -> $target (pane $pane)${prompt:+ with prompt}"

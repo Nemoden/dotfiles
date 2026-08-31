@@ -1,6 +1,6 @@
 ---
 name: whitebox
-description: 'Use when work carries unknowns that need explicit tracking, at any task size: decisions that must outlive the conversation (interruption, resume, handoff, a why-record worth auditing later), or open questions too entangled to hold in working memory. Triggers: "whitebox", "chart a map", "resume the map". Box-record frontmatter is the source of truth for state and edges; the mermaid diagram is a regenerated view.'
+description: 'Use when work carries unknowns that need explicit tracking, at any task size: decisions that must outlive the conversation (interruption, resume, handoff, a why-record worth auditing later), or open questions too entangled to hold in working memory. Triggers: "whitebox", "chart a map", "resume the map", "close the map". Box-record frontmatter is the source of truth for state and edges; the mermaid diagram is a regenerated view.'
 ---
 
 # Whitebox
@@ -19,6 +19,7 @@ Size is a signal, not the criterion: small-but-gnarly work deserves a map, large
 
 ## Vocabulary
 
+- **Ask**: the operator's request in their own words, captured verbatim before any design exists. A **fixed reference**, not working material: written once at charting, never revised, and the design may never edit it. Lives beside the map, not inside it, because everything inside the map is rewritten at every sync point. Mission is a compression of the Ask, so grading a finished map against Mission is circular; acceptance is checked against the Ask.
 - **Mission**: the product goal, why the effort exists. "Build a content creation system."
 - **Destination**: what ends this map: a spec ready to hand off, a decision locked, a change made in place. The stop condition. Without it the process cannot tell planning from building.
 - **Box**: one record holding one question whose resolution is a decision or a fact.
@@ -53,9 +54,18 @@ One map per effort. The map is a low-resolution index: it names boxes, shows sta
 ## Heading
 <1-2 lines: where the effort points next; sharpest open unknowns gisted from their boxes, links only>
 
+## Acceptance
+<derived from the Ask; one row per request. Working material, re-checked as boxes whiten>
+
+| # | Ask | Covered by | Status |
+|---|---|---|---|
+| 1 | <the request, short> | [<box>](<link>) | white / open / **no box** |
+
 ## Out of scope
 - [<box name>](<link>): <gist + why it is past the destination>
 ```
+
+The **Ask** is a sibling file, never a section of the map and never a box. A box holds a decidable question and carries a state; the Ask decides nothing and never whitens. Forcing it into a box means inventing a `state` and a `parent` for a thing that has neither, which is the signal it is the wrong container. Keep the verbatim words in the Ask file and the coverage table in the map: coverage changes as boxes whiten, and the Ask must not.
 
 Topology and state live in box-record frontmatter: one `state` field and explicit edge lists per box. The mermaid block is a derived view: regenerated from frontmatter, never edited by hand. If diagram and frontmatter disagree, frontmatter wins. Never read state, edges, or the frontier off the diagram: queries run over frontmatter; the diagram is for the operator's eyes.
 
@@ -131,11 +141,11 @@ Methods say what whitening means for this box:
 
 Charting touches the disk only at step 5. No map, no boxes, no provisional skeletons before the operator picks the store; until then, pending state lives in the conversation.
 
-1. Pin **Mission** and **Destination** through questioning, one question at a time. Destination first defines scope; everything else hangs on it.
+1. Pin **Mission** and **Destination** through questioning, one question at a time. Destination first defines scope; everything else hangs on it. Capture the operator's **Ask** as they gave it, before it is compressed into Mission; it is written to disk at step 5 and never revised after.
 2. Fix the domain language as terms come up (see Fallbacks: domain modeling). Entities, relationships, and levels in the domain's own words, never in implementation terms.
 3. If the effort designs or changes a system, sweep the non-functional dimensions (hard rule 3). A map for prose or curriculum may have none; skip freely.
 4. Sweep the space **breadth-first** for boxes: fan wide, do not dive deep on any thread. If no unknowns surface, the way is already clear: say so and skip the map.
-5. Ask the operator where the map should live (see Choosing the store). Create the map and its box records, then wire edges in a second pass by filling `parent`/`blocks`/`informs` frontmatter, since boxes need identities before they can reference each other. Regenerate the diagram once wiring is done.
+5. Ask the operator where the map should live (see Choosing the store). Write the **Ask** file first, verbatim. Then create the map and its box records, derive the Acceptance table from the Ask (one row per request, each pointing at the box that covers it or marked **no box**), and wire edges in a second pass by filling `parent`/`blocks`/`informs` frontmatter, since boxes need identities before they can reference each other. Regenerate the diagram once wiring is done. An Acceptance row with no box is a gap found at charting time, which is the cheapest moment to find one.
 6. Dispatch research boxes to subagents in parallel; link findings as they return.
 
 Charting ends with a persisted map. Continue into Working in the same session only if the operator wants to.
@@ -148,7 +158,51 @@ Charting ends with a persisted map. Continue into Working in the same session on
 4. Apply write-through-box after every increment of clarity (hard rule 1).
 5. Whitening sharpens unknowns: re-check the open unknowns in this box and its neighbours; any question now phrasable sharply becomes its own box, wired in via write-through.
 6. A box revealed to sit past the destination gets closed and gisted under Out of scope with the reason. It is a scope boundary, not a decision, so it stays out of Decisions so far.
-7. Repeat or stop. Any point is a clean break: the next session resumes from the map alone.
+7. Repeat or stop. Any point is a clean break: the next session resumes from the map alone. When the last box goes white, or the operator calls it done with boxes still open, run **Closing**.
+
+## Closing: the map is white
+
+Triggered when every box is white, or when the operator calls the effort done with boxes still open. The map is a working instrument and reads like one; closing is the one moment it is presented to a human as a finished thing. Do not skip it because the records already hold everything: they hold it scattered across fifteen files, and nobody rereads fifteen files.
+
+Four parts, in this order.
+
+**1. Replay the Ask.** Read the Ask file back, and walk the Acceptance table row by row: what was asked, which box answered it, and what the answer was. Then state plainly what was **not** delivered: rows still marked no box, anything narrowed from the original request, anything ruled Out of scope. Lead with the gaps rather than burying them, because this is the operator's last cheap chance to say "that one mattered".
+
+Never grade the map against Mission. Mission is a compression written after the Ask and shaped by the decisions it would be judging.
+
+**2. Draw the map for a human.** The mermaid block is for tooling. Render an ASCII view in the conversation instead: the decomposition tree, one line per box, state marked so it survives a plain-text terminal. Group by what the reader cares about, not by file order.
+
+```
+wick  ................................  DECIDED
+
+  substrate (facts, settled by research)
+    [x] watcher-strategy      hooks are the event source
+    [x] send-mechanics        peer bus; send-keys ruled out
+    [x] fork-mechanics        --fork-session, lineage on disk
+
+  structure
+    [x] world-model-shape     rich boundary, folded state
+    [x] daemon-api-surface    primitives only, newline JSON
+    [~] permission-mechanics  gate in daemon; consent memory open
+    [ ] playbook-format
+```
+
+`[x]` white, `[~]` grey, `[ ]` black. Keep it under a screen; a closing recap nobody scrolls through is a closing recap nobody reads.
+
+**3. Recap the decisions.** Not the gists from the map, which are already terse to the point of being reminders. Restate each decision as a claim with its reason, since the reason is what a reader six months out will need and what the box records bury under evidence. Call out any decision that was **forced** by a fact rather than chosen, and any that propagated into another box: those are the load-bearing ones and the most expensive to revisit blindly.
+
+**4. Offer cross-validation, by discovery, not by name.** A finished map is one long argument the operator has been inside the whole time, so it is exactly the artifact most worth checking with fresh eyes.
+
+Look at what is actually registered in this environment right now and offer what fits. Do not hardcode a skill name: the right tool differs per operator and changes over time, and a skill named here will rot. Match on what a skill *does*, from its description:
+
+- checks a document for false claims, bad citations, contradictions, stale references
+- verifies specific claims against evidence rather than trusting them
+- argues the opposing case, red-teams, or runs a pre-mortem against a decision
+- interrogates a plan by questioning until it breaks
+
+Offer the two or three that genuinely fit, say what each would catch that the others would not, and let the operator pick or decline. If nothing suitable is registered, say so and suggest the plainest alternative: a fresh agent reading only the Ask and the map, with no memory of the conversation, reporting where they disagree.
+
+Closing writes nothing to the map. It is a presentation of what the records already hold. If the operator reacts to it and something changes, that is ordinary Working: write it through to the box, and the closing can be run again.
 
 ## Choosing the store
 
@@ -156,8 +210,8 @@ The model above is store-agnostic. Ask the operator where records live before cr
 
 | Store | Map | Boxes | Fits when |
 |---|---|---|---|
-| markdown directory (reference store) | `<dir>/<slug>/map.md` | `<dir>/<slug>/boxes/*.md` | default. `<dir>` may be an in-repo knowledge path, or outside the repo entirely (`~/whitebox/`, `/tmp/`) when WIP must not touch version control |
-| issue tracker | parent issue or epic, mermaid block in its body | child issues, one per box | the team already lives in the tracker; native blocking shows the frontier in the tracker UI; frontmatter fields become labels and issue relations, states become labels |
+| markdown directory (reference store) | `<dir>/<slug>/map.md`, Ask at `<dir>/<slug>/ask.md` | `<dir>/<slug>/boxes/*.md` | default. `<dir>` may be an in-repo knowledge path, or outside the repo entirely (`~/whitebox/`, `/tmp/`) when WIP must not touch version control |
+| issue tracker | parent issue or epic, mermaid block in its body; Ask as a pinned comment or a locked description block | child issues, one per box | the team already lives in the tracker; native blocking shows the frontier in the tracker UI; frontmatter fields become labels and issue relations, states become labels |
 
 Never assume the store, and never scatter files into a repo uninvited. Real outputs the boxes point at (ADRs, specs, tickets) go wherever the operator's systems keep them; the map only links.
 
@@ -187,3 +241,8 @@ The skill is self-sufficient. For each capability below: if a matching skill is 
 | Pre-slicing an open unknown into box-sized pieces | An unknown becomes boxes only when sharp; it may yield several, or none |
 | Depth-diving one thread while charting | Charting is breadth; depth belongs to Working |
 | Choosing where files go by yourself | The operator picks the store, always; nothing is written before that choice, not even in a scratch dir |
+| Making the Ask a box, or a section of the map | It decides nothing and never whitens. Sibling file, fixed, never revised |
+| Grading the finished map against Mission | Mission is a compression of the Ask, already shaped by the decisions it would judge. Check against the Ask |
+| Revising the Ask as understanding improves | That turns the acceptance test into a mirror. The Ask is what was said, not what is now believed |
+| Ending at the last white box | Run Closing: replay the Ask, draw the map in ASCII, recap decisions with reasons, offer cross-validation |
+| Naming a specific validation skill in advance | Discover what is registered at closing time and match on what it does; a hardcoded name rots |

@@ -2,21 +2,24 @@
 description: Fork this session into a new tmux pane, window, or session (tmux-level, not the builtin /fork)
 ---
 
-Fork the current Claude Code session using `~/.agents/bin/claude-split`.
+Run `~/.agents/bin/claude-split` and say NOTHING.
 
 Parse `$ARGUMENTS` as `<target>[: <prompt>]`:
 
 - Target is one of `right`, `left`, `top`, `bottom`, `window`, `session`. Default to `right` when absent.
 - Text after the first `:` is the prompt to send into the fork. No colon means fork idle.
 
-Run one command, then report the pane id back to the user:
-
 ```bash
 ~/.agents/bin/claude-split <target> '<prompt>'
 ```
 
-Notes:
+Output rules, strict:
 
-- The fork is a real separate session, created by `claude --resume <id> --fork-session`. It inherits history up to the fork point, then diverges. Nothing you do afterwards reaches it.
-- `--fork-session` records no `forkedFrom` link to the parent. When the user wants that provenance in the transcript, tell them to run `/branch` inside the fork instead.
-- Do not drive a fork with `send-keys` after it starts. Report the pane id and let the user take it, or use `SendMessage` when the session is reachable.
+- The script is silent on success. Add nothing of your own: no echo of the ask, no confirmation, no pane id, no insight block, no summary. Emit zero characters.
+- Speak only when the script writes to stderr or exits non-zero. Then give the error and stop.
+
+Background facts, for answering later questions only. Never volunteer them:
+
+- The fork is a separate session from `claude --resume <id> --fork-session`. It inherits history to the fork point, then diverges.
+- `--fork-session` records no `forkedFrom` link. `/branch` inside the fork does record one.
+- Do not drive a fork with `send-keys` after it starts.

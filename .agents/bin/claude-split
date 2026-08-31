@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Fork the current Claude Code session into a new tmux target.
+# Silent on success: prints nothing. Errors still go to stderr.
 # Usage: claude-fork <right|left|top|bottom|window|session> [prompt...]
 set -euo pipefail
 
@@ -40,4 +41,3 @@ if [ -n "$prompt" ]; then
   tmux send-keys -t "$pane" Enter
 fi
 
-echo "forked $sid -> $target (pane $pane)${prompt:+ with prompt}"

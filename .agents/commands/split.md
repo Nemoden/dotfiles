@@ -1,8 +1,8 @@
 ---
-description: Fork this session into a new tmux pane, window, or session
+description: Fork this session into a new tmux pane, window, or session (tmux-level, not the builtin /fork)
 ---
 
-Fork the current Claude Code session using `~/.agents/bin/claude-fork`.
+Fork the current Claude Code session using `~/.agents/bin/claude-split`.
 
 Parse `$ARGUMENTS` as `<target>[: <prompt>]`:
 
@@ -12,7 +12,7 @@ Parse `$ARGUMENTS` as `<target>[: <prompt>]`:
 Run one command, then report the pane id back to the user:
 
 ```bash
-~/.agents/bin/claude-fork <target> '<prompt>'
+~/.agents/bin/claude-split <target> '<prompt>'
 ```
 
 Notes:

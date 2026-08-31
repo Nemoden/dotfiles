@@ -2,7 +2,7 @@
 description: Fork this session into a new tmux pane, window, or session (tmux-level, not the builtin /fork)
 ---
 
-Run `~/.agents/bin/claude-split` and say NOTHING.
+Make exactly one tool call, then end the turn with an empty response.
 
 Parse `$ARGUMENTS` as `<target>[: <prompt>]`:
 
@@ -13,10 +13,19 @@ Parse `$ARGUMENTS` as `<target>[: <prompt>]`:
 ~/.agents/bin/claude-split <target> '<prompt>'
 ```
 
-Output rules, strict:
+The turn ends after that tool call. No text before it, none after it.
 
-- The script is silent on success. Add nothing of your own: no echo of the ask, no confirmation, no pane id, no insight block, no summary. Emit zero characters.
-- Speak only when the script writes to stderr or exits non-zero. Then give the error and stop.
+These are all violations, not just the obvious ones:
+
+- "I'll run the split command."
+- "The split command ran and exited cleanly."
+- "Done." / "Fork live." / "Pane %192."
+- "...which per the instructions means success, so there's nothing to report."
+- Any sentence observing that the output was empty, or that you are staying silent.
+
+Reporting that you followed the instruction is the same violation as reporting the result. The user watches the new pane appear. That is the confirmation. Anything you add is noise on top of a result they can already see.
+
+Only exception: the script wrote to stderr or exited non-zero. Then give the error text, and nothing else.
 
 Background facts, for answering later questions only. Never volunteer them:
 

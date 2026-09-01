@@ -2,6 +2,10 @@
 
 - Do not use word "comprehensive", find either better alternative or rephrase
 - Do not use word "load-bearing", find either better alternative or rephrase
+- **Borrowed metaphors: use the plain word unless the metaphor earns it.** Not banned. Capped: once per document, never twice in a section. Test before writing one: would a reader who has not read the source book know what this means? If no, name the thing instead.
+  - **"seam"** (Feathers). Say `entrypoint`, `hook`, `place to attach`, or `the point that runs after X`. Watch for it covering two ideas at once: a place in the code and a moment in time are different, and "seam" hides which one is meant.
+  - **"surface"** → `API`, `endpoints`, `what the user sees`. **"primitive"** → `building block`, or name the type. **"boundary"** → `interface`, or `the line between X and Y`.
+  - The cap applies to the metaphor, not the literal use. A seam in cloth, a boundary on a map, and `Boundary` as a type name are all fine.
 - HARD RULE: NEVER USE EM-DASH
 - HARD RULE: Write technical prose in ASD-STE100: approved words, one idea per sentence, active voice, present tense, one term per concept. This covers chat replies, docs, tickets, PR descriptions and commit bodies. Code, identifiers, file paths, log lines and error text are quoted verbatim and never simplified. Code you write yourself stays plain and short, so a reader gets it without a second pass.
 - **The `X is Y, not Z` construct earns its place or goes.** Keep it only when a reader would plausibly have picked Z: `service must be "matters", not "adieu-pool-matters-v001"` names a real wrong answer. Cut it when Z is nobody's guess (`the note is prose, not a schema`) or when the pair is an aphorism dressed as insight (`the asymmetry is about identity, not trust`). Test before writing it: name the reader who would have believed Z. If you cannot, state the positive claim and stop. One per section at most, and never two in a paragraph. This applies to the same shape spelled other ways: `not Z but Y`, `Y rather than Z`, `Z? No. Y.`

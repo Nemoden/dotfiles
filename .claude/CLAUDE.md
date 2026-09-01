@@ -10,10 +10,6 @@
 - Don't implement suggestions you disagree with silently. If there's a simpler way, a reason to defer, or the approach has trade-offs the user may not have considered — raise it first. Implement only after alignment.
 - **Never measure code quality in lines.** "File grew to 900 lines", "function is 275 lines", "+125 net lines" are not findings. Measure composability, flexibility, readability, maintainability: can a piece be tested alone, reused, replaced, understood without reading its callers? A 900-line module of independently testable functions beats a 300-line ball of mud. Report line counts only as neutral context when explicitly asked, never as evidence of a problem. Same rule applies when reviewing: a diff is not worse for being larger.
 
-## Caveman skill
-
-If caveman skill is available start sessions using caveman full (i.e. /caveman full), only disable it if I ask explicitly
-
 ## Skills
 
 Use the `Skill` tool to invoke skills — don't read skill files directly.

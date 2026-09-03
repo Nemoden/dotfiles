@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+"""Sample usage:
+
+    $ jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+    Header:
+    {
+        "alg": "HS256",
+        "typ": "JWT"
+    }
+
+    Payload:
+    {
+        "sub": "1234567890",
+        "name": "John Doe",
+        "iat": 1516239022
+    }
+
+"""
+
+import base64
+import json
+import sys
+
+
+def decode_public_part(part):
+    """Return the decoded JSON value, or None when the part is not JSON."""
+    padded = part + "=" * (-len(part) % 4)
+    try:
+        return json.loads(base64.urlsafe_b64decode(padded))
+    except ValueError:
+        return None
+
+
+def main():
+    parts = sys.argv[1].split(".")
+    for i, part in enumerate(parts, start=1):
+        data = decode_public_part(part)
+        if data is None:
+            if i < 3:
+                print(f"Can't decode part #{i}: {part}")
+            continue
+        is_header = isinstance(data, dict) and "alg" in data
+        print("Header:" if is_header else "Payload:")
+        print(json.dumps(data, indent=4))
+        if i < len(parts) and decode_public_part(parts[i]) is not None:
+            print()
+
+
+if __name__ == "__main__":
+    main()

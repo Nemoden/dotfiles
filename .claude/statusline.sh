@@ -37,6 +37,7 @@ CWD=$(echo "$input" | jq -r '.cwd // .workspace.current_dir // "?"')
 COST=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 CTX_USED_PCT=$(echo "$input" | jq -r '.context_window.used_percentage // empty')
 CTX_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // empty')
+SESSION_ID=$(echo "$input" | jq -r '.session_id // empty')
 
 # Shorten cwd: show last 2 path components
 SHORT_CWD=$(echo "$CWD" | rev | cut -d'/' -f1-2 | rev)
@@ -177,5 +178,6 @@ fi
 
 echo -e "${BOLD}$MODEL${RST}$EFFORT_DISPLAY | ${CTX_DISPLAY}${CTX_DISPLAY:+| }${GREEN}$COST_FMT${RST}${TS_DISPLAY}"
 echo -e "${CYAN}📁 $SHORT_CWD${MAGENTA}$GIT_BRANCH${RST}"
+[ -n "$SESSION_ID" ] && echo -e "${DIM}🆔 $SESSION_ID${RST}"
 if [ -n "$USAGE_LINE" ]; then echo -e "$USAGE_LINE"; fi
 exit 0

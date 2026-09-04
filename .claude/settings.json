@@ -7,12 +7,17 @@
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
+      "Bash(*setup-ralph-loop.sh*)",
       "Bash(:*/ralph-loop/:*)",
-      "Bash(*setup-ralph-loop.sh*)"
+      "Bash(tmux capture-pane:*)",
+      "Bash(tmux display-message:*)",
+      "Bash(tmux list-panes:*)",
+      "Bash(tmux send-keys:*)",
+      "Bash(tmux split-window:*)"
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1[1m]",
   "hooks": {
     "PreToolUse": [
       {
@@ -22,6 +27,15 @@
             "type": "command",
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/block-nogit-commit.sh",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
           }
         ]
       }
@@ -122,6 +136,7 @@
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
+  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "thinking": {
     "type": "adaptive"

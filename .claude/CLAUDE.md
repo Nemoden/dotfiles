@@ -208,3 +208,5 @@ If `~/Projects/_llms` exists, it holds local snapshots of LLM-oriented vendor do
 - Sections like "Acceptance criteria" and "Out of scope" are welcome when they add value for a cold reader. "Out of scope" should list things a reasonable reader would assume are
 in-scope — not recap of session history.
 - Bare minimum: WHAT and WHY.
+
+@RTK.md

@@ -21,6 +21,7 @@
 import base64
 import json
 import sys
+from datetime import datetime, timezone
 
 
 def decode_public_part(part):
@@ -30,6 +31,37 @@ def decode_public_part(part):
         return json.loads(base64.urlsafe_b64decode(padded))
     except ValueError:
         return None
+
+
+def format_duration(seconds):
+    """Return a short duration such as '1d 40m', '2h 5m' or '30s'."""
+    seconds = int(abs(seconds))
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes, secs = divmod(rest, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if not parts:
+        parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
+def format_expiry(exp):
+    """Return a line such as 'Expires on ... (in 1d 40m)', or None when exp is not a number."""
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+        return None
+    now = datetime.now(timezone.utc)
+    when = datetime.fromtimestamp(exp, timezone.utc).astimezone()
+    delta = (when - now).total_seconds()
+    stamp = when.strftime("%Y-%m-%d %H:%M:%S %z")
+    if delta >= 0:
+        return f"Expires on {stamp} (in {format_duration(delta)})"
+    return f"Expired on {stamp} ({format_duration(delta)} ago)"
 
 
 def main():
@@ -43,6 +75,10 @@ def main():
         is_header = isinstance(data, dict) and "alg" in data
         print("Header:" if is_header else "Payload:")
         print(json.dumps(data, indent=4))
+        if not is_header and isinstance(data, dict) and "exp" in data:
+            expiry = format_expiry(data["exp"])
+            if expiry:
+                print(expiry)
         if i < len(parts) and decode_public_part(parts[i]) is not None:
             print()
 

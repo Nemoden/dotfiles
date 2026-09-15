@@ -34,7 +34,7 @@ Use `mode=inline` when the diff is small enough that spawning costs more than it
 
 - A mutation caught mid-flight reads as a genuine bug, and it is expensive to disprove.
 - A hat measuring before a mutation and asserting after gets a contradiction it cannot explain.
-- Stale bytecode outlives the restore. Anything that imports the mutated module can keep seeing it after the file is correct again, so tell hats to clear caches before measuring.
+- Stale compiled caches outlive the restore. Anything that imports the mutated module can keep seeing it after the file is correct again, so tell hats to clear caches before measuring.
 - A test run that writes or deletes tracked build artifacts makes every sibling's `git status` dirty, and "the tree is dirty" then stops being a signal anyone trusts.
 
 If a mutating hat has to share a tree, run it alone in its own round. A round where one hat mutates and three read is not one round of four results, it is one result and three that need re-running.
@@ -207,41 +207,21 @@ Flag, in rough order of severity:
 
 1. **Untyped bag crossing a boundary**: dict/map/object with no named shape, passed between functions or across a module edge
 2. **Nested untyped bags**: a bag whose values are bags. Severity compounds with depth
-3. **Date or time carried as a bare `str`**: the annotation says `str`, so the grammar is unstated. Epoch seconds, epoch millis, ISO 8601, offset-aware or naive? Parse to a real `datetime`/`date` at the edge, or name the string type (see the ladder). This one buys correctness, not only clarity: string datetimes sort and compare wrong across formats, and `"2026-08-18"` vs `"2026-08-18T00:00:00Z"` orders by accident. Applies to any primitive standing in for a value with a grammar, dates being the common case: also durations, money as `float`, and IDs whose format is load-bearing
+3. **Date or time carried as a bare string**: the annotation says string, so the grammar is unstated. Epoch seconds, epoch millis, ISO 8601, offset-aware or naive? Parse to the language's date type at the edge, or name the string type. This one buys correctness, not only clarity: string datetimes sort and compare wrong across formats, and `"2026-08-18"` vs `"2026-08-18T00:00:00Z"` orders by accident. Applies to any primitive standing in for a value with a grammar, dates being the common case: also durations, money as a float, and IDs whose format matters
 4. **Escape-hatch types where a concrete type is knowable**: `Any`, `any`, `interface{}`, `object`
 5. **Unvalidated shape at a trust boundary**: external JSON, HTTP body, cross-service payload accepted without a validating parse
 6. **Missing hints on a new signature**: only when the type is genuinely knowable
 7. **A name that lies about its type**: `id` holding an object, `count` holding a list
 
-Python ladder, strongest contract first. Pick by contract needed, not by habit:
+The ladder runs from a validating model at a trust edge, through a plain value object, down to a named alias over a primitive that must stay a primitive. Pick the rung by the contract needed, not by habit. The static-only rungs (a named dict shape, a named string alias) change nothing at runtime and are the safe default when the only goal is naming the shape.
 
-| Reach for | When |
-|---|---|
-| pydantic `BaseModel` | untrusted input crossing a trust boundary: HTTP body, cross-service payload. Buys runtime validation and coercion. Costs a dependency and parse time |
-| `@dataclass` | trusted internal value object. Attribute access, free `__eq__`/`__repr__`. `frozen=True` when it must not mutate |
-| `t.NamedTuple` | small immutable value you would otherwise make a 2-3 element tuple. Unpacking is a feature |
-| `t.TypedDict` | must stay a dict at runtime (forwarded to an API expecting dict, JSON-serialized, Lambda event). Static checks, zero runtime cost |
-| `t.NewType` alias | the value must stay a primitive at runtime (a sort key, a wire format, an id derived from the value's exact bytes) but its grammar is unstated. `IsoTimestamp = t.NewType("IsoTimestamp", str)`. Zero runtime change, every use site greppable, and the checker rejects a bare `str` in the slot. The safe rung for strings, as `TypedDict` is for dicts |
-| `dict[str, Any]` + docstring | genuinely ad-hoc or heterogeneous shape |
-
-**A serialisation layer refusing `datetime` is not a blocker, it is a conversion site.** Plenty of database and RPC clients raise on a `datetime` and hand back a string on read, so the stored form has to be a string. That constrains the **wire**, not the domain: serialise at the write seam, parse at the read seam. Name the seam before you accept the constraint. If you can point at the function that would convert, the objection is discharged and does not belong in the field's docstring; if you cannot find one, that missing seam is itself the finding.
-
-**Do not let a wire fact become a typing argument.** These are all statements about serialisation, and none of them decides the domain type:
-
-| Objection | What it actually constrains |
-|---|---|
-| "the client raises on this type" | the write seam. Convert there |
-| "reads come back as a string" | the read seam. Parse there |
-| "it is a sort key, width must be constant" | the stored bytes. Serialise with the one canonical formatter |
-| "another value is derived from its exact bytes" | the serialiser's stability, testable in one assertion |
-
-The format is genuinely forced only when **the type IS the wire shape**: a `TypedDict` fed straight into a storage call, or one describing a row exactly as read back. Typing `datetime` there is false at runtime in both directions. The honest move is then a pair, not a compromise: `NewType` on the storage shape, plus a domain type carrying real `datetime`, converted once at the boundary. A `str` everywhere is what you get by skipping the pair.
+**A serialisation layer refusing the date type is not a blocker, it is a conversion site.** Plenty of database and RPC clients raise on a date object and hand back a string on read, so the stored form has to be a string. That constrains the **wire**, not the domain: serialise at the write call, parse at the read call. Name the converting function before you accept the constraint. If you can point at it, the objection is discharged; if you cannot find one, that missing conversion is itself the finding. The format is genuinely forced only when the type IS the wire shape, a row exactly as written or read back. The honest move is then a pair: a named alias on the storage shape, plus a domain type carrying the real date, converted once.
 
 **Semantics come from the producer, not the consumer.** A value's type is what it *is*, not what its readers happen to need. If a consumer would behave identically on a hash, a counter, or a timestamp, that consumer's indifference is a fact about the consumer and is evidence of nothing about the value. Counting call sites that compare, sort or subtract answers the safety question ("what breaks if I change this?"), not the typing question ("what is this?"). Do not report the first as an answer to the second.
 
-Other languages: same principle, their own idiom. TypeScript: `interface`/`type` over inline object literals, `unknown` + narrowing over `any`, a validating parse (zod or equivalent) at the API edge over an `as` cast. Go: a struct over `map[string]interface{}`. For date and time in any language, prefer the standard library type over a string. Read what the file already does and match it.
+Each language has its own idiom for the rungs. TypeScript: `interface`/`type` over inline object literals, `unknown` + narrowing over `any`, a validating parse (zod or equivalent) at the API edge over an `as` cast. Go: a struct over `map[string]interface{}`. For date and time in any language, prefer the standard library type over a string. Read what the file already does and match it.
 
-**Document the fields that lie.** Non-obvious field knowledge goes in the **class docstring**, not a trailing `#` comment. Docstrings reach LSP hover, `help()`, and generated docs; comments reach none of them. Only document fields whose names hide something: an opaque ID behind a human-sounding name, a value mutated outside this code path, a field that doubles as a key seed. A field whose name already says it (`email: str`) needs nothing.
+**Document the fields that lie.** Non-obvious field knowledge goes in the type's doc comment, where hover, help and generated docs read it, not in a trailing comment that no tool reads. Only document fields whose names hide something: an opaque ID behind a human-sounding name, a value mutated outside this code path, a field that doubles as a key seed. A field whose name already says it (`email: str`) needs nothing.
 
 ### Typing restraint
 
@@ -251,9 +231,9 @@ Types are a readability tool here, not a compliance target. The gate is the same
 - A file with no hints anywhere. Respect the existing style until the file is modernised on purpose
 - Anything outside the diff. Untyped code the diff merely touches is pre-existing; note it, do not retrofit
 - A dict that stays inside one short function and never crosses a boundary
-- Introducing pydantic to a service that does not already depend on it. Propose that, do not do it. Same for `shared/`: CLAUDE.md forbids new deps there outright
+- Introducing a validation library to a package that does not already depend on it. Propose that, do not do it
 - A datetime string inside one short function that never crosses a boundary. Once it crosses one, "nothing compares it today" is NOT a reason to skip: the next caller re-derives the grammar from a producer's docstring, which is the cost this rung exists to remove. Weigh the parse's real failure modes, not the current absence of arithmetic
-- A datetime string that must stay a string at the storage or wire edge. Name it with a `NewType` alias. Confirm the edge really forces it first: see the serialisation note under the ladder, because a storage layer refusing `datetime` is usually a conversion site, not a forced format
+- A datetime string that must stay a string at the storage or wire edge. Name the string type instead of parsing it. Confirm the edge really forces it first: a storage layer refusing the date type is usually a conversion site, not a forced format
 
 ### Reuse and altitude
 
@@ -285,26 +265,13 @@ Feed it the quality diff, the pre-quality state, and the trades each finding dec
 - Something behaves differently → **revert that fix**. Do not repair it. A quality fix that needs debugging has already failed its own premise. Report it as proposed-not-applied.
 - Nothing differs → done. Report and stop.
 
-**The typing angle carries almost all this risk, and it is not theoretical.** A `dict` → model swap, or a `str` → `datetime` parse, changes behavior in ways that read as a refactor:
+**The typing angle carries almost all this risk, and it is not theoretical.** A bag-to-model swap, or a string-to-date parse, changes behavior in ways that read as a refactor: a missing key that returned null now raises; a validating model coerces values or drops extra keys; a bag mutated in place somewhere is now a different object and the mutation is lost; a parse raises on legacy rows whose format differs; a value written straight back to storage or a response body now serialises differently; and the round trip is lossy wherever the stored format is narrower than the date type, so equality checks, cache keys and dedup silently flip.
 
-| Rewrite | Silent behavior change |
-|---|---|
-| `d.get("x")` → `model.x` | missing key was `None`, now raises `AttributeError` |
-| `dict` → pydantic `BaseModel` | pydantic **coerces**: `"5"` becomes `5`, `"true"` becomes `True`. Downstream `is`/type checks flip |
-| `dict` → pydantic `BaseModel` | extra keys pass through a dict, get dropped or rejected by a model depending on config |
-| `dict` → `@dataclass` | dict was mutated in place somewhere; the dataclass is a different object and the mutation is lost |
-| adding a required field | a caller that omitted it worked before, raises now |
-| `Any` → concrete type | tightens a static check only, but a checker error is a build break |
-| `str` → `datetime` | a string that never raised now raises on any row whose format differs. Legacy rows rarely all match |
-| `str` → `datetime` | naive/aware mismatch: comparing an aware value to a naive one raises `TypeError` at runtime, not at parse |
-| `str` → `datetime` | a value written straight back to storage or a response body now serializes differently. `str(dt)` is not the input string |
-| `str` → `datetime` | the round trip is lossy wherever the format is narrower than `datetime`. A house format with millisecond precision returns `123000` microseconds for an input of `123456`, so `parsed == original` is False. Any test, cache key or dedup check comparing the two silently flips |
-
-Treat every dict-to-model swap and every string-to-datetime parse as **behavior-changing until proven otherwise**. Prove it by finding every construction site and every read site, or do not apply it. Propose it instead. `TypedDict` and `NewType` are the safe rungs of the ladder precisely because they are zero runtime change; prefer them when the only goal is naming the shape.
+Treat every bag-to-model swap and every string-to-date parse as **behavior-changing until proven otherwise**. Prove it by finding every construction site and every read site, or do not apply it. Propose it instead. The static-only rungs (a named bag shape, a named string alias) are safe precisely because they are zero runtime change; prefer them when the only goal is naming the shape.
 
 For a datetime parse specifically, proving it means three things: the parse handles every format present in real stored data, not only the format the happy path writes; nothing downstream compares the value against a naive datetime; and no write path or response body carries the value back out unchanged. Cannot show all three, propose it.
 
-Same trap in the simplify angles, smaller: short-circuit order (`and`/`or` reordering changes what gets evaluated), truthiness (`if x` is not `if x is not None`: `0` and `""` diverge), and generator-to-list changes when the consumer iterates twice.
+Same trap in the simplify angles, smaller: reordering a short-circuit condition changes what gets evaluated; a truthiness check treats zero and empty values differently from a null check; and a lazy iterator handed to a consumer that iterates twice yields nothing the second time.
 
 ## Rules that make it work
 
@@ -312,10 +279,10 @@ Same trap in the simplify angles, smaller: short-circuit order (`and`/`or` reord
 - **Keep the fan-out's context benefit.** Ask hats for findings, not transcripts. A hat that pastes back the files it read defeats the point. Verify by re-reading the specific lines a finding names, not by re-running its whole search.
 - **Execute over read.** For shared helpers, write throwaway scripts hitting edge cases. Most real bugs surface from inputs you were NOT targeting.
 - **Check the blast radius before changing a value.** A field feeding a log may also be a dict key, a filename, or customer-visible text. Grep consumers before swapping it. A "log-only" change that alters an invoice is worse than the leak.
-- **A log line must never raise.** Prefer `.get()` over subscript for anything newly referenced in logging.
+- **A log line must never raise.** Prefer a lookup with a default over one that raises on a missing key, for anything newly referenced in logging.
 - **Watch for fix-induced bugs.** A fix to load-bearing code frequently introduces a new bug its own test does not catch. Each round, re-attack what the previous round changed.
 - **A fix can reintroduce the defect it just removed, one layer out.** Deleting a tautological assertion and replacing it with a call that compares a function against itself does not fix anything: it relocates the same emptiness where it is harder to see. After writing a replacement test, mutate the code it claims to cover and watch it fail. A test that cannot fail is worse than a missing one, because it reads as coverage. Same shape in a guard: a check whose condition no reachable input can violate.
-- **Run the repo's actual gate, not a generic triple.** "Tests + compile" is not the check: Python has no compile step, and a green pytest says nothing about a type checker or linter the CI requires. Find what CI enforces (its workflow files, and any per-directory allow-list a ratchet uses), then run exactly that. A branch can pass every test and still be unmergeable, and an untyped value the typing lens would have named is often what the checker catches first. Note also which parts of the tree the gate does NOT cover: an annotation in an ungated directory is documentation, and worth less than one a checker verifies.
+- **Run the repo's actual gate, not a generic triple.** "Tests + compile" is not the check: a green test suite says nothing about a type checker or linter the CI requires. Find what CI enforces (its workflow files, and any per-directory allow-list a ratchet uses), then run exactly that. A branch can pass every test and still be unmergeable, and an untyped value the typing lens would have named is often what the checker catches first. Note also which parts of the tree the gate does NOT cover: an annotation in an ungated directory is documentation, and worth less than one a checker verifies.
 - **Test both directions.** Not just "is the bad thing caught" but "does the good thing survive". Over-correction is a real defect, just quieter.
 - **Baseline before blaming.** Failing tests may predate the branch. Run the same suite on the base ref in a scratch worktree before calling it a regression.
 - **Sweep, don't spot-fix.** A reviewer names 2 instances; find all N. The bug class usually recurs.

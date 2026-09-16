@@ -1,6 +1,6 @@
 ---
 name: python
-description: Use when writing, editing, reviewing or debugging any Python code. Covers typing a value that crosses a function or module edge, choosing between pydantic, dataclass, NamedTuple, TypedDict and NewType, converting a dict to a model or a str to a datetime, deciding what check proves a Python change is done, and a Python test that misbehaves after a file was edited and restored.
+description: Use when writing, editing, reviewing or debugging any Python code, and when planning, specifying or designing a change in a Python-heavy project before any code exists: an implementation plan, a spec, an ADR, a ticket breakdown, a data-shape or API-contract decision. Covers typing a value that crosses a function or module edge, choosing between pydantic, dataclass, NamedTuple, TypedDict and NewType, converting a dict to a model or a str to a datetime, deciding what check proves a Python change is done, and a Python test that misbehaves after a file was edited and restored.
 ---
 
 # Python

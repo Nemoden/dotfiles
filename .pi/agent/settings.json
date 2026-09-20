@@ -1,0 +1,9 @@
+{
+  "lastChangelogVersion": "0.86.0",
+  "theme": "dark",
+  "defaultProvider": "openrouter",
+  "defaultModel": "z-ai/glm-5.3-flash",
+  "modelThinkingLevels": {
+    "openrouter/z-ai/glm-5.3-flash": "high"
+  }
+}

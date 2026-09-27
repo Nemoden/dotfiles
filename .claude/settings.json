@@ -5,6 +5,7 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "includeCoAuthoredBy": false,
+  "cleanupPeriodDays": 99999,
   "permissions": {
     "allow": [
       "Bash(*setup-ralph-loop.sh*)",
@@ -133,6 +134,11 @@
   "outputStyle": "terse-explainer",
   "alwaysThinkingEnabled": false,
   "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "agentPushNotifEnabled": true,

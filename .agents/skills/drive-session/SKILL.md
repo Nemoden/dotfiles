@@ -43,11 +43,15 @@ Start the watcher in the private tmux server so it survives your turns:
 
 ```bash
 SOCK=${TMPDIR:-/tmp}/claude-tmux-sockets/claude.sock; mkdir -p "$(dirname $SOCK)"
-tmux -S $SOCK new -d -s watch-<short> "bash <abs>/scripts/watch.sh --session-id <ID> --window <N> \
-  --threshold <P> --interval <SECS> --msg '<chosen text>' --log <scratchpad>/watch-<short>.log"
+tmux -S $SOCK new -d -s watch-<ID8> "bash <abs>/scripts/watch.sh --session-id <ID> --window <N> \
+  --threshold <P> --interval <SECS> --msg-file <scratchpad>/msg-<ID8>.txt --log <scratchpad>/watch-<ID8>.log"
 ```
 
-Put the text in a file and pass `--msg-file`, so quotes in the text cannot break the command. Test first with `--once --dry-run`. The watcher finds the pane again from the registry on each check, so a session resumed in a new pane is still followed.
+`<ID8>` is the first 8 characters of the target session id. Other watchers can run on the same private tmux server, so every name comes from the target id: the tmux session, the message file, the log. Then a tmux name tells you which session a watcher drives, and a restart cannot kill a different watcher. Before you start, run `tmux -S $SOCK ls`. A watcher with a name like `compact-watch` does not show its target, so read its command with `tmux -S $SOCK list-panes -a -F '#{session_name} #{pane_start_command}'`.
+
+`watch.sh` holds a lock per target session id (`$TMPDIR/drive-session-locks/<ID>.pid`). A second watcher for the same id exits with code 4 and names the pid that holds the lock. That is correct: two watchers on one session both send `/compact`. Stop the old watcher first, or keep it. `--dry-run` skips the lock, so you can test next to a live watcher.
+
+Put the text in a file and pass `--msg-file`, so quotes in the text cannot break the command. The watcher reads the file once at start. To change the text, edit the file and restart the watcher. A restart moves the check times, so move the report cron too. Test first with `--once --dry-run`. The watcher finds the pane again from the registry on each check, so a session resumed in a new pane is still followed.
 
 Checks run on a fixed schedule from the start time (start + k × interval), and after a `/compact` send the watcher logs `compact confirmed: pre -> post` or a WARNING.
 

@@ -3,6 +3,8 @@
 # Usage: watch.sh --session-id ID --window TOKENS (--msg TEXT | --msg-file FILE)
 #                 [--threshold 60] [--interval 1800] [--idle-wait 1200]
 #                 [--log FILE] [--once] [--dry-run]
+# One watcher per session id: a second one exits 4 while the first lives.
+# --dry-run never sends, so it skips the lock and can run next to a watcher.
 # Checks run on a fixed grid (start + k*INTERVAL), so a reporter can align to it.
 # Pane and transcript are looked up again each check from ~/.claude/sessions,
 # so a session resumed in another pane is still followed.
@@ -11,7 +13,7 @@ unset TMUX
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 SID='' WINDOW='' MSG='' THRESHOLD=60 INTERVAL=1800 IDLE_WAIT=1200
-LOG="${TMPDIR:-/tmp}/drive-session-watch.log" ONCE=0 DRY=''
+LOG='' ONCE=0 DRY=''
 while [[ $# -gt 0 ]]; do
   case $1 in
     --session-id) SID=$2; shift 2 ;;
@@ -27,7 +29,30 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown arg $1" >&2; exit 64 ;;
   esac
 done
-[[ -n $SID && -n $WINDOW && -n $MSG ]] || { sed -n '2,8p' "$0" >&2; exit 64; }
+[[ -n $SID && -n $WINDOW && -n $MSG ]] || { sed -n '2,10p' "$0" >&2; exit 64; }
+LOG=${LOG:-${TMPDIR:-/tmp}/drive-session-watch-$SID.log}
+
+# Two watchers on one session would both /compact it.
+LOCK="${TMPDIR:-/tmp}/drive-session-locks/$SID.pid"
+take_lock() {
+  local pid
+  mkdir -p "$(dirname "$LOCK")"
+  (set -o noclobber; echo $$ >"$LOCK") 2>/dev/null && return
+  pid=$(<"$LOCK")
+  # pid alive AND still a watcher for this id; guards against pid reuse
+  if kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= | grep -q -- "$SID"; then
+    echo "watcher pid $pid already drives $SID (lock $LOCK); stop it first" >&2
+    exit 4
+  fi
+  rm -f "$LOCK"
+  (set -o noclobber; echo $$ >"$LOCK") 2>/dev/null \
+    || { echo "lost lock race for $SID" >&2; exit 4; }
+}
+if [[ -z $DRY ]]; then
+  take_lock
+  trap 'rm -f "$LOCK"; kill $(jobs -p) 2>/dev/null' EXIT
+  trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+fi
 
 log() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
 
@@ -87,5 +112,6 @@ while true; do
   (( ONCE )) && exit 0
   now=$(date +%s)
   while (( start + k * INTERVAL <= now )); do k=$((k+1)); done
-  sleep $(( start + k * INTERVAL - now ))
+  # background + wait, so a signal runs the EXIT trap now, not after the sleep
+  sleep $(( start + k * INTERVAL - now )) & wait $!
 done

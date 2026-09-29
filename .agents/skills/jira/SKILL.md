@@ -1,6 +1,6 @@
 ---
 name: jira
-description: "Manage Jira issues: list, create, view, edit, transition, and comment. Use when the user asks to create a ticket/issue, list their issues, check sprint status, move a ticket to a different status, update a Jira issue, add comments, view issue details, or any Jira-related task. Also triggers on: 'create a ticket', 'my issues', 'sprint board', 'move to in progress', 'close the ticket', 'jira', 'what am I working on'."
+description: "Manage Jira issues: list, create, view, edit, transition, and comment. Use when the user asks to create a ticket/issue, list their issues, check sprint status, move a ticket to a different status, update a Jira issue, add comments, view issue details, or any Jira-related task. Also triggers on: 'create a ticket', 'my issues', 'sprint board', 'move to in progress', 'close the ticket', 'jira', 'what am I working on', 'ticket style', 'concise ticket', 'short ticket', 'full ticket write-up'."
 ---
 
 # Jira
@@ -170,7 +170,16 @@ curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue" \
   }'
 ```
 
-Always include a green success panel for acceptance criteria when creating task tickets. See the "Common pattern: Acceptance Criteria" section in [references/adf.md](references/adf.md).
+In the **full** style (see Ticket styles), always include a green success panel for acceptance criteria. See the "Common pattern: Acceptance Criteria" section in [references/adf.md](references/adf.md). The shorter styles carry acceptance as a `Done when` line, or none for **nano**.
+
+### Ticket styles
+
+Six body styles: **nano**, **brief**, **mechanics**, **options**, **audit**, **full**. Templates, examples and the signal table: [references/styles.md](references/styles.md). Read it before drafting any ticket body.
+
+- User names a style or a length ("super concise", "full write-up") → use that style.
+- One ticket, no style named → pick from the signal table in styles.md and say which one in one line before creating.
+- Several tickets → in the pre-create summary, show a `ticket → style` column beside the proposed label; the user can change any row.
+- Keep one style per ticket. Mixing labels from two styles is a new style nobody asked for.
 
 ### Content rules for ticket descriptions
 

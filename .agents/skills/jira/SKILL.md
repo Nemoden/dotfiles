@@ -170,16 +170,16 @@ curl -s -X POST "$CC_JIRA_SERVER/rest/api/3/issue" \
   }'
 ```
 
-In the **full** style (see Ticket styles), always include a green success panel for acceptance criteria. See the "Common pattern: Acceptance Criteria" section in [references/adf.md](references/adf.md). The shorter styles carry acceptance as a `Done when` line, or none for **nano**.
+At **full** density (see Ticket body), acceptance criteria go in a green success panel. See the "Common pattern: Acceptance Criteria" section in [references/adf.md](references/adf.md). At **brief** density acceptance is a `Done when` line; at **nano** there is none.
 
-### Ticket styles
+### Ticket body: blocks, density, presets
 
-Six body styles: **nano**, **brief**, **mechanics**, **options**, **audit**, **full**. Templates, examples and the signal table: [references/styles.md](references/styles.md). Read it before drafting any ticket body.
+A body is a set of **blocks** (What, Why, What happens, Options, Workaround today, ...) written at one **density** (nano, brief, full). A **preset** (wish, bug, chain bug, decision, audit, epic) is a named block set. Catalogue, order, "include when" rules, presets and examples: [references/styles.md](references/styles.md). Read it before drafting any ticket body.
 
-- User names a style or a length ("super concise", "full write-up") → use that style.
-- One ticket, no style named → pick from the signal table in styles.md and say which one in one line before creating.
-- Several tickets → in the pre-create summary, show a `ticket → style` column beside the proposed label; the user can change any row.
-- Keep one style per ticket. Mixing labels from two styles is a new style nobody asked for.
+- Before any create call, show one proposal line per ticket: `<title>: <preset> · <density> · <+block> <-block>`. Several tickets: one line each, beside label and sprint in the pre-create summary.
+- Silence is yes. The user edits in the same words ("nano, add What happens"); recompose and go on. Never ask block by block.
+- The user's own words win: "super concise" is nano, "full write-up" is full.
+- Blocks keep catalogue order whatever the set.
 
 ### Content rules for ticket descriptions
 

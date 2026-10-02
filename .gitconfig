@@ -67,3 +67,7 @@
 	eventBrief = true
 	eventNesting = 1
 	configparams = custom.metacommands
+[pull]
+	rebase = true
+[rebase]
+	autoStash = true

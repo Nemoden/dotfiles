@@ -174,9 +174,27 @@ At **full** density (see Ticket body), acceptance criteria go in a green success
 
 ### Ticket body: blocks, density, presets
 
+**Hard floor: every ticket reads cold.** A fresh agent with the repo and this ticket only (no chat, no session, no local files) must know four things:
+
+1. **Where:** the product area plus one searchable starting point (a function, type, route, state or screen name).
+2. **What:** the target end state, not only the current fault.
+3. **Why:** who hits what, and what it costs.
+4. **Done:** how to tell it is finished.
+
+Density shapes length, never completeness. When a density or preset rule meets the floor, the floor wins: grow the block, or move up one density.
+
 A body is a set of **blocks** (What, Why, What happens, Options, Workaround today, ...) written at one **density** (nano, brief, full). A **preset** (wish, bug, chain bug, decision, audit, epic) is a named block set. Catalogue, order, "include when" rules, presets and examples: [references/styles.md](references/styles.md). Read it before drafting any ticket body.
 
 - Before any create call, show one proposal line per ticket: `<title>: <preset> · <density> · <+block> <-block>`. Several tickets: one line each, beside label and sprint in the pre-create summary.
+- **Cold read, before any create call.** Dispatch one fresh subagent (cheapest capable model) per batch: the draft texts plus repo access, nothing else, no chat and no session notes. Use the prompt in [references/styles.md](references/styles.md), "Cold read". The author never checks its own draft: it already knows the answer.
+- Act on the reply, and on nothing else:
+  - wrong restatement → fix that point;
+  - **Guessed** → settle it only when the readings lead to different work; a guess that keeps current behaviour needs nothing;
+  - **Not found** → add only a decision the assignee must not make alone; implementation choices (log levels, where a button sits) stay with the assignee;
+  - add the smallest text that settles it;
+  - **Derivable** → cut, unless pivotal (outcome-changing decision, a constraint the repo cannot show, irreversible or mission-critical).
+
+  Re-run only for a ticket that changed.
 - Silence is yes. The user edits in the same words ("nano, add What happens"); recompose and go on. Never ask block by block.
 - The user's own words win: "super concise" is nano, "full write-up" is full.
 - Blocks keep catalogue order whatever the set.
@@ -184,11 +202,12 @@ A body is a set of **blocks** (What, Why, What happens, Options, Workaround toda
 ### Content rules for ticket descriptions
 
 - **Simplicity is king. Use the simplest wording possible.** Tickets are read by busy people — engineers picking up the work, reviewers approving merges, future-you six months later. Every sentence has to earn its place. Prefer plain language ("the workflow runs one job per service") over jargon-stacked phrasing ("the per-svc matrix job names are dynamic and don't appear on PRs that touch no services"). If a sentence needs a second read to parse, rewrite it. Short words beat long ones; concrete examples beat abstract descriptions. When you catch yourself writing "is safe to require because [technical mechanism]", stop and explain the mechanism in one sentence, then state the conclusion in another.
-- **Never reference line numbers** in code references. Lines drift as code changes — by the time someone reads the ticket the line number is wrong and misleads both humans and LLMs. Reference function/method names alongside file paths instead.
-- **Never reference local-machine file paths** (e.g. `~/tmp/...`, `/Users/<you>/...`, `/private/tmp/...`). Tickets are read by other engineers and future LLMs who don't have your filesystem. If a local draft or scratch file contains context that matters, **embed the context into the ticket itself** — regurgitate the relevant facts in prose. Tickets may freely cross-reference other Jira tickets (Jira keys), Confluence pages, GitHub PRs/commits, repo paths (relative to repo root), and public URLs — but not anything that only exists on the author's workstation. A ticket must be readable cold without access to any local artifact.
+- **Never reference line numbers** in code references. Lines drift as code changes — by the time someone reads the ticket the line number is wrong and misleads both humans and LLMs. Reference function/method names instead.
+- **Never reference local-machine file paths** (e.g. `~/tmp/...`, `/Users/<you>/...`, `/private/tmp/...`). Tickets are read by other engineers and future LLMs who don't have your filesystem. If a local draft or scratch file contains context that matters, **embed the context into the ticket itself** — regurgitate the relevant facts in prose. Tickets may freely cross-reference other Jira tickets (Jira keys), Confluence pages, GitHub PRs/commits, and public URLs — but not anything that only exists on the author's workstation. A ticket must be readable cold without access to any local artifact.
 - **Self-contained ≠ no refs.** Self-contained = *ticket + refs = complete*. Cite refs as original inputs; synthesise load-bearing facts inline so the body alone conveys the issue. Refs serve as evidence, not the missing half.
 - **No conversation leakage.** Ban "we discussed", "this chat", "as agreed earlier". Ticket must read cold.
-- **Include** file paths, function names, identifiers — anything the assignee actually needs.
+- **Decisions travel with the ticket.** A decision made outside the ticket (by the owner, a reviewer or the chat) goes into **Fix**, **Out of scope** or **Open questions**, with its reason, in the ticket's own words. "As ruled" is not a reason.
+- **Include** function, type, route, state and screen names: anything the assignee searches for. No file paths, no line numbers.
 
 ### Refs / Sources section
 
@@ -210,7 +229,7 @@ Paste real code whenever it's more useful than prose. Examples: the offending li
 
 - Real code, never pseudocode.
 - Preserve original comments — author's wrong comment IS evidence.
-- Cite by function name + repo-relative path. No line numbers.
+- Cite by function name. No file paths, no line numbers.
 - Small. One function/block/signature. Hundreds of lines = prose belongs there instead.
 - ADF `codeBlock` node for multi-line.
 - Excerpts illustrate; they don't prescribe the fix.
@@ -220,6 +239,8 @@ Paste real code whenever it's more useful than prose. Examples: the offending li
 User names parent up-front → set at create-time (`"parent": {"key": "PROJ-NNN"}`). Not after — orphans the ticket on boards for a window. No parent named + plausibly belongs under epic → ask, don't pick.
 
 ### Ticket calibration
+
+Calibration trims **how**. It never trims the floor's where, what, why or done, nor pivotal content. Derivable non-pivotal content goes, even when it reads helpful.
 
 Tickets should be terse enough that agents aren't spoon-fed, detailed enough that load-bearing decisions aren't lost. Agents picking up a ticket are competent — they don't need to be told which directories to grep or which command flags to use. They DO need to be told the decisions you've already made and the conventions they couldn't infer.
 
@@ -400,7 +421,7 @@ PROJ-XXX (or "None — can start immediately")
 PROJ-YYY (parent epic / PRD ticket, if applicable)
 ```
 
-Avoid file paths and code snippets — they go stale. Exception: small decision-encoding snippets (state machine, schema, type shape) inline if prose can't capture the decision precisely.
+Code snippets go stale. Exception: small decision-encoding snippets (state machine, schema, type shape) inline if prose can't capture the decision precisely.
 
 ### Multi-ticket workflows with dependencies
 

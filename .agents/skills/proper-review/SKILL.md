@@ -1,503 +1,534 @@
 ---
 name: proper-review
-description: Use when reviewing a PR, diff, branch, or any proposed code change. First gathers context autonomously (fetches PR/commits via gh, follows Jira keys via the jira skill, follows Confluence links via the confluence skill, reads referenced files/URLs), then gates the review behind a WHY interrogation so you assess whether the work should exist before assessing how it's written. Criticism is expressed as diffs (not prose walls), entanglement claims get first-principles cost/benefit, and every review opens with specific praise. Triggers on "review this PR", "proper review", "review the diff", "/proper-review", a GitHub PR URL, or any code review request.
+description: 'Use when reviewing a PR, diff, branch, or any proposed code change. Staged senior-engineer review (cold read → stated WHY → reconcile with HARD HALT → calibrate → blind independent solve → compare → reach sweep → bots LAST; full prose to /tmp file, distilled emoji statusline to chat), with a derived verdict: any 💀/🔥 blocker mechanically forbids SHIP/SHIP-WITH-NITS, and the FIX-THEN-SHIP verdict covers "right shape, gated on listed blockers". Halts and clarifying asks always surface fully in chat. Triggers on "review this PR", "proper review", "review the diff", "/proper-review", a GitHub PR URL, or any code review request.'
 ---
 
 # Proper Review
 
-A code review that skips WHY is theatre. You can polish syntax on code that should never have been written. This skill forces you to interrogate the premise *before* you touch the implementation — and to express criticism as diffs, not prose.
+**Derived verdict.** Any 💀/🔥 blocker mechanically rules out SHIP/SHIP-WITH-NITS, and the **FIX-THEN-SHIP** verdict names the "design is right, merge is gated" state. The full review prose is written to a `/tmp` file, the full review is also held in the agent's working context, and **only a distilled emoji statusline lands in chat**. You read the headline; you ask to expand anything; the answer comes from context (file is the durable fallback if context is later compacted or you want to read it yourself).
 
-## Core principle
+A review that reads the bots first confirms the bots. A review that reads the ticket's stated reason before reading the code sees the code as confirming the ticket — and misses the case where the code quietly does something *else*. This skill enforces the order a good human reviewer uses naturally:
 
-**Five-whys before line-by-line.** A PR's stated reason (WHY₁) is almost always a surface answer. Recurse: ask why WHY₁ is true. WHY₂ often debunks WHY₁ — the ticket was reactive, the problem isn't real, the metric isn't moving, no user is harmed. If you can't reach bedrock, **stop and ask**. Do not invent a plausible WHY to keep moving; that is the failure mode this skill prevents.
+**read the code cold → understand the stated WHY → reconcile (halt on mismatch) → calibrate → solve it yourself → compare → only then read what others said.**
 
-**Bedrock** = one of:
-- Measurable user-observable harm (bug report, support volume, churn)
-- Revenue / legal / compliance obligation with a citation
-- Measured performance constraint (numbers, not vibes)
-- A blocker for concrete upcoming work (named, scheduled)
-- A correctness invariant the code currently violates
+Order is the discipline. If you read the code before the ticket's prose, your reading of *what the code does* can't be primed by *what it's supposed to do* — so a code-says-X / ticket-says-Y divergence surfaces instead of getting rationalised away. If you solve the problem before critiquing the diff, you can't anchor on the author. If you read the bots last, you can't inherit their framing. The stages below enforce all three.
 
-**Not bedrock** = "PM asked," "we always do it this way," "feels cleaner," "tech debt" (without measured pain), "for consistency" (without naming what breaks otherwise), "future flexibility" (without a named near-term caller).
+## How this skill delivers output (read this first)
 
-## First-principles on every entanglement claim
+- **Stages 1a–5 run SILENTLY.** Do not stream stage prose to chat. Build the full review (every stage's output, in the output shape listed in Stage 6) into a single document held in your working context AND written to a `/tmp` file as you go.
+- **The ONLY things that break silence mid-review are HARD HALTS and clarifying asks** — they need the user's decision before the review can continue, so they surface fully inline in chat (never file-only):
+  - The Stage 2.5 blind-solve problem-statement confirmation checkpoint.
+  - A Stage 2.7 **MISMATCH** halt.
+  - A Stage 2 **PREMISE-BROKEN / NO-BEDROCK / ASK-USER** stop, or any assumption-voiced ask.
+  - A Stakes-tier ambiguity ask (Stage 1.5).
+- **At the end (Stage 6)** write the full review to `/tmp/review-<id>.md`, keep the full review in context, and emit ONLY the distilled emoji statusline strip to chat.
+- **After delivery,** "expand N", "show the WHY chain", "what did the blind solver say", etc. are answered from your held context. The file is the durable copy — re-read it if your context was compacted.
 
-When the PR bundles concerns ("X for the main feature, Y for a cross-cutting concern, Z for an adjacent fix"), **do not default to "split it"**. Default to a cost/benefit question: *what if we shipped without Y? what if we shipped without Z?* Force the answer to be a number, a failure mode, or a named caller — not a vibe.
+The stage **Output:** blocks below define what goes *into the file*, not what streams to chat. Here, "Output:" = "write this section to the review document."
 
-For each "extra" concern in a diff, ask:
-- **What does it cost to add now?** (lines, abstractions, coupling, write amplification, deploy blast)
-- **What does it cost to NOT add now?** (named user harm, named correctness break, named follow-up work that becomes harder)
-- **Is the bundling load-bearing or accidental?**
-  - **Load-bearing** = the feature is unsafe to ship without it. Example: exposing an HTTP endpoint that returns privilege-sensitive payloads without an access-control check on that endpoint. The two are inseparable; splitting produces an unsafe interim state.
-  - **Accidental** = the concerns just happen to be in the same diff. Different rollout blast radius, different revert paths, different owners. Split.
+## The stages
 
-If the bundling is load-bearing, **do not recommend splitting it**. Recommend either (a) landing the dependency in a *prior* PR so this PR adds the feature on top, or (b) hardening both together in this PR. Recommending splits on load-bearing entanglement creates unsafe interim deploys.
+| # | Stage | Gate |
+|---|---|---|
+| 1a | Context acquisition — fetch diff, enumerate refs/bots (don't read PR-body/ticket prose OR bot content yet) | hard |
+| 0.5 | Cold code read (main thread, diff only) | hard |
+| 1b | Context — now read the stated-WHY prose (PR body, ticket, docs) | hard |
+| 1.5 | Stakes calibration | hard |
+| 2 | WHY interrogation | hard |
+| 2.7 | Code-vs-WHY reconciliation (HARD HALT on mismatch) | hard |
+| 2.5 | Blind independent solve (subagent, no diff) | conditional |
+| 3 | Fit & approach comparison | — |
+| 3.5 | Adversarial + named-risk probes | — |
+| 4 | Issues (diff-driven) | — |
+| 5 | Read bots/others LAST | — |
+| 6 | Distill & write — full review to /tmp + context, statusline to chat | hard |
 
-For any performance claim (denormalisation, caching, batching, parallelism, custom data structure, hand-rolled optimisation): demand the numbers. What is the measured cost being avoided, against what budget at the call site, and is that cost user-visible? If the saved cost is invisible (background job, async pipeline, off-critical-path), the optimisation pays for nothing and you pay its added complexity — extra state, new failure modes, harder reasoning, more code to maintain. Reject the optimisation; do the simple thing. "Performance" without a number is a vibe, not a justification.
+Run in order. **Do not read PR-body/ticket prose before Stage 1b** (it would prime the cold read) and **do not read bot comment content before Stage 5** (it would anchor your findings). These two are the load-bearing rules.
 
-Apply this reasoning when reading the code. **Do not narrate "applying first principles now."** The user sees the conclusions and the diffs; they don't need the meta-commentary.
+Skip the whole skill only for: trivial diffs (typo, dep bump with no behaviour change, generated code), an explicit "just lint this," or a live-incident hotfix where the incident *is* the WHY.
 
-## TL;DR per section
+---
 
-Every top-level section (Context, WHY, Fit, Issues) opens with a `TL;DR:` line. One line, scannable, sets reader expectation before the body.
+## Stage 1a — Context acquisition: fetch, don't read the WHY yet (hard gate)
 
-| Section | TL;DR shape |
-|---|---|
-| Context | Sources in *importance order* (most → least authoritative). Typical: `PR description, JIRA ticket KEY-NNN, code, common sense`. If a source was unreachable, say so here. |
-| WHY | Quick reasoning: *doing →* user benefit; *not doing →* concrete cost. One sentence each. |
-| Fit | One of three patterns: `Great fit. No other solutions worth considering.` / `Good fit. Could also consider XXXX` / `Bad idea because YYYY. Better: ZZZZ`. |
-| Issues | One line — e.g. `1 blocker, 2 nits, no system-killers.` |
+Fetch everything reachable, but **defer reading the prose that states the WHY** — the PR description body, the linked ticket's description, the design docs. You'll read those at Stage 1b, *after* the cold code read. At 1a you fetch them and stash them UNREAD, and you enumerate references and bots.
 
-TL;DR is not a substitute for the body. It is a pre-read so the user can decide depth.
+**Identify input, fetch primary:**
 
-## Severity indicators per finding
-
-Each praise item in **What's good** and each issue in **Issues** carries a severity emoji as the first character of its header. This lets the reader scan for what matters without parsing prose.
-
-**Praise scale (What's good):**
-
-| Emoji | Meaning |
-|---|---|
-| 🌟 | Exemplary. Steal-this-pattern. The kind of decision other PRs in this codebase should copy. |
-| ✨ | Thoughtful, non-obvious. A choice a less-careful author would have skipped. |
-| *(none)* | Ordinary good. Worth naming, not worth a star. |
-
-**Issue scale (Issues):**
-
-| Emoji | Meaning |
-|---|---|
-| 💀 | System-killer. Ship this and prod burns / data corrupts / security gap opens. Hard merge block. |
-| 🔥 | Blocker. Must fix before merge. Correctness, regression, or significant user-visible breakage. |
-| ⚠️ | Should fix, not a merge blocker. Degraded UX, hardening, missing test for a real risk. |
-| 💭 | Nit. Taste, micro-cleanup, optional. Author's call. |
-
-Place the emoji at the start of the header (`### 💀 1. Title`). The verdict's blockers list MUST match every 💀 and 🔥 item — they cannot become nice-to-haves.
-
-**Second header marker — bot-overlap signal.** Every Issue header carries a second emoji *immediately after* the severity, *before* the number: `🤖` if a bot already flagged this finding, `✨` if this is an independent catch. Full shape: `### <severity> <bot-marker> N. <Title>`. Examples: `### 💀 🤖 1. Title` / `### 🔥 ✨ 2. Title` / `### ⚠️ 🤖 3. Title`. This is the at-a-glance signal — reader scans the Issues section and sees instantly which findings overlap with bot review and which are independent, without having to read the `Prior bot:` line under each diff. The under-diff `Prior bot:` line is still mandatory because it carries the deep-link, the reason for reinforcement, and the partial/multiple-bot nuance — the header marker is the summary, the line is the detail.
-
-## Express criticism as diffs
-
-Every concrete issue gets a `diff` block showing before → after. Prose explanations sit *above* the diff, not in place of it. Reasoning: a wall of "this is wrong because…" without a diff makes the reviewer the author's editor. A diff makes the change actionable in one paste.
-
-**Format per issue:**
-
-````
-### <severity-emoji> <bot-marker> N. <Short problem statement>
-
-<1–3 sentences: what's wrong, why it matters, what the fix is.>
-
-```diff
---- a/path/to/file.ext
-+++ b/path/to/file.ext
-@@ <context>
-- old line
-+ new line
-```
-
-**Prior bot:** <see "Prior bot crediting" below — MANDATORY on every finding>
-
-<Optional 1-line caveat or follow-up note.>
-````
-
-`<severity-emoji>` = 💀 / 🔥 / ⚠️ / 💭. `<bot-marker>` = 🤖 (bot already flagged) / ✨ (independent catch). Both are required on every Issue header.
-
-**Rules:**
-- Diff must be minimal — only the lines that change, with enough context to locate them.
-- Use unified diff syntax (`---` / `+++` / `@@` / `-` / `+`) so the reader can `git apply` or paste mentally.
-- If the fix is "delete the file" / "revert the commit," show the deletion as `- <line>` with no `+` counterpart.
-- If the issue has no clean diff (e.g. "this PR should be three PRs," "this needs a follow-up RFC"), say so explicitly and skip the diff block — don't fake one.
-- For missing tests, show a stub `+` diff of the test to add, not just "needs a test."
-- Prose without a diff is permitted ONLY for: architectural verdicts (Phase 3 fit), the WHY chain (Phase 2), and the section TL;DRs.
-- **`No diff.` is a forbidden ending for any numbered Issue.** Every numbered finding in Phase 4 MUST end with a unified diff on real `file:line` (additions, deletions, or both). If you find yourself typing `No diff.`, the finding does not belong in Issues — move it to a one-line entry under **Acknowledged trade-offs** above What's good, or cut it entirely. Common cases that should NOT become Issues: "author already accepted the trade-off in PR comments," "out of scope per author," "follow-up ticket exists," "convention differs but both sides are correct." If the finding is real but the fix is "open a separate ticket," write the ticket title under Acknowledged trade-offs — don't dress it as an Issue.
-
-**Example — the firmness test:**
-
-BAD (vague, lets the finding survive without committing):
-
-````
-### 💭 Validator may reject some valid inputs
-The narrowing in the last commit fixed one case but other inputs
-matching similar patterns may still be rejected. Worth an audit.
-
-No diff.
-````
-
-GOOD (concrete, diff or fallout):
-
-````
-### ⚠️ `src/validators/foo.py:42` — pattern accepts strings the
-caller documents as invalid; narrow the alternation
-
-```diff
--PATTERN = re.compile(r'\bfoo\b|\bbar\b')
-+PATTERN = re.compile(r'\bfoo\s?bar\b')
-```
-````
-
-If the BAD version is what you'd write, either firm it up to the GOOD shape (with a concrete location + diff) or cut it. Both outcomes beat the BAD version surviving into the review.
-
-**Why this format:** the previous prose-heavy style made the reviewer the author's editor — the author had to translate "X is wrong because Y, consider Z" into a code change. Diffs collapse that step. The reviewer's judgment is encoded in the patch.
-
-## Prior bot crediting (mandatory per finding)
-
-Every numbered Issue carries the bot-overlap signal in TWO places:
-
-1. **In the header — a second emoji** between the severity emoji and the number: `🤖` (bot already flagged this finding) or `✨` (independent catch). Full header shape: `### <severity> <bot-marker> N. <Title>`. This is the scan-speed signal so the reader sees overlap-vs-independent without descending into each finding.
-2. **Under the diff — the `**Prior bot:**` line** carrying the deep-link, the reason for reinforcement, and any partial/multiple-bot nuance.
-
-Both are mandatory on every Issue. The header marker and the under-diff line MUST agree: 🤖 in the header → the line must name a bot + URL; ✨ in the header → the line must say `not raised by any bot review`.
-
-Cross-reference each finding against the bot reviews enumerated in Phase 1 and pick exactly one of the `Prior bot:` line shapes:
-
-- `**Prior bot:** 🤖 already flagged by <bot-login> ([inline](url)). Reinforced here because <reason: prod-safety / blocker / bot's diff insufficient / etc.>.`
-- `**Prior bot:** 🤖 partially flagged by <bot-login> ([inline](url)) — bot caught <X>, missed <Y> (this review adds <Y>).`
-- `**Prior bot:** 🤖 flagged by multiple bots (<bot-a>, <bot-b>) ([<bot-a>](url-a), [<bot-b>](url-b)).`
-- `**Prior bot:** ✨ not raised by any bot review.`
-
-`<bot-login>` = the exact login captured in Phase 1's `Prior bot reviews` sub-bundle. Don't hardcode "claude-bot" / "coderabbit" — use whatever the PR actually has. Prefer login over display name for greppability.
-
-**Why this is mandatory:**
-- 🤖 → reader sees this finding overlaps with a bot. Their decision to add their own comment / reinforce / extend is one glance, not a re-read of the PR thread.
-- ✨ → reader sees this is an independent catch. Worth elevating.
-- Silence on this line → reader can't tell if you read the bot comments. Looks like you missed them, even when you didn't.
-
-**Bot findings not promoted to Issues.** Between the Issues section and the Verdict, add a `Bot findings not promoted to Issues` sub-section listing every bot lead you chose not to elevate to a numbered Issue (only when ≥1 bot finding was dropped). One line each:
-
-```
-- 🤖 <bot-login> on <file:line> — "<bot's summary, ≤80 chars>" — Dropped because: <reason>.
-```
-
-Reasons: `already covered by Acknowledged trade-offs`, `verified against code, bot is wrong`, `out of scope per author / WHY-locked`, `duplicate of Issue N`, `bot misread the diff`. Forces an explicit decision on every bot lead — no silent drops, no "I didn't notice."
-
-**Bot overlap on the verdict.** Add a `Bot overlap:` line immediately after the verdict reason: `Bot overlap: N of M issues already flagged by bots (🤖); K issues are independent (✨).` Reader sees the ratio at a glance. If overlap = 100%, the human review added nothing — the verdict text MUST acknowledge that ("this review confirms <bot>'s findings; no independent catches").
-
-## Praise what works
-
-Every review includes a **"What's good"** section, placed **after the Verdict, not before**. Rules:
-
-1. **Be specific.** Not "good test coverage" — name the test, the invariant it locks, and the regression it prevents. Name the file, the function, the line, the decision.
-2. **Praise non-obvious decisions.** A choice that aligns with an existing codebase convention (naming scheme, error-tagging pattern, module boundary) is praise-worthy; conformance to a generic style guide is not. Praise the choices a less-careful author would have skipped.
-3. **Praise WHY-comments.** A comment that names a non-obvious constraint or invariant ("library X is not thread-safe here, so we serialize calls") is exemplary; a comment that restates what the code does ("loop over files") is not. WHY-comments are what good engineers leave behind; surface them.
-4. **Show the code, not just the location.** When the praise is about a specific snippet (a guard, a comment, a deterministic-id pattern, a test assertion), include a small fenced code block of the actual lines. A reader scanning the review should see *what* you're praising without opening the file. Pure-prose praise is allowed only for structural decisions (file split, module boundary) where there is no single snippet to quote.
-5. **Tag severity with an emoji** per the praise scale above (🌟 / ✨ / *none*).
-
-**Format per praise item:**
-
-````
-### <emoji> <path/to/file.ext:LINE> — <short label>
-
-<1–2 sentences: what the decision is and why it's good.>
-
-```<lang>
-<actual snippet, 2–8 lines>
-```
-````
-
-Praise serves three purposes:
-- The author keeps doing the good things in the next PR.
-- The reviewer demonstrates they read the code rather than running a checklist.
-- Future readers of the review see what "good" looks like in this codebase.
-
-If you cannot find anything specific to praise after honest reading, the PR is in serious trouble — make that the verdict, don't fake the praise. But the bar is "specific," not "absent" — most PRs have *something* worth naming.
-
-## Workflow
-
-Run the phases in order. Phase 1 and Phase 2 are **hard gates**. Do not proceed to Phase 3 until both produce a locked WHY (or an explicit user decision to proceed anyway).
-
-### Phase 1 — Context acquisition (blocking gate)
-
-You cannot interrogate a WHY you haven't read. Gather all reasonably-reachable context for the change. The user typically gives a GitHub PR/commit URL, a local branch reference, a file path, or "review my work." Normalize the input, fetch primary context, then chase references one hop deep.
-
-**1. Identify input type and fetch primary context:**
-
-| Input shape | Primary fetch |
+| Input | Fetch |
 |---|---|
 | GitHub PR URL | `gh pr view <url> --json title,body,author,commits,files,comments,reviews,headRefName,baseRefName` + `gh pr diff <url>` |
 | GitHub commit URL | `gh api repos/{owner}/{repo}/commits/{sha}` + diff |
-| GitHub branch / compare URL | `gh api` for commits + diff |
-| "this PR" / "my PR" with no URL | `gh pr view --json ...` from CWD |
+| Branch / compare URL | `gh api` for commits + diff |
+| "this PR" (no URL) | `gh pr view --json ...` from CWD |
 | Local branch / "this diff" | `git status`, `git diff <base>...HEAD`, `git log <base>..HEAD` |
 | File path | `Read` |
 | Arbitrary URL | `WebFetch` |
-| Nothing specified | Ask user what to review before doing anything |
+| Nothing specified | Ask what to review before doing anything |
 
-**2. Chase references (one hop, breadth-first):**
+**What you may look at NOW:** the diff, the file list, the commit *subjects* (short, mechanical — usually safe), the branch name, bot/comment metadata. **What you stash UNREAD until 1b:** the PR description body, the linked ticket's description/comments, linked design docs — anything that *argues the reason for the change*. Fetch them (so 1b is just a read, not another round-trip), but do not read their content yet. If a commit message body is a full rationale paragraph, treat it as WHY-prose and stash it too; one-line subjects are fine to read.
 
-| Reference pattern | How to fetch |
-|---|---|
-| Jira key (`[A-Z]+-\d+` in PR body, branch name, commit messages) | Invoke the `jira` skill |
-| Confluence URL | Invoke the `confluence` skill |
-| GitHub issue / PR link | `gh issue view` / `gh pr view` |
-| Linked file in the repo | `Read` |
-| External URL (docs, RFCs, support tickets) | `WebFetch` |
-| Slack / private tool link with no auth | Ask user to paste the relevant content |
+> Why: the cold read at 0.5 only works if you haven't yet absorbed "what this is supposed to achieve." Reading the PR body now defeats the entire point of the skill.
 
-**Recursion rule:** one hop from primary. Only recurse further if a linked ticket/doc is clearly load-bearing for understanding WHY. Otherwise note as "unfetched: <url>" and stop.
+**Capture the review id NOW.** From the input, derive a short slug for the `/tmp` filename used at Stage 6: a PR gets `pr<N>` (e.g. `pr588`), a commit gets `commit-<short-sha>`, a local branch gets the kebab branch name, a bare file gets its basename. Stash it — `/tmp/review-<slug>.md`.
 
-**3. Handle missing access:** never fabricate. If you couldn't read it, say so and ask the user.
+**Chase references (one hop, breadth-first) — fetch, stash WHY-prose UNREAD:** Jira key (`[A-Z]+-\d+`) → `jira` skill (fetch, stash description unread). Confluence URL → `confluence` skill (fetch, stash unread). GitHub issue/PR link → `gh ... view` (stash body unread). Repo file → `Read` (code files are fine to read; design docs stash). External URL → `WebFetch` (stash unread). Auth-walled link → ask user to paste (defer the paste to 1b). Recurse a second hop only if a linked ticket/doc is clearly load-bearing for WHY; else note `unfetched: <url>` and stop.
 
-**4. Handle empty context:** if PR body + commit messages + linked ticket + branch name are all uninformative → STOP, ask user for the WHY before proceeding.
+**Load the repo's own written rules (for the Stage 3.5 convention probe).** Read the project's instruction/convention files — the agent-instructions file(s) (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` and equivalents, repo root AND the touched module's dir, since a nearer file overrides root), any `CONTRIBUTING`/style doc, and the linter/formatter config the changed files are subject to. Extract only **machine-checkable, project-specific hard rules** into a short checklist, quoted verbatim with source — bans and concrete thresholds (e.g. a ban on referencing ticket keys in code comments, banned words, a max line width, a branch-name pattern, a required wrapper/annotation on a given construct). Skip aspirational prose ("prefer clear names") — generic taste is a Stage-4 nit at most, not a convention check. If no convention doc is reachable, say so; never invent rules. (Reading convention files is fine — they're rules, not the change's WHY.)
 
-**5. Enumerate prior bot reviews (mandatory).** Before producing the context bundle, fetch every inline + summary review comment on the PR and identify which were posted by bots. This becomes a Phase 4 cross-reference (see "Prior bot crediting" below) — skipping it produces silent overlap with bot findings, which makes the reviewer look like they didn't read the PR.
+Never fabricate. If you couldn't read it, say so.
 
-Fetch:
+**Bots: enumerate, do NOT read content.** Record *that* bots reviewed and how many comments each left — never what they said. Reading their findings now would anchor you. Stash deep-links; open them in Stage 5.
+
+Fetch the comment metadata:
 ```bash
 gh api repos/{owner}/{repo}/pulls/{n}/comments --paginate
 gh api repos/{owner}/{repo}/issues/{n}/comments --paginate
 gh pr view <url> --json reviews,comments
 ```
-Capture each comment's `html_url` (or `url` for issue comments) so the Phase 4 `Prior bot:` line can deep-link.
+Capture each comment's `html_url` for the Stage 5 deep-link. **Bot detection** (generic, err toward tagging): `author.is_bot == true`; REST `User.type == "Bot"`; login matches `*bot` / `*-ai` / `*-reviewer` / `*-pull-request-reviewer`; well-known set (`claude`, `coderabbitai`, `copilot-pull-request-reviewer`, `bito-bot`, `codium-ai`, `sourcery-ai`, `qodo-merge-pro`, `github-actions`); or `authorAssociation == "NONE"` with review-shaped output. Record login + counts only.
 
-**Bot detection — generic, not an allowlist.** Tag a comment as bot-authored if ANY of these hold:
-- `author.is_bot == true` in `gh pr view --json` output
-- GitHub `User.type == "Bot"` in REST `/comments` response
-- Login matches `*[-]bot`, `*bot`, `*-ai`, `*-reviewer`, `*-pull-request-reviewer` (case-insensitive)
-- Login is in the well-known set: `claude`, `coderabbitai`, `copilot-pull-request-reviewer`, `bito-bot`, `codium-ai`, `sourcery-ai`, `qodo-merge-pro`, `github-actions`
-- `authorAssociation == "NONE"` combined with structured review-shaped output (checklists, "Summary"/"Issues"/"Review" section headings, repeated emoji-prefixed findings)
+If you accidentally read a bot finding (or the PR-body WHY) while skimming, name it — in Stage 5 for bots, in Stage 1b for the WHY-prose — rather than pretending you didn't.
 
-Err on the side of tagging. A human flagged as bot just gets an unused `Prior bot:` cross-reference; a bot missed as human defeats the whole point of this enumeration.
-
-For each detected bot, record: login, count of inline comments, count of summary comments, posted-at (latest), and how many `html_url` values you successfully captured.
-
-**6. Produce a context bundle:**
-
+**Output (→ file):**
 ```
-## Context (Phase 1)
-TL;DR: <sources in importance order, e.g. "PR description, JIRA PROJ-123, code, common sense">
-
-- Source: <PR URL / local branch / file>
-- Primary: <title + 1-line body summary>
-- Author / branch: <name> / <branch>
-- Diff scope: <N files, +X/-Y lines>
-- Linked ticket(s): <KEY-123: title — 1-line summary>  OR  none
-- Linked docs: <Confluence/RFC/etc — 1-line summary>  OR  none
-- Referenced files/URLs: <fetched or noted>
-- Prior bot reviews:
-    - <bot-login>: <N inline> + <M summary> comments, latest <YYYY-MM-DD>, <K> deep-links captured
-    - <bot-login>: ...
-    - OR  none detected
-- Unreachable / asked user about: <list>
+## Context-1a (Stage 1a)
+TL;DR: <what was fetched; WHY-prose stashed unread>
+- Source / Diff scope (N files, +X/-Y) / Author + branch / Commit subjects (1-line each)
+- Review file: /tmp/review-<slug>.md
+- WHY-prose stashed UNREAD: <PR body | ticket PROJ-123 desc | design doc url>
+- Prior bot reviews: <login: N inline + M summary, latest YYYY-MM-DD — COUNTS ONLY> OR none
+- Convention sources: <instruction file(s) + linter — N hard rules loaded> OR none reachable
+- Unreachable / asked about: ...
 ```
 
-### Phase 2 — WHY (blocking gate)
+---
 
-1. **Extract WHY₁.** Read PR description, commit messages, linked ticket, code comments. Quote verbatim. No paraphrase.
-2. **Recurse.** Ask: *why is WHY₁ true?* Produce WHY₂. Repeat for WHY₃ if WHY₂ is still abstract. Stop at bedrock or exhaustion.
-3. **Adversarial check** on each WHY:
-   - "If we shipped nothing, what measurable thing gets worse, for whom, by when?"
-   - "If we deleted this PR and the ticket, who notices in 30 days?"
-   - "Is this solving a problem, or performing solving-a-problem?"
-4. **Classify outcome:**
-   - **Bedrock found** → WHY locked. Record it. Proceed to Phase 3.
-   - **Chain debunks itself** → STOP. Report `PREMISE BROKEN: [explain]. Recommend: kill / rescope.`
-   - **No bedrock, only convention/feeling/authority** → STOP. Report `NO BEDROCK FOUND. Stated reason: [WHY₁]. Could not derive harm beneath it. Should this exist?` Ask user.
-   - **Ambiguous / cannot derive** → STOP. Ask user. Do not guess.
+## Stage 0.5 — Cold code read (hard gate)
 
-5. **Refactor / cleanup PRs** require one of: (a) blocks a named upcoming change, (b) measured pain (numbers, not vibes), (c) fixes an actual correctness issue. Else treat as no-bedrock.
+Read the diff and articulate **what changed and what it achieves — from the code alone.** You have NOT yet read the PR description or ticket prose, so this reading can't be primed by the stated intent. This is the un-anchoring that makes Stage 2.7 meaningful.
 
-6. **Missing-ticket-prose-but-obvious-feature exception**: when the WHY is plausibly real from the feature shape + repo signals (PR labels, branch name, surrounding module, recent commits) but is not *written down*, you may proceed *with an explicit flag* in the verdict. The flag must call out that the ticket should be backfilled before merge so future devs know what this exists to solve. Do not silently invent a WHY and proceed as if it were stated.
+This is the main thread reading the code — fast, no subagent. The blindness here is *temporal* (you haven't read the WHY-prose yet), not delegated. Describe, don't yet critique:
 
-### Phase 3 — Solution fit (only after Phase 2 passes)
+- **What changed** — files, functions, the mechanical delta. One or two sentences.
+- **What it achieves** — the *behavioural* effect, inferred purely from the code. "Adds a `region` field to the event payload and routes events tagged `eu` to a second queue." Not "implements the multi-region ticket" — you don't know about the ticket yet.
+- **Inferred intent** — your best read of *why* someone wrote this, from the code only. Lock it. This is the claim Stage 2.7 will test against the stated WHY.
 
-With WHY locked, evaluate whether *this* solution is the right shape for *this* problem.
+Stay descriptive. No severity, no findings, no "this is wrong" — those come later and would be premature before WHY locks. If the code is genuinely unreadable in isolation (heavy domain context needed), say so and note which parts you're unsure of — that uncertainty itself feeds Stage 2.7.
 
-- **Minimum solution.** What is the smallest change that resolves the bedrock WHY? State it in one sentence.
-- **Diff vs minimum.** Compare actual diff to minimum. For every line beyond the minimum, demand justification: tied to WHY, or speculative?
-- **Entanglement audit.** Apply the first-principles cost/benefit above to every "extra" concern. Distinguish load-bearing (cannot split safely) from accidental (should split). Be explicit about which is which — splitting load-bearing concerns creates unsafe interim deploys; *not* splitting accidental ones creates revert pain.
-- **Rejected alternatives.** Does the PR consider simpler approaches? If not, name one and ask the author to justify *against* it.
-- **Abstraction tax.** New abstraction (class, interface, config flag, helper module)? Demand 3+ current callers OR a named concrete near-term caller. "Future flexibility" alone fails.
-- **Test shape.** Tests assert behavior the WHY cares about, or lock implementation details? Over-tested impl is worse than under-tested behavior.
+**Output (→ file):**
+```
+## Cold read (Stage 0.5)
+TL;DR: <what the code does, from code alone — one line>
+- What changed / What it achieves (behavioural) / Inferred intent (locked) / Parts unclear from code alone
+```
 
-Possible Phase 3 verdicts:
-- **Right size** → proceed to Phase 4.
-- **Overbuilt** → call out specific lines/abstractions to trim, then proceed.
-- **Wrong shape** → recommend rethink before line review is useful.
+---
 
-### Phase 3.5 — Adversarial probes (between Fit and Issues)
+## Stage 1b — Context: now read the stated WHY (hard gate)
 
-Static diff reading misses bugs that need adversarial input thinking. Before Phase 4, probe every new behaviour the diff introduces with hostile inputs. This phase feeds Phase 4 findings — it does not stand alone in the output.
+Now read the prose you stashed at 1a — the PR description body, the linked ticket's description and comments, the design docs, any pasted auth-walled content. This is the *stated* WHY: what the author and the ticket claim the change is for.
 
-**For every new regex / parser / validator / lexicon / state machine in the diff:**
+Read it straight. Don't yet reconcile (that's 2.7) and don't yet five-whys it (that's 2). Just absorb what's claimed, quoting the load-bearing lines.
 
-1. List 3 inputs that *look correct* but should match WRONG — false positives where a broad pattern fires on inputs the author didn't intend (e.g. a keyword used in unrelated contexts that share the same word). Pick inputs the author probably did not test.
-2. List 3 inputs that *look correct* but should match RIGHT — false negatives where the pattern misses cases the author intended (e.g. a token that survives the input-normaliser without the word-boundary the pattern still requires).
-3. Run them mentally. If uncertain, run them against the actual compiled pattern via `Bash` / `python3 -c` / language-equivalent. Don't guess.
-4. For each input where behaviour is wrong, that's a Phase 4 finding with a concrete diff.
+**Output (→ file):**
+```
+## Context-1b (Stage 1b)
+TL;DR: <stated purpose in one line, per the prose>
+- Stated WHY (quote from PR body / ticket) / Linked ticket(s) / Linked docs / Referenced files
+- Anything in the prose that surprised you vs the cold read (flag, don't resolve yet)
+```
 
-**For every hardcoded constant in the diff (log levels, timeouts, batch sizes, retry counts, concurrency limits, page sizes, cache TTLs):**
+---
 
-- Ask: *what does this cost in prod at p99 traffic?* If you can't answer with a number or a named failure mode, that's a probe.
-- **Short-circuit probe.** For each literal, ask: *is this value normally chosen per environment in this codebase?* If yes — the literal short-circuits that mechanism and ships one environment's value (usually dev's) to all of them. Finding by default. The fix is to remove the literal and let the existing per-environment mechanism decide; if no such mechanism exists yet, the finding is that one should.
+## Stage 1.5 — Stakes calibration (hard gate)
 
-**For every test file in the diff:**
+Not every change deserves prod-grade scrutiny. A one-time test-only backfill doing N+1 queries is *fine*; flagging it as a perf blocker is noise. Classify the change before interrogating WHY, and state which checks relax.
 
-- Distinguish *call-shape assertions* from *behaviour assertions*. Mocking a dependency then asserting how the code-under-test called the mock proves call shape — it does NOT prove the real dependency does anything useful with those calls. If the change's whole point is the *real* dependency's behaviour (e.g. a logger migration whose value is structured-output emission, a serialiser swap whose value is wire format), a fully-mocked test cannot prove the change works. That's a coverage-illusion finding: stub a smoke test that exercises the real dependency and asserts the externally-observable output.
+| Tier | What it is | Rigor |
+|---|---|---|
+| `prod-critical` | Runs against prod data/traffic, customer-visible, or mutates persistent state | Full. Every Stage 3.5 risk applies; irreversibility / corruption / missing-timeout are blockers. |
+| `internal-tooling` | Internal dashboards, ops scripts, read-only prod tooling, BI | Correctness + reversibility matter; UX/polish relaxes; perf only if it blocks the operator. |
+| `throwaway-script` | One-time migration/backfill/investigation, deleted after use | Correctness on data it touches matters; N+1, cohesion, coverage, abstraction mostly lifted. Reversibility still matters if it writes prod. |
+| `test-only` | Only test code/fixtures, or runs only against non-prod data | Most prod checks lifted. Judge: tests the right behaviour, not flaky, doesn't give false confidence (over-mocking). |
 
-Adversarial probes feed Phase 4 findings. They do not produce praise (praise is for what the author did, not for what the reviewer probed).
+**The tier is a claim — verify it.** "Throwaway script" with no self-delete that writes a prod table is `prod-critical` until proven otherwise. When ambiguous, **ask** (this breaks silence — surface the ask in chat) — voice the assumption: *"I read this as throwaway test-only, so I'd lift the N+1 and coverage checks. But it writes `adieu-pool-matters-dev` — genuinely throwaway, or does it persist? If prod, I'd re-flag the N+1."*
 
-### Phase 4 — Standard review (diff-driven)
+This conditions every later severity. A finding that's 🔥 at `prod-critical` may be 💭 or dropped at `throwaway-script`. State the conditioning whenever it changes a verdict.
 
-Each issue uses the diff format from "Express criticism as diffs" above. Cover:
+**Output (→ file):**
+```
+## Stakes (Stage 1.5)
+TL;DR: <tier> — <what relaxes>
+- Tier / Evidence (why this tier) / Relaxed checks / Still-enforced
+```
 
-- **Correctness.** Logic, off-by-ones, null/empty, concurrency, ordering, idempotency, race conditions, retry semantics.
-- **Edges.** Inputs the author didn't think about. Failure modes. Partial failures. Adversarial inputs for security-sensitive paths.
-- **Regressions.** Behavior changed that callers depend on. API/contract shifts. Migration shape.
-- **Tests.** Adequate for the WHY's risk surface. Missing tests get a stub `+` diff of the test to add.
-- **Coherence.** Matches codebase conventions, or breaks them with a stated reason.
-- **Risk.** Blast radius if wrong. Reversibility. Rollout/rollback story. Need for feature flag / kill switch / DLQ.
+---
 
-### Verdict
+## Stage 2 — WHY interrogation (hard gate)
 
-End every review with one explicit verdict:
+**Five-whys before line-by-line.** A PR's stated reason (WHY₁) is almost always surface. Recurse: *why is WHY₁ true?* WHY₂ often debunks WHY₁ — the ticket was reactive, the problem isn't real, the metric isn't moving, no user is harmed.
 
-- `KILL` — premise broken, work shouldn't exist
-- `RESCOPE` — WHY is real but this PR addresses the wrong slice
-- `TRIM` — WHY and shape OK, but overbuilt; specify what to cut
-- `SHIP-WITH-NITS` — substantively fine, minor cleanups
-- `SHIP` — ready
+**Bedrock** = measurable user harm (bug report, support volume, churn) / revenue-legal-compliance obligation with a citation / measured perf constraint (numbers, not vibes) / a blocker for named scheduled work / a correctness invariant the code violates.
 
-One sentence reason. **List blockers separately from nice-to-haves** — blockers must be addressed before merge; nice-to-haves can be follow-up tickets. If you wrote a long review and can't commit to a verdict, you didn't review — you described.
+**Not bedrock** = "PM asked," "we always do it this way," "feels cleaner," "tech debt" without measured pain, "for consistency" without naming what breaks, "future flexibility" without a named near-term caller.
 
-## Prior bot reviews are leads, not facts
+**Steps:**
+1. Extract WHY₁ — quote verbatim from PR/commits/ticket/comments (the prose you read at 1b). No paraphrase.
+2. Recurse to WHY₂, WHY₃ until bedrock or exhaustion.
+3. Adversarial check each: *if we shipped nothing, what measurable thing gets worse, for whom, by when? If we deleted this PR + ticket, who notices in 30 days? Is this solving a problem or performing solving-a-problem?*
+4. Classify: **bedrock found** → LOCKED, proceed. **Chain debunks itself** → STOP, `PREMISE BROKEN: [explain]. Recommend kill/rescope.` **Only convention/feeling/authority** → STOP, `NO BEDROCK. Stated: [WHY₁]. Couldn't derive harm beneath it. Should this exist?` **Ambiguous** → STOP, ask. (A STOP/ASK breaks silence — surface it in chat.)
 
-Bot reviews (Claude, CodeRabbit, Copilot, Bito, etc.) are *leads* — never ground truth. Two LLMs agreeing about a third LLM's code is one model talking to itself, not signal.
+Refactor/cleanup PRs need one of: blocks a named upcoming change, measured pain (numbers), or fixes a real correctness issue. Else no-bedrock.
 
-- **Verify before relaying.** Bot bug claim → read the code, decide independently, present as *your* finding.
-- **Bot ✅ ≠ resolved.** Re-check the fix against the diff.
-- **No bot flag ≠ safe.** Bots miss WHY, scope, entanglement — your job.
-- **Don't quote bot praise or consensus** in your review. "All ten bots green" legitimises bot-to-bot derivation. Cut it.
+**Missing-ticket exception:** when WHY is plausibly real from feature shape + repo signals (labels, branch, surrounding module, recent commits) but isn't written down, you may proceed *with an explicit verdict flag* that the ticket should be backfilled before merge. Never silently invent a WHY.
 
-Allowed: mine bot comments for *leads to investigate*; disagree explicitly when warranted.
+**Assumption-voiced ask.** When WHY is unclear or a claim can't be resolved from PR + code alone, don't guess and don't ask open-endedly. Voice the assumption *with evidence*, then ask (in chat):
 
-**Visibility ≠ deference.** The mandatory `Prior bot:` line on every finding (see "Prior bot crediting") is a *visibility* mechanism, not a deference mechanism. Crediting a bot for raising something first does not make the bot's claim correct, and does not relieve you from independently verifying the underlying defect. The line tells the reader where the lead came from; the diff and the reasoning are still yours. A finding tagged 🤖 still needs you to have read the code and decided independently — overlap with a bot is not the same as derivation from a bot.
+> *"I think the author is trying to do **X**. But **A** in the diff suggests **THIS**, and **B** suggests **THAT** — so either X is only partially achieved, or I'm missing the mark. Which?"*
 
-User CLAUDE.md / project memory overrides this section.
+Showing the reasoning gives the user a sharp thing to confirm or correct. Filling an intent gap with the author's own framing is the failure this prevents.
 
-## Anti-patterns to refuse
+**Output (→ file):**
+```
+## WHY (Stage 2)
+TL;DR: Doing → <benefit>. Not doing → <concrete cost>.
+- WHY₁ (quote) / WHY₂ / WHY₃ (bedrock) / Bedrock type / Status [LOCKED | PREMISE-BROKEN | NO-BEDROCK | ASK-USER]
+- <assumption-voiced ask if anything unclear>
+```
 
-- **Sycophant WHY invention.** Filling in a plausible WHY because the PR didn't state one. Ask instead (with the missing-ticket-prose exception above for obviously-real features).
-- **Nitpicking before WHY.** Style, naming, formatting — banned until Phase 2 is locked. They legitimize work that may not warrant existing.
-- **"LGTM with minor suggestions"** without a verdict. Either commit or say what's missing.
-- **Treating consistency as bedrock.** "For consistency with X" only counts if you can name what concretely breaks.
-- **"Mirrors existing pattern" as praise.** An existing pattern in the codebase is not automatically good — it may be the same workaround copied twice. Before praising conformance, ask: is the underlying pattern *correct*, or does it paper over a deeper issue (missing packaging, ad-hoc imports, hand-rolled validation)? If the latter, downgrade praise to nit and flag the underlying debt.
-- **Vibe verdicts.** "Feels overengineered" → name the abstraction and the missing caller. "Needs more tests" → name the uncovered risk surface AND provide a test stub diff.
-- **Wall-of-text critique.** Prose without diffs is the failure mode this skill exists to prevent. If you find yourself writing 4+ sentences without a diff, stop and write the diff.
-- **Default-to-split on entanglement.** Always run the cost/benefit first; some bundles are load-bearing and splitting them produces unsafe interim deploys.
-- **Skipping praise.** Every review ends with "What's good" after the Verdict, with specific named items. Even tough verdicts. (Earlier versions of this skill placed praise *before* Issues; that anchored the reviewer toward a positive verdict before Phase 4 had finished critiquing. Praise goes last so it doesn't soften the Issues pass.)
-- **Generic praise.** "Nice work" / "good tests" / "clean code" are worse than no praise — they signal the reviewer didn't read carefully.
-- **Importing bot-review consensus.** Treating prior automated review ✅s, ❌s, or "all addressed" claims as evidence. They are bot-to-bot conversation. Read the diff; derive findings yourself. See "Prior bot reviews are leads, not facts."
-- **Silent bot overlap.** Raising an issue a bot already raised without a `Prior bot:` line crediting the bot. Reader can't tell whether you read the bot comments — looks like you missed them. The `Prior bot:` line is mandatory on every numbered Issue; ✨ when the catch is independent, 🤖 with deep-link when it overlaps.
-- **Pretending originality.** Issue prose that paraphrases a bot's wording without crediting. If your diff matches a bot's suggested diff line-for-line, say so on the `Prior bot:` line — `🤖 already flagged by <bot>, this review adopts the bot's diff verbatim` is honest; pretending it's your own catch is not.
+---
 
-## Output shape
+## Stage 2.7 — Code-vs-WHY reconciliation (HARD HALT on mismatch)
+
+You now hold two independently-formed things: the **cold read** (Stage 0.5 — what the code does, formed before you knew the stated reason) and the **locked WHY** (Stage 2 — what the change is *for*, per the ticket/PR). Put them side by side and ask one question:
+
+> **Does what the code actually does match what the ticket/PR says it's supposed to do?**
+
+Because the cold read was formed *before* you read the WHY-prose, this comparison is honest — your reading of the code wasn't bent to fit the stated intent. A divergence here is the highest-value thing a review can surface: the code and its own ticket disagree.
+
+**Compare on:**
+- **Scope** — does the code do *less* than the WHY claims (under-delivers — a stated goal not actually implemented)? *more* than the WHY claims (scope creep — behaviour the ticket never asked for, possibly unreviewed elsewhere)?
+- **Direction** — does the code achieve something *different from or contradictory to* the stated goal (the ticket says "rate-limit per user," the code rate-limits per IP)?
+- **Silent behaviour** — does the code change behaviour the WHY never mentions (a side effect, a touched code path, an altered default) that a reviewer trusting the ticket would never look for?
+
+**Verdict of this stage:**
+- **MATCH** — code does what the WHY says, no unstated behaviour of consequence → state it, proceed to 2.5.
+- **MISMATCH** — *any* divergence on scope, direction, or silent behaviour → **HARD HALT. Do not proceed.** Surface to the human with both readings shown, and ask which is right. Always flag; never rationalise the gap away or pick a side silently.
+
+> This is a hard gate by the user's explicit rule: *any* code-vs-stated-WHY divergence stops the review and goes to the human. The reviewer's job here is to *detect and surface*, not to decide whether the code or the ticket is "more correct" — that's the human's call. A mismatch is not automatically a defect (the ticket may be stale, or the extra behaviour may be desired-but-undocumented), but it is *always* worth the human's eyes before the review continues.
+
+**A MISMATCH halt ALWAYS surfaces FULLY in chat** (not file-only, not distilled) — it blocks the review pending the user's decision. There is no statusline for a halted review; the review never reached a verdict.
+
+**Halt output (when MISMATCH — print in chat):**
+```
+## Reconciliation (Stage 2.7) — ⛔ HALT: code-vs-WHY mismatch
+Cold read said the code does:   <from Stage 0.5>
+Stated WHY says it should do:    <from Stage 2>
+Divergence: <scope under | scope over | direction | silent behaviour> — <one sentence>
+
+I'm halting the review here per the hard-gate rule. This is a divergence between what
+the code does and what the ticket/PR claims, and it needs your eyes before I go on.
+Which is right — is the code doing the intended thing and the ticket is stale/incomplete,
+or does the code diverge from the intent? <assumption-voiced ask if you have a lean>
+```
+
+**Proceed output (when MATCH — → file):**
+```
+## Reconciliation (Stage 2.7)
+TL;DR: MATCH — code does what the WHY states; no unstated behaviour of consequence.
+- Cold read vs stated WHY: aligned on <scope / direction / behaviour>
+```
+
+---
+
+## Stage 2.5 — Blind independent solve (conditional gate)
+
+Before critiquing the author's approach, solve the problem yourself — *blind*, so the diff doesn't anchor you. A reviewer who reads the implementation first evaluates *the author's solution*; one who solves it first evaluates *the problem*, then compares. (You read the diff at 0.5 — but to *describe* it, not to design against it. The subagent below has read nothing, which is the real blindness.)
+
+You can't un-see a diff you've read. So delegate the blind solve to a **fresh subagent that never sees the diff and can't fetch it.**
+
+**Fires when EITHER (be eager):**
+- **Net-new logic** — new behaviour, algorithm, data flow, or contract. (Pure-mechanical — rename, config, dep bump, test-only, generated — does NOT fire on this axis at any size.)
+- **Size** — changed-files ≥ 5 OR `additions + deletions` ≥ 150.
+
+**Skips** when small AND mechanical — go to Stage 3. State it: `Blind-solve: skipped (3-file rename, mechanical).`
+
+**Run it:**
+1. **Draft the problem statement** from the locked WHY + stakes tier + established constraints (owning service, its storage, the invariant it must hold). Describe the *problem*, never the author's solution — no file names that hint at the approach, no diff content.
+2. **Show it to the user, get confirmation** — a checkpoint, because a misframed problem makes the subagent solve the wrong thing. **This checkpoint surfaces in chat** (it needs the user's eyes before dispatch):
+   > *"Here's the problem statement for the blind solver. It will NOT see the PR. Correct me before I dispatch:"* → [statement]
+   Incorporate corrections, then dispatch.
+3. **Dispatch a fresh subagent** (`Agent`, `general-purpose` or `Plan`) with the confirmed statement + minimal constraints (not the conversation history) and an explicit ban: *you may NOT fetch the PR, branch, or any diff; design from the problem alone.* Ask for 1–3 approaches and its pick, with reasoning.
+4. **Receive its solution** — your independent baseline. You now hold the author's approach (diff you read) and an un-anchored designer's (subagent). Stage 3 compares.
+
+A subagent gives *real* blindness; "try not to anchor" doesn't — you've already read the diff. Cost is one dispatch; payoff is an honest second design to compare against.
+
+**Output (→ file):**
+```
+## Blind solve (Stage 2.5)
+TL;DR: <fired | skipped (reason)>
+- Problem statement (confirmed with user) / Subagent approaches (1–3) / Subagent's pick + why
+```
+
+---
+
+## Stage 3 — Fit & approach comparison
+
+With WHY locked, code-vs-WHY reconciled, and an independent solution in hand, judge whether the author's approach is the right shape — by comparing to your blind solve, not in a vacuum.
+
+- **Minimum solution.** Smallest change resolving the bedrock WHY, in one sentence. Compare actual diff to it; every line beyond demands a tie to WHY or it's speculative.
+- **Approach comparison** (drives the Fit TL;DR):
+  - **Matches** your blind solve → strong signal the shape is right.
+  - **Better** than yours → say so specifically; praise-worthy (author saw what your solver didn't).
+  - **Worse / differs** → highest-value finding a review produces. Name what your approach does that theirs doesn't; decide: real defect, or two valid ways? Worse on a Stage-3.5 risk axis (irreversible, corrupting, untimed) = blocker. Worse on taste only = nit.
+  - Be honest when theirs is better. The blind solve un-anchors you; it isn't a claim your design is the standard.
+- **Naming-honesty.** For each name implying a contract — `version`, `validator`, `serializer`, `cache`, `lock`, `transaction`, `idempotent`, `registry`, `retry` — verify the implementation delivers the contract. A `get_prompt_version` returning a content hash is mis-named: the name is the defect.
+- **Entanglement audit.** When the PR bundles concerns, **don't default to "split it."** Ask per extra concern: cost to add now (lines, coupling, write-amplification, deploy blast)? cost to NOT add now (named harm, named correctness break, named follow-up made harder)? **Load-bearing** (feature unsafe without it — e.g. an endpoint returning privilege-sensitive payloads without its access-control check) → don't split; land the dependency in a prior PR or harden both together. **Accidental** (different blast radius, revert path, owner) → split.
+- **Performance claims** demand a number: measured cost avoided, against what budget at the call site, user-visible? If the saved cost is invisible (background/async/off-critical-path), reject the optimisation — you pay complexity for nothing. "Performance" without a number is a vibe.
+- **Abstraction tax.** New class/interface/flag/helper needs 3+ current callers OR a named near-term caller. "Future flexibility" alone fails.
+- **Test shape.** Tests assert behaviour the WHY cares about, not implementation details.
+
+Don't narrate "applying first principles now" — the review records conclusions and diffs, not meta-commentary.
+
+**Fit TL;DR shapes:** `Matches my solve. Right shape.` / `Better than mine — author <did X> I'd have missed.` / `Differs — mine <does Y>; theirs doesn't. <Real defect | valid alternative>.` / `Wrong shape — theirs solves a different problem than the WHY states.`
+
+---
+
+## Stage 3.5 — Adversarial + named-risk probes
+
+Static diff reading misses bugs that need adversarial thinking and the risks a senior reviewer scans for explicitly. Run each probe; skip with a one-liner when the Stage-1.5 tier lifts it. Don't pad with green checkmarks.
+
+**Adversarial inputs** — for every new regex / parser / validator / lexicon / state machine: list 3 inputs that look correct but should match WRONG (false positives the author didn't test) and 3 that look correct but should match RIGHT (false negatives the pattern misses). Run them mentally; if uncertain run them for real (`python3 -c`, language-equivalent) — don't guess. Each wrong result is a finding with a diff.
+
+**Hardcoded constants** — log levels, timeouts, batch sizes, retry counts, concurrency limits, page sizes, TTLs: ask *what does this cost in prod at p99?* If no number or named failure mode, it's a probe. **Short-circuit probe:** if the value is normally chosen per-environment in this codebase, a literal ships one env's value (usually dev's) to all — finding by default; fix is to route through the existing per-env mechanism.
+
+**Named risks** (each conditioned by tier):
+1. **Irreversibility.** Mutates prod data, drops a column, rewrites records, takes an action with no rollback? Is there a dry-run / backup / reverse migration / kill switch? Irreversible + `prod-critical` = 💀 until a rollback path exists. (`throwaway-script` writing prod is still on the hook — this rarely lifts.)
+2. **Data corruption.** Partial failure leaving inconsistent state? Non-atomic multi-write without a transaction or idempotency key? Half-applying migration? Corruption of persistent state = 💀/🔥 at `prod-critical`.
+3. **Untimed external calls.** Every 3rd-party HTTP call, RPC / cross-service call, external DB query — does it set a timeout? An unbounded wait hangs the caller and exhausts the request budget / connection pools. Missing timeout on a hot request path = 🔥.
+4. **Performance / N+1.** Per-item queries in a loop, missing batch, O(n²) on a request path. 🔥 on a `prod-critical` request path; lifted for a one-time `throwaway-script` (state it: "N+1 acceptable — one-time backfill").
+5. **Cohesion / coupling / LoB.** Is the logic where a reader would look for it, or scattered? New coupling between modules that shouldn't know each other? Respect locality of behaviour — coincidental duplication beats wrong coupling; don't flag DRY violations that are actually correct locality.
+6. **Boy-scout / missed caveats.** A non-obvious constraint left uncommented, a WHY the next reader trips on, an easy leave-it-better skipped. 💭 nits, never blockers — but naming them is part of a real review.
+
+**Test files** — distinguish *call-shape* assertions from *behaviour* assertions. Mocking a dependency then asserting how the code called the mock proves call shape, not that the real dependency does anything useful. If the change's whole point is the real dependency's behaviour (a logger migration whose value is structured output, a serialiser swap whose value is wire format), a fully-mocked test can't prove it works — coverage-illusion finding; stub a smoke test exercising the real dependency.
+
+**Evidence beyond the diff** (run when triggered): **build/type gate** — if CI is stale/unknown on typed code, run `mypy`/`tsc --noEmit`/`cargo check`; if you can't run it, require green CI in the verdict. **Blast radius** — on any renamed/removed/signature-changed exported symbol, `grep -rn "<symbol>"` (or LSP) to count callers; outside-diff callers not updated = 🔥 with a stub diff; cite the command.
+
+**Reach — what did this change OBLIGATE that's not in the diff?** Adversarial probes above ask "does the diff work?"; this asks "did the change *finish*?" Trust the happy-path correctness the author clearly handled — spend the budget here. Fires whenever the diff **adds a member to a closed set** (enum value, map/dict key, status constant, kind/type discriminator, schema enum entry, new `case`/branch) OR **changes a consumed surface** (response field, payload/event key, stored attribute, config key). The edited symbol keeps its name, so Blast-radius won't fire — yet every consumer that switches / looks-up / validates / whitelists over that set is now silently missing the new member, and those consumers are *outside the diff by construction* (the author didn't need to touch them, which is why they break).
+
+You've read the diff, the WHY, and the author's justification — so judging Reach in the main thread inherits "the author said it's cosmetic." Like the Stage 2.5 blind solve, un-anchor it: **when the set has ≥ a handful of consumers OR is consumed across a language / package / service boundary, dispatch a fresh subagent that sees ONLY the consumer side** — give it the set's name, the new member's value, and the ban *you may NOT read the author's diff or its reasoning; grep every consumer of this set and report which mishandle the new member.* It judges each consumer cold, can't inherit the author's framing. For a trivially-scoped set (one or two in-module consumers) an inline `grep`/LSP-search is fine — state which path you took.
+
+Either way: search the new member and its existing siblings across the **whole codebase — including other languages, packages, or services that consume the same set** (a back-end enum often drives a separate front-end map; cite the command); a consumer the diff didn't touch that mis-handles the new value = 🔥, that silently skips/defaults = ⚠️, cosmetic = 💭 — each written as a stub diff. **An in-diff "alignment" unit test does NOT discharge this** — a test inside the owning component can't observe a consumer in another. State the result even when clean: `Reach: <member> — N consumers searched (subagent | inline), all safe.`
+
+**Convention compliance** (only if Stage 1a loaded ≥1 rule). Run the diff's *added* lines against the loaded checklist. Each hit is a Stage-4 Issue (usually ⚠️/💭) with the rule quoted verbatim + source, so the author sees it's the *project's* rule, not your taste. In scope = a rule the repo wrote down; out of scope = generic style with no rule behind it. This is not "lint the PR" — only the loaded hard rules, nothing aspirational.
+
+---
+
+## Stage 4 — Issues (diff-driven)
+
+Write every finding from your *own* reading — at this point you've still opened zero bot comments. Cover correctness (logic, off-by-one, null/empty, concurrency, ordering, idempotency, retries), edges/failure modes, regressions/contract shifts, tests, coherence, risk — all conditioned by the stakes tier.
+
+**Every finding is a diff.** Prose sits *above* the diff, not instead of it. Format:
 
 ````
-## Context (Phase 1)
-TL;DR: <sources in importance order — e.g. "PR description, JIRA PROJ-123, code, common sense">
+### <severity> N. <short problem statement>
+<1–3 sentences: what's wrong, why it matters, the fix.>
+```diff
+--- a/path/file.ext
++++ b/path/file.ext
+@@ <context>
+- old
++ new
+```
+<optional 1-line caveat>
+````
 
-- Source: ...
-- Primary: ...
-- Author / branch: ...
-- Diff scope: ...
-- Linked ticket(s): ...
-- Linked docs: ...
-- Referenced files/URLs: ...
-- Unreachable / asked about: ...
+Severity (first char of header): **💀** system-killer (prod burns / data corrupts / security gap — hard block) · **🔥** blocker (correctness, regression, user-visible breakage) · **⚠️** should-fix (degraded UX, hardening, missing test for a real risk) · **💭** nit (taste, optional). The verdict's blocker list MUST include every 💀 and 🔥.
 
-## WHY (Phase 2)
-TL;DR: Doing → <user benefit>. Not doing → <concrete cost>.
+Rules: diff minimal, unified syntax so it pastes/applies. Hunk headers carry REAL line numbers from the PR head branch whenever derivable (`git grep -n` / `git show <head-ref>:<path>` — cheap; run it): `@@ -857,12 +857,14 @@`, not a bare `@@`. Bare `@@` only when the target file genuinely isn't fetchable. A finding in code outside the diff (reach sweep, missed coverage) still anchors to the head branch's line numbers, not local main's — the two drift. "Delete the file" → `-` lines with no `+`. Missing test → stub `+` diff of the test to add, not "needs a test." No clean diff possible (e.g. "this should be three PRs") → say so, skip the block, don't fake one. **`No diff.` is forbidden** for a numbered Issue — if you'd write it, the finding isn't an Issue: move it to `Acknowledged trade-offs` (author already accepted, out of scope, follow-up ticket exists, convention differs but both correct) or cut it.
 
-- WHY₁ (stated): "<quote>"
-- WHY₂: ...
-- WHY₃ (bedrock): ...
-- Bedrock type: [user-harm | revenue | legal | perf | blocker | invariant]
-- Status: [LOCKED | PREMISE-BROKEN | NO-BEDROCK | ASK-USER]
+Firmness test — BAD: `### 💭 Validator may reject some valid inputs … worth an audit. No diff.` GOOD: `### ⚠️ src/validators/foo.py:42 — pattern accepts strings the caller documents invalid` + a real diff narrowing the alternation. Firm it up or cut it.
 
-## Fit (Phase 3)  -- only if LOCKED
-TL;DR: <one of: "Great fit. No other solutions worth considering." | "Good fit. Could also consider XXXX." | "Bad idea because YYYY. Better: ZZZZ.">
+(Bot markers are added in Stage 5 — not now.)
 
-- Minimum solution: ...
-- Actual diff vs minimum: [right-size | overbuilt | wrong-shape]
-- Entanglement audit: <which extras are load-bearing vs accidental, with cost/benefit reasoning>
+---
 
-## Issues (Phase 4)
-TL;DR: <e.g. "1 system-killer, 1 blocker, 3 nits.">
+## Stage 5 — Read bots/others LAST
 
-### 💀 🤖 1. <Short problem statement>
+Now, and only now, open the deep-links stashed in Stage 1a and read what bots and other humans said. Your findings are locked, so anything you adopt is genuinely cross-checked, not inherited.
+
+Bot reviews are **leads, not facts** — two LLMs agreeing about a third LLM's code is one model talking to itself. For each comment, pick one:
+
+- **Caught something I missed** → verify against the code yourself; if real, add a new Stage 4 issue marked 🤖 with a `Prior bot:` line.
+- **Also found it** → add 🤖 + `Prior bot:` deep-link to your existing finding. Independence preserved — you found it first, blind.
+- **Wrong, my findings refute it** → say so with reasoning. High value: *"CodeRabbit flags the N+1 in `backfill.py` — but per Stage 1.5 this is a one-time throwaway against test data, so it's fine. Bot lacks the stakes context."*
+
+**Per-finding bot marker.** Every Issue header carries a second emoji after the severity: `🤖` (a bot flagged it) or `✨` (independent catch) — `### 🔥 ✨ 2. Title`. Header marker and the `Prior bot:` line must agree. Pick one line shape:
+- `**Prior bot:** 🤖 already flagged by <login> ([inline](url)). Reinforced because <prod-safety / blocker / bot's diff insufficient>.`
+- `**Prior bot:** 🤖 partially flagged by <login> ([inline](url)) — caught <X>, missed <Y> (added here).`
+- `**Prior bot:** 🤖 flagged by multiple bots (<a>, <b>) ([a](url-a), [b](url-b)).`
+- `**Prior bot:** ✨ not raised by any bot review.`
+
+Use the exact login captured in Stage 1a (not a hardcoded "claude-bot"). Because every finding was formed before reading a bot, the ✨ markers are *true* independence, not a claim.
+
+**Bot findings not promoted to Issues** (only when ≥1 dropped) — one line each, forces an explicit decision:
+```
+- 🤖 <login> on <file:line> — "<summary ≤80 chars>" — Dropped because: <already in Acknowledged trade-offs | verified, bot is wrong | out of scope/WHY-locked | duplicate of Issue N | bot misread the diff>.
+```
+
+---
+
+## Stage 6 — Distill & write (hard gate)
+
+The review is now complete in your context. Two deliverables:
+
+**1. Write the full review to file.** Assemble every stage's output (the output shape: Context-1a, Cold read, Context-1b, Stakes, WHY, Reconciliation, Blind solve, Fit, Issues with bot markers, Bot findings not promoted, Verdict, What's good) into one markdown document and write it to `/tmp/review-<slug>.md` (the slug captured at Stage 1a). Use the **Full review file shape** below. Keep this full review in your working context too — follow-up "expand" answers come from context; the file is the durable fallback.
+
+**2. Emit ONLY the statusline strip to chat.** Nothing else. No stage prose, no issue diffs, no what's-good — those live in the file + your context. The strip is the entire chat surface for a completed review.
+
+### The statusline strip (chat surface)
+
+One dense emoji line, then a one-sentence "what", then the file path + the expand hint. Format:
+
+```
+<verdict-light> <VERDICT>  │  <purpose-chip>  │  <fit-chip>  │  <blocker-chip>  │  <nit-chip>  │  <tier-chip>  │  <bot-chip>
+
+<one sentence: what the PR does>
+📄 /tmp/review-<slug>.md  — ask "expand N" for any issue, or "show <stage>"
+```
+
+**Chips (include each only when it applies; drop the chip otherwise):**
+
+- **Verdict** (always): `🟢 SHIP` · `🟢 SHIP-WITH-NITS` · `🟠 FIX-THEN-SHIP` · `🟡 TRIM` · `🟧 RESCOPE` · `🟥 KILL`. The light leads the strip.
+
+  **The verdict is derived, not chosen.** Two axes feed it — design quality (is the shape right?) and mergeability (any 💀/🔥 open?):
+  - blockers = 0, design right → `SHIP` (or `SHIP-WITH-NITS` when ⚠️/💭 remain)
+  - blockers ≥ 1, design right → `FIX-THEN-SHIP` — the shape matches the WHY; merge is gated on the listed 💀/🔥, nothing more. Typical case: one contract bug in an otherwise correct diff.
+  - design wrong (scope beyond WHY / wrong approach / premise shaky) → `TRIM` / `RESCOPE` / `KILL`, regardless of blocker count.
+
+  Hard rule: **💀/🔥 present → SHIP and SHIP-WITH-NITS are forbidden.** A `🟢` light next to a `🛑` chip is a contradiction — if you're about to emit it, the verdict is `FIX-THEN-SHIP` (or worse).
+- **Purpose-match** (only when blind solve fired + reconciliation ran): `🎯 purpose-match` when Stage 2.7 was MATCH; `❌ purpose-mismatch` if it somehow proceeded with caveats. (A true 2.7 MISMATCH halts before Stage 6 — no strip is emitted.)
+- **Fit-match** (only when blind solve fired): `🧩 fit-match` (author ≈ blind solve) · `🧩➕ fit-better` (author beat the solver) · `🧩⚠️ fit-differs` (real divergence — see Issues) · `🧩❌ fit-wrong-shape`. If blind solve skipped: `🧩 fit-skip`.
+- **Blockers** (always): `🚫 0 blockers` when none · `🛑 N blockers` when N≥1 (counts every 💀 + 🔥).
+- **Nits** (always): `💭 M nits` (counts ⚠️ + 💭). `💭 0 nits` is fine.
+- **Tier** (always): `⚠️ prod-critical` · `🔧 internal` · `🗑️ throwaway` · `🧪 test-only`.
+- **Bot overlap** (only when ≥1 bot reviewed): `🤖 K/T overlap` — K of your T issues a bot also flagged. `🤖 0 bots` when bots reviewed but you adopted/overlapped none. Omit the chip entirely when no bot reviewed.
+
+Worked example (PR #588: SHIP, blind fired + matched, 0 blockers, 2 nits, prod-critical, 1 of 2 issues bot-overlapped):
+
+```
+🟢 SHIP  │  🎯 purpose-match  │  🧩 fit-match  │  🚫 0 blockers  │  💭 2 nits  │  ⚠️ prod-critical  │  🤖 1/2 overlap
+
+Widens super-doc classifier to catch fund balance docs beyond annual statements.
+📄 /tmp/review-pr588.md  — ask "expand N" for any issue, or "show <stage>"
+```
+
+Worked example (PR #598: right shape, one 🔥 contract bug → verdict derived to FIX-THEN-SHIP):
+
+```
+🟠 FIX-THEN-SHIP  │  🎯 purpose-match  │  🧩 fit-match  │  🛑 1 blocker  │  💭 2 nits  │  ⚠️ prod-critical  │  🤖 1/3 overlap
+
+Persists external-provider ids on user records via an async refresh call — but the refresh payload fails the receiver's validation, so the backfill never lands.
+📄 /tmp/review-pr598.md  — ask "expand N" for any issue, or "show <stage>"
+```
+
+**Halt supersedes the strip.** If the review halted at Stage 2.7 (MISMATCH) or stopped at Stage 2 (PREMISE-BROKEN / NO-BEDROCK / ASK-USER), there is no completed verdict and no strip — the full halt/stop text was already surfaced in chat at that stage. Do not write a SHIP-shaped file or emit a statusline for a halted review.
+
+### Full review file shape
+
+````
+# Review: <title> — <slug>
+_Generated by proper-review. Verdict: <VERDICT>. Full prose; chat showed only the statusline._
+
+## Context-1a (Stage 1a)
+...
+## Cold read (Stage 0.5)
+...
+## Context-1b (Stage 1b)
+...
+## Stakes (Stage 1.5)
+...
+## WHY (Stage 2)
+...
+## Reconciliation (Stage 2.7)
+...
+## Blind solve (Stage 2.5)
+...
+## Fit (Stage 3)
+...
+## Issues (Stage 4 + bot markers from Stage 5)
+### 🔥 ✨ 1. <problem>
 <1–3 sentences>
 ```diff
 - ...
 + ...
 ```
-**Prior bot:** 🤖 already flagged by <bot-login> ([inline](url)). Reinforced here because <reason>.
-<optional caveat>
-
-### 🔥 ✨ 2. <Short problem statement>
-...
-**Prior bot:** ✨ not raised by any bot review.
-
-### ⚠️ 🤖 3. <Short problem statement>
-...
-**Prior bot:** 🤖 partially flagged by <bot-login> ([inline](url)) — bot caught <X>, missed <Y>.
-
-### 💭 ✨ 4. <Short problem statement>
-...
 **Prior bot:** ✨ not raised by any bot review.
 
 ## Bot findings not promoted to Issues
-<Only when ≥1 bot finding was dropped. One line per dropped lead — forces an explicit decision, no silent drops.>
-
-- 🤖 <bot-login> on <file:line> — "<bot's summary, ≤80 chars>" — Dropped because: <already covered by Acknowledged trade-offs | verified against code, bot is wrong | out of scope per author / WHY-locked | duplicate of Issue N | bot misread the diff>.
-- 🤖 <bot-login> on <file:line> — "<...>" — Dropped because: <...>.
+- 🤖 <login> on <file:line> — "<summary>" — Dropped because: <reason>.
 
 ## Verdict
-[KILL | RESCOPE | TRIM | SHIP-WITH-NITS | SHIP] — <one-line reason>
-
-**Bot overlap:** N of M issues already flagged by bots (🤖); K issues are independent (✨). <If overlap = 100%, the verdict text MUST acknowledge that this review confirms existing bot findings and adds no independent catches.>
-
-**Blockers before merge** (must include every 💀 and 🔥):
-1. ...
-2. ...
-
-**Nice-to-haves / follow-ups** (⚠️ and 💭):
-- ...
-- ...
-
-**Acknowledged trade-offs** (findings that don't belong in Issues — author already accepted, out-of-scope, or covered by follow-up ticket):
-- <one-line: trade-off — author's stated reason — follow-up ticket if any>
+[KILL | RESCOPE | TRIM | FIX-THEN-SHIP | SHIP-WITH-NITS | SHIP] — <reason, conditioned by tier; derived per the verdict rule — 💀/🔥 present forbids SHIP*>
+**Bot overlap:** N of M flagged by bots (🤖); K independent (✨).
+**Blockers before merge:** ...
+**Nice-to-haves / follow-ups:** ...
+**Acknowledged trade-offs:** ...
 
 ## What's good
-
-### 🌟 <path/file.ext:LINE> — <short label>
-<1–2 sentences naming the decision and why it's good.>
+### 🌟 <file:LINE> — <label>
+<1–2 sentences; credit author where their approach beat the blind solve>
 ```<lang>
-<actual snippet, 2–8 lines>
+<snippet 2–8 lines>
 ```
-
-### ✨ <path/file.ext:LINE> — <short label>
-...
-
-### <path/file.ext:LINE> — <short label>
-<ordinary good — no emoji prefix>
 ````
 
-## Parallelism: don't slice the PR
+---
 
-proper-review is single-context by design. The phase gates (Phase 2 WHY → Phase 3 Fit → Phase 4 Issues) require one reviewer holding the whole diff. Parallel reviewers reviewing file-slices break the gates:
+## Follow-up protocol (after the strip)
 
-- Each slice does its own mini-WHY or skips it → no locked premise
-- Entanglement audit (Phase 3) is impossible without seeing the whole diff
-- Verdict becomes N stapled mini-reviews, not one coherent call
-- Slice boundaries (infra/python/tests/frontend) are author-side concerns; review must judge them together, not in isolation
+The full review is in your context and in the file. When the user asks to go deeper:
 
-**Rule:** when running this skill, do NOT spawn parallel agents that each review a subset of files. One reviewer, whole diff, phases in order.
+- **"expand N" / "expand the contribution-receipt issue"** → surface that Issue's full prose + diff from context.
+- **"show the WHY chain" / "show fit" / "show <stage>"** → surface that stage's full section.
+- **"show everything" / "paste the full review"** → surface the whole document (or tell them it's at `/tmp/review-<slug>.md` if they'd rather open it).
+- **"why did you drop the bot's X finding"** → surface the Bot-findings-not-promoted line + your reasoning.
 
-**If the user says "use teams" / "use parallel agents" / "split this review":** interpret as "dimension parallelism over whole diff," not "file slicing." Spawn dimension-agents (security/perf/tests/etc.) each seeing every changed file. Main agent runs Phases 1–3 + Verdict; dimension-agents feed Phase 4 only.
+Answer from your held context for speed. **If your context was compacted** (you no longer hold the review), re-`Read` `/tmp/review-<slug>.md` and surface from there — that's exactly what the file is for. If the file is also gone (new session, `/tmp` cleared), say so and offer to re-run the review.
 
-## When to skip this skill
+Never re-derive a finding from scratch when the user asks to expand it — that risks a different answer than the one the strip summarised. The strip, the file, and the expanded answer must all agree.
 
-- Trivial diffs (typo, dependency bump with no behavior change, generated code).
-- User explicitly says "just check syntax" / "just lint this."
-- Hotfix on a live incident where WHY is self-evident (the incident).
+---
 
-In all other cases, run Phase 2. The cost of asking "why" is one message. The cost of approving work that shouldn't exist compounds forever.
+## Anti-patterns to refuse
+
+- **A 🟢 verdict with a 🛑 chip.** SHIP/SHIP-WITH-NITS while any 💀/🔥 is open contradicts itself and buries the blocker. Derive the verdict: blockers gate → FIX-THEN-SHIP.
+- **Streaming stage prose to chat.** This skill runs Stages 1a–5 silently; the chat surface is the Stage-6 statusline only. The exceptions are halts and clarifying asks (2.7 mismatch, 2 stop/ask, 1.5 tier ask, 2.5 problem-statement checkpoint) — those surface fully inline.
+- **Distilling a halt.** A Stage-2.7 mismatch, a PREMISE-BROKEN/NO-BEDROCK stop, or any clarifying ask is surfaced FULLY in chat — never reduced to a chip or hidden in the file. The user must decide before the review continues.
+- **Emitting a statusline for a halted/stopped review.** No verdict → no strip. The halt text already went to chat.
+- **Re-deriving on expand.** When the user says "expand N", surface what's in context/file — don't re-run the analysis and risk a divergent answer. Strip, file, and expansion must agree.
+- **Reading the PR-body/ticket WHY before the cold code read.** The whole point — read the stated reason first and your reading of *what the code does* bends to fit it, so a code-vs-ticket mismatch never surfaces. Fetch the prose at 1a, read it at 1b.
+- **Rationalising away a Stage-2.7 mismatch.** Any code-vs-stated-WHY divergence is a HARD HALT to the human — don't pick a side, don't decide the ticket is "obviously stale," don't proceed. Surface both readings and ask.
+- **Reading bots before Stage 5.** Read their content early and you inherit their framing.
+- **Reading the diff to *design against it* before the blind solve** (when it fires). The 0.5 cold read *describes*; designing your own solution from the diff anchors you on the author. The blind solve is delegated to a subagent for exactly this reason.
+- **Sycophant WHY invention** — filling a plausible WHY because the PR didn't state one. Ask (missing-ticket exception aside).
+- **Nitpicking before WHY** — style/naming/format banned until Stage 2 locks. Legitimizes work that may not warrant existing.
+- **Trusting good prose as correct design.** A thorough PR description justifies the design *within its own frame* — it never challenges the frame.
+- **A name as proof.** `get_x_version` isn't a version function because it's named one. Verify the contract.
+- **Uniform rigor.** Flagging an N+1 in a one-time throwaway as a blocker is noise. Condition on the stakes tier.
+- **"LGTM with minor suggestions"** without a verdict. Commit or say what's missing.
+- **Consistency as bedrock** without naming what concretely breaks.
+- **Vibe verdicts** — "feels overengineered" → name the abstraction + missing caller; "needs more tests" → name the uncovered risk + a stub diff.
+- **Wall-of-text critique** — prose without a diff. 4+ sentences with no diff → stop and write the diff.
+- **Default-to-split on entanglement** — run cost/benefit first; some bundles are load-bearing.
+- **Proving the happy path instead of sweeping the reach** — burning the review re-verifying math / guards / normalisation the author clearly handled, while never searching which consumers of a new enum value / map key / discriminator went unswept. The consumer the author couldn't see is the one the diff-bound reviewer also can't see — search it (across languages/packages), un-anchored, before the verdict.
+- **Scoring a comment by your own taste when the repo wrote a rule** — praising or passing a comment without checking it against the project's loaded conventions. Convention compliance ≠ comment quality; run the Stage-1a-loaded rules.
+- **Importing bot consensus** — "all bots green" is bot-to-bot conversation, not evidence. Derive findings yourself.
+- **Silent bot overlap** — raising what a bot raised without the `Prior bot:` line; reader can't tell you read them.
+- **Skipping praise** — every review ends with specific named What's good in the file, even tough verdicts. Generic praise ("nice work") is worse than none.
+- **Rubber-stamping unknown CI** — no SHIP without confirming CI green or running the build when CI is stale; if unknown, say so.
+
+## Parallelism
+
+One reviewer holds the whole diff — the stage gates require it; parallel reviewers on file-slices break the WHY lock, the cold-read/reconciliation, and the entanglement audit. When the diff is large (≥8 files OR ≥400 lines) or touches ≥2 of {access control, DB migrations, public API contract, infra/CI, payment/PII}, or the user opts in ("thorough", "deep review", "security review", "use agents"), you may spawn **dimension-agents that each hold the whole diff with a single lens** (security / performance / tests / migration / API-contract) feeding Stage 4 only — the main agent runs Stages 1a–3 + 5 + 6 and writes the verdict. Log the trigger in the Context-1a section (file). **Do not confuse these with the Stage 2.5 blind-solve subagent** — dimension-agents read the whole diff; the blind solver reads none of it.

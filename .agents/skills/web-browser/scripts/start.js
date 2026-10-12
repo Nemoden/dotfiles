@@ -1,80 +1,117 @@
 #!/usr/bin/env node
 
-import { spawn, execSync } from "node:child_process";
+// Start the agent browser for one profile, or reuse it if it already runs.
+// It runs from its own data folder, so the user's daily Chrome is never
+// started, stopped or written to.
+
+import { execFileSync, spawn } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DAILY_ROOT,
+  DEFAULT_PROFILE,
+  StepError,
+  browserPort,
+  dataDir,
+  flag,
+  run,
+  sleep,
+  updateSession,
+} from "./session.js";
 
-const useProfile = process.argv[2] === "--profile";
+const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
-if (process.argv[2] && process.argv[2] !== "--profile") {
-  console.log("Usage: start.ts [--profile]");
-  console.log("\nOptions:");
-  console.log(
-    "  --profile  Copy your default Chrome profile (cookies, logins)",
-  );
-  console.log("\nExamples:");
-  console.log("  start.ts            # Start with fresh profile");
-  console.log("  start.ts --profile  # Start with your Chrome profile");
-  process.exit(1);
+if (flag("help")) {
+  console.log(`Usage: start.js [--profile=<name>] [--headless] [--watch]
+
+  --profile=<name>  Agent browser identity (default ${DEFAULT_PROFILE}). At each cold start,
+                    the logins (cookies, local storage) of the daily Chrome profile with
+                    that name, folder or email are copied in. No match: empty profile.
+  --headless        No window.
+  --watch           Also log console and network of the agent browser (watch.js).`);
+  process.exit(0);
 }
 
-// Kill existing Chrome
-try {
-  execSync("killall 'Google Chrome'", { stdio: "ignore" });
-} catch {}
+const profile = typeof flag("profile") === "string" ? flag("profile") : DEFAULT_PROFILE;
 
-// Wait a bit for processes to fully die
-await new Promise((r) => setTimeout(r, 1000));
-
-// Setup profile directory
-execSync("mkdir -p ~/.cache/scraping", { stdio: "ignore" });
-
-if (useProfile) {
-  // Sync profile with rsync (much faster on subsequent runs)
-  execSync(
-    `rsync -a --delete "${process.env["HOME"]}/Library/Application Support/Google/Chrome/" ~/.cache/scraping/`,
-    { stdio: "pipe" },
-  );
-}
-
-// Start Chrome in background (detached so Node can exit)
-spawn(
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  [
-    "--remote-debugging-port=9222",
-    `--user-data-dir=${process.env["HOME"]}/.cache/scraping`,
-    "--profile-directory=Default",
-    "--disable-search-engine-choice-screen",
-    "--no-first-run",
-    "--disable-features=ProfilePicker",
-  ],
-  { detached: true, stdio: "ignore" },
-).unref();
-
-// Wait for Chrome to be ready by checking the debugging endpoint
-let connected = false;
-for (let i = 0; i < 30; i++) {
+/** Find a daily Chrome profile by display name, folder name or email. */
+function findDailyProfile(name) {
+  let cache = {};
   try {
-    const response = await fetch("http://localhost:9222/json/version");
-    if (response.ok) {
-      connected = true;
-      break;
-    }
-  } catch {
-    await new Promise((r) => setTimeout(r, 500));
+    cache = JSON.parse(readFileSync(join(DAILY_ROOT, "Local State"), "utf8")).profile.info_cache;
+  } catch {}
+  const all = Object.entries(cache).map(([dir, info]) => ({ dir, name: info.name, email: info.user_name || "" }));
+  const want = name.toLowerCase();
+  const hit = all.find((p) => [p.dir, p.name, p.email].some((v) => v && v.toLowerCase() === want));
+  return { hit, all };
+}
+
+/** Copy the files that hold logins. Saved passwords are not copied. */
+function copyLogins(src, dst) {
+  mkdirSync(dst, { recursive: true, mode: 0o700 });
+  const cookies = join(src, "Cookies");
+  if (existsSync(cookies)) {
+    rmSync(join(dst, "Cookies"), { force: true });
+    rmSync(join(dst, "Cookies-journal"), { force: true });
+    // sqlite3 makes a consistent copy while the daily Chrome keeps the file open.
+    execFileSync("sqlite3", [`file:${cookies}?mode=ro`, `.backup '${join(dst, "Cookies")}'`]);
+  }
+  const storage = join(src, "Local Storage");
+  if (existsSync(storage)) {
+    rmSync(join(dst, "Local Storage"), { recursive: true, force: true });
+    cpSync(storage, join(dst, "Local Storage"), { recursive: true, filter: (p) => !p.endsWith("/LOCK") });
   }
 }
 
-if (!connected) {
-  console.error("✗ Failed to connect to Chrome");
-  process.exit(1);
-}
+await run(
+  async () => {
+    const dir = dataDir(profile);
+    const running = await browserPort(profile);
+    if (running) {
+      updateSession((s) => (s.profile = profile));
+      console.log(`✓ agent browser "${profile}" already running (port ${running}). This session uses it now.`);
+      return;
+    }
 
-// Start background watcher for logs/network (detached)
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-const watcherPath = join(scriptDir, "watch.js");
-spawn(process.execPath, [watcherPath], { detached: true, stdio: "ignore" }).unref();
+    const { hit, all } = findDailyProfile(profile);
+    if (hit) {
+      copyLogins(join(DAILY_ROOT, hit.dir), join(dir, "Default"));
+      console.log(`✓ copied logins from your Chrome profile "${hit.name}" (${hit.dir})`);
+    } else {
+      const known = all.map((p) => `"${p.name}"`).join(", ");
+      console.log(`note: no daily Chrome profile "${profile}" (you have: ${known}). Using agent profile as is.`);
+    }
 
-console.log(
-  `✓ Chrome started on :9222${useProfile ? " with your profile" : ""}`,
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    rmSync(join(dir, "DevToolsActivePort"), { force: true });
+    const args = [
+      `--user-data-dir=${dir}`,
+      "--profile-directory=Default",
+      "--remote-debugging-port=0",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-search-engine-choice-screen",
+      "--disable-features=ProfilePicker",
+    ];
+    if (flag("headless")) args.push("--headless=new");
+    spawn(CHROME, [...args, "about:blank"], { detached: true, stdio: "ignore" }).unref();
+
+    let port = null;
+    for (let i = 0; i < 40 && !port; i++) {
+      await sleep(500);
+      port = await browserPort(profile);
+    }
+    if (!port) {
+      throw new StepError(`agent browser "${profile}" did not start within 20s`, "tell the user. Do not kill or restart Chrome.");
+    }
+    updateSession((s) => (s.profile = profile));
+
+    if (flag("watch")) {
+      const watcher = join(dirname(fileURLToPath(import.meta.url)), "watch.js");
+      spawn(process.execPath, [watcher, `--profile=${profile}`], { detached: true, stdio: "ignore" }).unref();
+    }
+    console.log(`✓ agent browser "${profile}" started (port ${port}). Your daily Chrome is untouched.`);
+  },
+  { tabs: false },
 );

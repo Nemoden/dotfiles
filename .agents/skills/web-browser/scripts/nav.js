@@ -1,65 +1,26 @@
 #!/usr/bin/env node
 
-import { connect } from "./cdp.js";
+import {
+  StepError,
+  currentProfile,
+  flag,
+  navigate,
+  openTab,
+  pageInfo,
+  positional,
+  resolveTab,
+  run,
+} from "./session.js";
 
-const DEBUG = process.env.DEBUG === "1";
-const log = DEBUG ? (...args) => console.error("[debug]", ...args) : () => {};
-
-const url = process.argv[2];
-const newTab = process.argv[3] === "--new";
-
-if (!url) {
-  console.log("Usage: nav.js <url> [--new]");
-  console.log("\nExamples:");
-  console.log("  nav.js https://example.com       # Navigate current tab");
-  console.log("  nav.js https://example.com --new # Open in new tab");
-  process.exit(1);
-}
-
-// Global timeout
-const globalTimeout = setTimeout(() => {
-  console.error("✗ Global timeout exceeded (45s)");
-  process.exit(1);
-}, 45000);
-
-try {
-  log("connecting...");
-  const cdp = await connect(5000);
-
-  log("getting pages...");
-  let targetId;
-
-  if (newTab) {
-    log("creating new tab...");
-    const { targetId: newTargetId } = await cdp.send("Target.createTarget", {
-      url: "about:blank",
-    });
-    targetId = newTargetId;
-  } else {
-    const pages = await cdp.getPages();
-    const page = pages.at(-1);
-    if (!page) {
-      console.error("✗ No active tab found");
-      process.exit(1);
-    }
-    targetId = page.targetId;
-  }
-
-  log("attaching to page...");
-  const sessionId = await cdp.attachToPage(targetId);
-
-  log("navigating...");
-  await cdp.navigate(sessionId, url);
-
-  console.log(newTab ? "✓ Opened:" : "✓ Navigated to:", url);
-
-  log("closing...");
-  cdp.close();
-  log("done");
-} catch (e) {
-  console.error("✗", e.message);
-  process.exit(1);
-} finally {
-  clearTimeout(globalTimeout);
-  setTimeout(() => process.exit(0), 100);
-}
+await run(async () => {
+  const url = positional()[0];
+  if (!url) throw new StepError("no URL given", "nav.js <url> --new=<name>  or  nav.js <url> --tab=<name>");
+  const timeout = Number(flag("timeout")) || 15000;
+  const newName = flag("new");
+  const t = newName !== undefined ? await openTab(newName, currentProfile()) : await resolveTab(flag("tab"));
+  const { loaded } = await navigate(t.cdp, t.sessionId, url, timeout);
+  const info = await pageInfo(t.cdp, t.sessionId);
+  const state = loaded ? "loaded" : `still loading after ${timeout / 1000}s, usable`;
+  console.log(`✓ ${t.name}: ${state}  ${info.url}  "${info.title}"`);
+  t.cdp.close();
+});

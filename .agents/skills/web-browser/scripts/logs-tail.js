@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 
 import { existsSync, readdirSync, readFileSync, statSync, watch } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { STATE_ROOT } from "./session.js";
 
-const LOG_ROOT = join(homedir(), ".cache/agent-web/logs");
+// One folder per agent profile, then one per day.
+const LOG_ROOT = join(STATE_ROOT, "logs");
 
 function findLatestFile() {
   if (!existsSync(LOG_ROOT)) return null;
   const dirs = readdirSync(LOG_ROOT)
-    .filter((name) => /^\d{4}-\d{2}-\d{2}$/.test(name))
-    .map((name) => join(LOG_ROOT, name))
+    .flatMap((profile) => (statSafe(join(LOG_ROOT, profile))?.isDirectory() ? readdirSync(join(LOG_ROOT, profile)).map((day) => join(LOG_ROOT, profile, day)) : []))
+    .filter((path) => /\d{4}-\d{2}-\d{2}$/.test(path))
     .filter((path) => statSafe(path)?.isDirectory())
-    .sort();
+    .sort((a, b) => a.slice(-10).localeCompare(b.slice(-10)));
   if (dirs.length === 0) return null;
   const latestDir = dirs[dirs.length - 1];
   const files = readdirSync(latestDir)

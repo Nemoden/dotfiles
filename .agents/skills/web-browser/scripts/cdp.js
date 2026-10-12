@@ -4,12 +4,12 @@
 
 import WebSocket from "ws";
 
-export async function connect(timeout = 5000) {
+export async function connect(port, timeout = 5000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const resp = await fetch("http://localhost:9222/json/version", {
+    const resp = await fetch(`http://127.0.0.1:${port}/json/version`, {
       signal: controller.signal,
     });
     const { webSocketDebuggerUrl } = await resp.json();
@@ -34,7 +34,7 @@ export async function connect(timeout = 5000) {
   } catch (e) {
     clearTimeout(timeoutId);
     if (e.name === "AbortError") {
-      throw new Error("Connection timeout - is Chrome running with --remote-debugging-port=9222?");
+      throw new Error(`Connection timeout on port ${port}`);
     }
     throw e;
   }
@@ -119,6 +119,21 @@ class CDP {
       });
 
       this.ws.send(JSON.stringify(msg));
+    });
+  }
+
+  waitFor(method, sessionId, timeout) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        off();
+        resolve(null);
+      }, timeout);
+      const off = this.on(method, (params, sid) => {
+        if (sid !== sessionId) return;
+        clearTimeout(timer);
+        off();
+        resolve(params);
+      });
     });
   }
 

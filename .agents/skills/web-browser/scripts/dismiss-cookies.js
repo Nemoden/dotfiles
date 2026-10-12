@@ -7,11 +7,11 @@
  * Supports common CMPs: OneTrust, Cookiebot, Didomi, Quantcast, Google, BBC, Amazon, etc.
  *
  * Usage:
- *   ./dismiss-cookies.js          # Accept cookies
- *   ./dismiss-cookies.js --reject # Reject cookies (where possible)
+ *   ./dismiss-cookies.js --tab=<name>           # Accept cookies
+ *   ./dismiss-cookies.js --tab=<name> --reject  # Reject cookies (where possible)
  */
 
-import { connect } from "./cdp.js";
+import { flag, positional, resolveTab, run } from "./session.js";
 
 const DEBUG = process.env.DEBUG === "1";
 const log = DEBUG ? (...args) => console.error("[debug]", ...args) : () => {};
@@ -288,27 +288,9 @@ function collectFrames(frameTree, frames = []) {
   return frames;
 }
 
-// Global timeout
-const globalTimeout = setTimeout(() => {
-  console.error("✗ Global timeout exceeded (30s)");
-  process.exit(1);
-}, 30000);
-
-try {
-  log("connecting...");
-  const cdp = await connect(5000);
-
-  log("getting pages...");
-  const pages = await cdp.getPages();
-  const page = pages.at(-1);
-
-  if (!page) {
-    console.error("✗ No active tab found");
-    process.exit(1);
-  }
-
-  log("attaching to page...");
-  const sessionId = await cdp.attachToPage(page.targetId);
+await run(
+  async () => {
+  const { cdp, sessionId } = await resolveTab(flag("tab"));
 
   // Wait a bit for consent dialogs to appear
   await new Promise((r) => setTimeout(r, 500));
@@ -361,13 +343,7 @@ try {
     console.log(`○ No cookie dialog found to ${mode}`);
   }
 
-  log("closing...");
   cdp.close();
-  log("done");
-} catch (e) {
-  console.error("✗", e.message);
-  process.exit(1);
-} finally {
-  clearTimeout(globalTimeout);
-  setTimeout(() => process.exit(0), 100);
-}
+  },
+  { timeout: 30000 },
+);

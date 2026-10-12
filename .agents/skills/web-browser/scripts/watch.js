@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
 import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
-import { connect } from "./cdp.js";
+import { DEFAULT_PROFILE, STATE_ROOT, connectProfile, flag, slug } from "./session.js";
 
-const LOG_ROOT = join(homedir(), ".cache/agent-web/logs");
+const profile = typeof flag("profile") === "string" ? flag("profile") : DEFAULT_PROFILE;
+const LOG_ROOT = join(STATE_ROOT, "logs", slug(profile));
 const PID_FILE = join(LOG_ROOT, ".pid");
 
 function ensureDir(dir) {
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 }
 
@@ -134,7 +134,7 @@ async function attachToTarget(cdp, targetInfo) {
 }
 
 async function main() {
-  const cdp = await connect(5000);
+  const cdp = await connectProfile(profile);
 
   cdp.on("Target.targetCreated", async (params) => {
     try {

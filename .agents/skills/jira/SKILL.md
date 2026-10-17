@@ -152,6 +152,8 @@ jira issue create -p PROJ -t Task -P PROJ-361 --no-input \
 
 Use when the issue needs panels, code blocks, bullet lists, or inline code formatting. Read [references/adf.md](references/adf.md) for the full ADF node reference before constructing the JSON.
 
+**Every Jira key in a body is an `inlineCard`**, never a plain text node: `{"type": "inlineCard", "attrs": {"url": "$CC_JIRA_SERVER/browse/PROJ-123"}}`. Jira then renders it as a card with the key, title and status. This holds for parents, related tickets and every key in prose. Markdown-in, markdown-out tools (an Atlassian MCP connector's `contentFormat: "markdown"`) turn keys into plain text: create through ADF, or fix the keys right after with a REST edit that swaps each key text for an `inlineCard`.
+
 **ADF is not markdown.** Backticks, asterisks, and `\n` inside a text node render literally. Inline code requires splitting the string into separate text nodes with a `code` mark on the code spans — see "ADF is not markdown" in the reference.
 
 ```bash
@@ -454,3 +456,4 @@ For rich formatting (panels, code, tables, marks), read [references/adf.md](refe
 - **Acceptance criteria**: green `success` panel with bold header + bullet list
 - **Inline code**: text node with `{"type": "code"}` mark
 - **Bold**: text node with `{"type": "strong"}` mark
+- **Jira keys**: `inlineCard` node with the browse URL, never plain text (see "Cross-referencing JIRA tickets" in the reference)

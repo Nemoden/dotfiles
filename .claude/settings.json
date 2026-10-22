@@ -1,12 +1,11 @@
 {
+  "cleanupPeriodDays": 99999,
   "env": {
     "CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "includeCoAuthoredBy": false,
-  "model": "claude-opus-5-5",
-  "cleanupPeriodDays": 99999,
   "permissions": {
     "allow": [
       "Bash(*setup-ralph-loop.sh*)",
@@ -19,6 +18,7 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -122,13 +122,21 @@
   },
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
-    "ralph-loop@claude-plugins-official": true
+    "ralph-loop@claude-plugins-official": false,
+    "logo-design@logo-design-skill": false,
+    "telemetry@builtin": false
   },
   "extraKnownMarketplaces": {
     "superpowers-marketplace": {
       "source": {
         "source": "github",
         "repo": "obra/superpowers-marketplace"
+      }
+    },
+    "logo-design-skill": {
+      "source": {
+        "source": "github",
+        "repo": "kaankiziltug/logo-design-skill"
       }
     }
   },

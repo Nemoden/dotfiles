@@ -282,14 +282,14 @@ end
 # upgrade ls
 if command -sq eza
     alias ls='eza --time-style long-iso'
-    alias l='ls -la --icons'
+    alias l='ls -la --icons=always'
     alias la='ls -la'
     alias lsd='ls -D'
     alias lnew='l -snew'
     alias lnewr='l -snew -r'
     alias lanew='la -snew'
     alias lanewr='la -snew -r'
-    alias tree='eza -T --icons'
+    alias tree='eza -T --icons=always'
 else
     alias l='ls -lA'
     alias la='ls -lA'

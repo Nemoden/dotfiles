@@ -198,6 +198,7 @@ If `~/Projects/_llms` exists, it holds local snapshots of LLM-oriented vendor do
 
 # PRs on github
 
+- Open every PR as a draft (`gh pr create --draft`). I mark it ready myself.
 - The utter bare minimum for PR description is: WHAT changed and WHY
 - Never comment under my name without asking persmission to do so first
 - **Review comments carry a ```suggestion block whenever the fix is applicable.** Prose says why, the block makes it one click. A comment that describes an edit without offering it makes the author retype what you already worked out.

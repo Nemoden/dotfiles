@@ -1,4 +1,4 @@
-"""Build tmux sessions, windows and panes from a snapshot or layout file, and resume a Claude session in each pane.
+"""Build tmux sessions, windows and panes from a snapshot or layout file, and resume the agent session in each pane.
 
 Usage: python3 -I restore.py SOURCE PANES_OUT.json [--dry-run] [--only a,b] [--skip a,b]
 
@@ -13,27 +13,42 @@ Format (snapshot.py writes all keys; a hand-written layout needs only name, pane
        "panes": [{"sid": "<session id>", "cwd": "/start/dir", "command": "claude"},
                  {"sid": null, "cwd": "/dir", "command": "nvim", "split": "25%"}]}]}]}
 
-A pane with a sid runs `claude -r <sid>` in cwd. A pane without one gets a
-shell in cwd, and its old command only shows in the plan. "split" puts a pane
-to the right of the previous one at that width; "layout" puts all panes back
-at their saved geometry. A tmux session that exists already gets the windows
-appended, and its current windows stay as they are. A Claude session with a
-live process is left out, because two processes on one transcript corrupt it.
+A pane with a sid resumes it in cwd: `claude -r <sid>`, or with "command"
+"codex" `codex resume <sid>`, or with "command" "pi" `pi --session <session_file>`.
+A pane without a sid gets a shell in cwd, and its old command only shows in the
+plan. "split" puts a pane to the right of the previous one at that width;
+"layout" puts all panes back at their saved geometry. A tmux session that
+exists already gets the windows appended, and its current windows stay as they
+are. A session with a live process is left out, because two processes on one
+transcript corrupt it.
 PANES_OUT.json maps each session id to its new tmux pane id (%N).
 """
 import glob
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scan import boot_time, live_session_ids  # noqa: E402
-from snapshot import SNAPS, STATUS_MARKS  # noqa: E402
+from snapshot import SNAPS, STATUS_MARKS, read_layout  # noqa: E402
 
-# Each claude process loads its whole transcript at start; dozens at once stall the machine.
+# Each agent process loads its whole transcript at start; dozens at once stall the machine.
 STAGGER_S = 3
+
+
+def resume_cmd(pane):
+    """The command that resumes the pane's session; a hand-written layout has no "command", so it means claude."""
+    sid = pane.get("sid")
+    if not sid:
+        return None
+    if pane.get("command") == "codex":
+        return f"codex resume {sid}"
+    if pane.get("command") == "pi":
+        return f"pi --session {shlex.quote(pane.get('session_file') or sid)}"
+    return f"claude -r {sid}"
 
 
 def tmux(*args):
@@ -76,7 +91,8 @@ def main():
     data = json.load(open(source))
     print(f"source: {source}" + (f" (taken {data['taken_at']})" if "taken_at" in data else ""))
 
-    live = live_session_ids()
+    # Codex and pi keep no process registry, so a session open in a live pane counts as live.
+    live = live_session_ids() | {p["sid"] for s in read_layout() or [] for w in s["windows"] for p in w["panes"] if p["sid"]}
     live_windows = tmux_windows()
     existing = set(live_windows)
     panes, notes, launched = {}, [], 0
@@ -113,7 +129,8 @@ def main():
                     cmd = ["new-window", "-d", "-t", f"{name}:", "-n", win["name"], "-c", cwd, *fmt]
                 else:
                     cmd = ["split-window", "-d", "-h", "-l", pane.get("split", "50%"), "-t", prev, "-c", cwd, *fmt]
-                what = f"claude -r {sid}" if sid else f"shell (was: {pane.get('command', '?')})"
+                resume = resume_cmd(pane)
+                what = resume or f"shell (was: {pane.get('command', '?')})"
                 print(("DRY " if dry else "") + f"{name}:{win['name']}{' (appended)' if appended else ''}  {cwd}  -> {what}")
                 if dry:
                     prev = first = first or "<pane>"
@@ -123,7 +140,7 @@ def main():
                 first = first or pid
                 prev = pid
                 if sid:
-                    tmux("send-keys", "-t", pid, "-l", f"claude -r {sid}")
+                    tmux("send-keys", "-t", pid, "-l", resume)
                     tmux("send-keys", "-t", pid, "Enter")
                     panes[sid] = pid
                     launched += 1
@@ -139,7 +156,7 @@ def main():
 
     if not dry:
         json.dump(panes, open(out_path, "w"), indent=1)
-    print(f"{'would resume' if dry else 'resumed'} {launched} Claude sessions")
+    print(f"{'would resume' if dry else 'resumed'} {launched} agent sessions")
     for n in notes:
         print("  NOTE", n)
 

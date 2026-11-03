@@ -19,6 +19,8 @@ A snapshot records each tmux session, window (name, order, pane geometry) and pa
 
 With no snapshot, `rebuild` gets the layout from the Claude session transcripts instead. `rebuild`, the resume message and the reply check work for Claude sessions only.
 
+To add another tool, use the restore-agent-sessions-add-agent skill.
+
 Scripts are in `scripts/` next to this file. Run them as `python3 -I <abs path>/scripts/<name>.py`. Snapshots are in `~/.cache/restore-agent-sessions/snapshots/`. Keep other work files in the scratchpad.
 
 ## Setup on a machine

@@ -7,7 +7,8 @@ description: >
   "review loop", "review-fix loop", "run the triplets", "loop reviewers", "review
   until clean", or invokes /review-fix-loop. After the correctness loop goes dry, a
   terminal quality pass runs two simplification lenses plus a typing lens.
-  Args: rounds=N, hats=a,b,c, agents=N, mode=inline|fanout, model=NAME, quality=off.
+  Args: rounds=N, hats=a,b,c, agents=N, mode=inline|fanout, model=NAME, quality=off,
+  twins=on.
 ---
 
 Review AND fix in one loop. Each round: run hats, verify findings, fix, re-verify, commit. Stop when a round finds nothing major, or cap hit.
@@ -24,6 +25,7 @@ Then one **quality pass** over the settled code: two simplification lenses and a
 | mode | fanout | `mode=inline` |
 | model | inherit | `model=NAME` |
 | stop | first dry round | cap is backstop only |
+| twins | off | `twins=on` |
 | quality pass | on, after loop goes dry | `quality=off` |
 
 **Default mode is fanout: one agent per hat, in parallel.** Each hat asks a different question, so they parallelise cleanly, and keeping each hat's file-reading in its own context leaves the main thread free to judge findings instead of drowning in greps and diffs. Context pollution is the main cost of running hats inline.
@@ -89,6 +91,8 @@ while round <= cap:
     for f in findings:
         if false: context.refuted += (f, why)      # record the reason
         if deferred: context.out_of_scope += (f, boundary)
+    if no major findings and twins=on:
+        findings = blind twins (see below)
     if no major findings: stop        # dry round = done
     fix the real ones -> context.fixed += them
     context.gotchas += anything learned that is not in the code
@@ -130,6 +134,29 @@ Keep four lists:
 You have context reviewers do not: ticket scope, prior rounds, live data, the user's decisions. **Refuting a finding on that basis is correct and expected.** But refute explicitly and record it; do not silently drop it. A finding you ignore without a reason comes back every round.
 
 Feed the block forward verbatim rather than summarising it away. The reason for each refutation is the load-bearing part.
+
+## Confirm the dry round with blind twins (opt-in)
+
+Off by default. Turn on with `twins=on`, or when the user asks for twins in any words ("with twins", "use twins"). Suggest it when a miss is costly: auth, data, money.
+
+A dry round is one set of agents saying "nothing". With `twins=on`, run one confirmation round before you stop. It catches two misses the normal rounds cannot see:
+
+- **One hat, one agent.** Hats are disjoint, so each angle has exactly one reviewer. What that agent misses, no other agent looks for.
+- **A wrong refutation is permanent.** The context block tells every later round to ignore refuted findings. If your reason was wrong, nothing raises the finding again.
+
+For each hat of the dry round, spawn a twin: a fresh agent with the same charter and the same diff, and **no context block**. Twins run in parallel and see neither each other nor earlier rounds. In `mode=inline` the twins still run as agents: an inline twin shares your context, so it is not blind.
+
+| Twin returns | Action |
+|---|---|
+| a finding in none of the lists | verify it as usual. One agent is enough: a verified finding is real, whatever the other agents saw |
+| a refuted finding, same reason you refuted | drop it, do not re-adjudicate |
+| a refuted finding, with evidence against your reason | reopen it, read the evidence, record the outcome |
+| a fixed finding | check the fix holds. It holds: drop it. It does not: it is a major finding |
+| nothing major | dry round confirmed. Stop |
+
+A verified major finding from a twin means the round was not dry. Fix, commit, continue the loop. The cap still applies.
+
+Twins never run when the loop stopped on the cap.
 
 ## Quality pass (terminal, runs once)
 
@@ -306,7 +333,12 @@ Quality pass:
 - guard-band result: whether any quality fix changed behavior, and what you reverted
 - typing findings you proposed rather than applied, and why (new dependency, construction sites you could not enumerate)
 
-At the end: rounds run, why you stopped (dry vs. cap), whether the quality pass ran, what remains open.
+Confirmation round (`twins=on` only):
+- what each twin found, verified vs. dropped
+- twin-only findings per hat: a hat whose twin found what it missed has a charter gap; name the gap
+- any refutation the twins reopened, and the outcome
+
+At the end: rounds run, why you stopped (dry, confirmed dry, or cap), whether the quality pass ran, what remains open.
 
 Be straight about a hat that produced nothing. "Round 3 dry" is a real result. Do not pad it.
 

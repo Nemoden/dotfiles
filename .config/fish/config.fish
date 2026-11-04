@@ -35,6 +35,9 @@ fish_add_path /opt/homebrew/opt/python@3.13/libexec/bin
 if test -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
 end
+if test -d $HOME/.nix-profile
+    fish_add_path $HOME/.nix-profile/bin
+end
 
 if command -sq direnv
     direnv hook fish | source

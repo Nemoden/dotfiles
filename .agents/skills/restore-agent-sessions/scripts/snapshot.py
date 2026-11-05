@@ -47,8 +47,9 @@ AGENTS = ("claude", "codex", "pi")
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 UUID_PREFIX = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1,12}"
 SEP = "\t"
-# Hooks append live state marks (✓, ✓✓, ⛔, spinners) to window names; a restore must not freeze them.
-STATUS_MARKS = re.compile(r"[\s -⯿⠀-⣿\U0001f000-\U0001faff]+$")
+# Hooks append live state marks (\u2713, \u26d4, \u2692 plus a count, spinners) to window names; a restore must not freeze them.
+# Pattern uses escapes, not literal glyphs: a literal U+2000 once became a space and the class swallowed all of ASCII.
+STATUS_MARKS = re.compile(r"(?:\s*(?:\u2692\d+|[\u2000-\u2bff\u2800-\u28ff\U0001f000-\U0001faff]+))+$")
 # pane_title goes last: a title may hold a tab, and the last field takes the rest of the line.
 FIELDS = ["session_name", "window_index", "window_name", "window_layout", "window_active", "window_width",
           "window_height", "pane_id", "pane_index", "pane_active", "pane_pid", "pane_current_path",

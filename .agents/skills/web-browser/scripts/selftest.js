@@ -18,6 +18,16 @@ const ME = `selftest-${process.pid}`;
 const OTHER = `selftest-other-${process.pid}`;
 
 const server = createServer((req, res) => {
+  if (req.url.startsWith("/api/")) {
+    // Echo the header and cookie, so a curl replay proves they were sent.
+    res.setHeader("content-type", "application/json");
+    return res.end(JSON.stringify({ items: [1, 2], token: req.headers["x-token"] ?? null, cookie: req.headers.cookie ?? null }));
+  }
+  if (req.url === "/api-page") {
+    res.setHeader("set-cookie", "sid=abc");
+    res.setHeader("content-type", "text/html");
+    return res.end(`<title>API</title><script>fetch("/api/products?page=2", { method: "POST", headers: { "x-token": "abc" }, body: '{"q":1}' })</script>`);
+  }
   if (req.url === "/slow-img") return setTimeout(() => res.end(), 4000);
   const slow = req.url === "/slow" ? '<img src="/slow-img">' : "";
   res.setHeader("content-type", "text/html");
@@ -76,6 +86,9 @@ try {
   check("start: starts the agent browser", r.code === 0 && r.out.includes("started"), r);
   r = await sh("start.js", [`--profile=${PROFILE}`, "--headless"]);
   check("start: second call reuses it", r.code === 0 && r.out.includes("already running"), r);
+  r = await sh("start.js", [`--profile=${PROFILE}`, "--headless", "--watch"]);
+  check("start --watch on a running browser starts the logger", r.code === 0 && r.out.includes("logging network"), r);
+  await new Promise((res) => setTimeout(res, 1000));
 
   r = await sh("eval.js", ["document.title"]);
   check("eval with no tabs: error names the next step", r.code === 1 && r.err.includes("no tabs") && r.err.includes("next:"), r);
@@ -124,6 +137,27 @@ try {
   r = await sh("dismiss-cookies.js", ["--tab=one"]);
   check("dismiss-cookies runs on the named tab", r.code === 0 && r.out.includes("No cookie dialog"), r);
 
+  r = await sh("nav.js", [`${BASE}/api-page`, "--new=api"]);
+  await new Promise((res) => setTimeout(res, 1000));
+  r = await sh("net.js", ["--tab=api"]);
+  const post = r.out.split("\n").find((l) => l.includes("POST") && l.includes("/api/products"));
+  check("net: first request of a new tab is logged", /^\s*1\s+GET\s+200\s+Document .*\/api-page/m.test(r.out), r);
+  check("net: lists the API call", post?.includes(" 200 ") && post.includes("Fetch"), r);
+  const n = post?.trim().split(/\s+/)[0];
+  r = await sh("net.js", ["--tab=api", `--show=${n}`]);
+  check("net --show: headers, request body, response body", r.out.includes("x-token: abc") && r.out.includes('{"q":1}') && r.out.includes('"items":[1,2]'), r);
+  r = await sh("net.js", ["--tab=api", `--curl=${n}`]);
+  const replay = await new Promise((res) => {
+    const c = spawn("sh", ["-c", r.out]);
+    let o = "";
+    c.stdout.on("data", (d) => (o += d));
+    c.on("close", () => res(o));
+  });
+  const want = '{"items":[1,2],"token":"abc","cookie":"sid=abc"}';
+  check("net --curl: replay gets the same data, with header and cookie", json(replay) === want, { out: `${r.out}\nreplay: ${replay}`, err: r.err });
+  r = await sh("net.js", ["--tab=nope"]);
+  check("net with an unknown tab: lists real names", r.code === 1 && r.err.includes('no tab "nope"') && r.err.includes("api"), r);
+
   r = await sh("eval.js", ["--tab=one", "1"], { session: OTHER });
   check("another session cannot use this session's tab", r.code === 1 && r.err.includes('no tab "one"'), r);
   r = await sh("nav.js", [`${BASE}/p/6`, "--new=x", `--profile=${PROFILE}`], { session: OTHER });
@@ -140,14 +174,25 @@ try {
   r = await sh("eval.js", ["--tab=t1", "1"]);
   check("tab closed by the user: reported and removed", r.code === 1 && r.err.includes('tab "t1" was closed'), r);
 
-  r = await sh("tabs.js", ["--close=one"]);
-  check("tabs --close=one", r.code === 0 && r.out.includes("closed one") && r.err.includes("(none)"), r);
+  r = await sh("tabs.js", ["--close=one,api"]);
+  check("tabs --close=one,api", r.code === 0 && r.out.includes("closed one") && r.out.includes("closed api") && r.err.includes("(none)"), r);
+  const loggerPid = Number(readFileSync(join(STATE_ROOT, "logs", PROFILE, ".pid"), "utf8"));
 
   r = await sh("stop.js", [`--profile=${PROFILE}`]);
   check("stop: closes the agent browser", r.code === 0 && r.out.includes("closed"), r);
   await new Promise((res) => setTimeout(res, 1500));
   r = await sh("nav.js", [`${BASE}/p/7`, "--new=y", `--profile=${PROFILE}`]);
   check("after stop: error says run start.js", r.code === 1 && r.err.includes("start.js"), r);
+  let loggerAlive = true;
+  for (let i = 0; i < 20 && loggerAlive; i++) {
+    try {
+      process.kill(loggerPid, 0);
+      await new Promise((res) => setTimeout(res, 500));
+    } catch {
+      loggerAlive = false;
+    }
+  }
+  check("after stop: the logger exits", !loggerAlive);
 } finally {
   const port = await browserPort(PROFILE);
   if (port) {
@@ -157,6 +202,7 @@ try {
   server.close();
   await new Promise((res) => setTimeout(res, 1000));
   rmSync(dataDir(PROFILE), { recursive: true, force: true });
+  rmSync(join(STATE_ROOT, "logs", PROFILE), { recursive: true, force: true });
   for (const id of [ME, OTHER]) rmSync(join(STATE_ROOT, "sessions", `${id}.json`), { force: true });
 }
 

@@ -1,6 +1,6 @@
 ---
 name: web-browser
-description: "Drive a separate agent Chrome over the Chrome DevTools Protocol: open named tabs, navigate, run JavaScript, take screenshots, batch-extract data from many URLs. It can use the logins of one of the user's Chrome profiles, but it never touches the user's daily Chrome. Use when a task needs a real browser and the Claude in Chrome tools (mcp__claude-in-chrome__*) are not available, or for script-heavy or headless work."
+description: "Drive a separate agent Chrome over the Chrome DevTools Protocol: open named tabs, navigate, run JavaScript, take screenshots, batch-extract data from many URLs, capture the API calls of a page and replay them as curl. It can use the logins of one of the user's Chrome profiles, but it never touches the user's daily Chrome. Use when a task needs a real browser and the Claude in Chrome tools (mcp__claude-in-chrome__*) are not available, or for script-heavy or headless work."
 license: Based on Mario Zechner's browser-tools
 ---
 
@@ -98,16 +98,25 @@ JS
 
 `stop.js` refuses while other sessions still have tabs in that browser. Usually you do not need it: close your tabs and leave the browser running.
 
-## Console and network log (optional)
+## Network: see the API calls of a page
+
+For scraping, the API calls behind a page are usually better than its HTML. For the full recon method, use the `scraping-recon` skill. These commands give it the data.
 
 ```bash
-~/.claude/skills/web-browser/scripts/start.js --watch    # also log console, errors and network
-~/.claude/skills/web-browser/scripts/logs-tail.js        # print the newest log
-~/.claude/skills/web-browser/scripts/logs-tail.js --follow
-~/.claude/skills/web-browser/scripts/net-summary.js      # status counts and failed requests
+~/.claude/skills/web-browser/scripts/start.js --watch                 # start the logger (also when the browser runs)
+~/.claude/skills/web-browser/scripts/nav.js https://example.com --new=ex
+~/.claude/skills/web-browser/scripts/net.js --tab=ex                  # list fetch, XHR and page requests, numbered
+~/.claude/skills/web-browser/scripts/net.js --tab=ex --grep=/api/     # only URLs that contain /api/
+~/.claude/skills/web-browser/scripts/net.js --tab=ex --all            # also scripts, styles, images
+~/.claude/skills/web-browser/scripts/net.js --tab=ex --show=7         # request 7: headers, body, response headers, response body
+~/.claude/skills/web-browser/scripts/net.js --tab=ex --curl=7         # request 7 as a curl command, with cookies
 ```
 
-Logs go to `~/.cache/web-browser/logs/<profile>/<date>/` (private folder). They hold full request URLs, so turn logging on only when you debug a page.
+- The logger records only pages that load after it starts. If `net.js` shows nothing, run `start.js --watch` and load the page again.
+- The logger saves JSON, XML, HTML and plain-text response bodies up to 2 MB. `--show` prints the path of the full body file. Use `jq` on that file.
+- To test if a site needs a browser, run the `--curl` command, then remove headers and cookies one by one.
+- The log holds the user's cookies and auth tokens. Never paste a `--curl` command or a log line into a ticket, doc or chat. Logs are in `~/.cache/web-browser/logs/<profile>/` (owner only). When the recon is done, tell the user where they are.
+- `logs-tail.js [--follow]` prints the newest raw log of any tab, with console messages and page errors. `net-summary.js` counts its status codes.
 
 ## Example: full task
 

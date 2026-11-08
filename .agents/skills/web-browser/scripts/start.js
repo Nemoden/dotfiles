@@ -11,12 +11,14 @@ import { fileURLToPath } from "node:url";
 import {
   DAILY_ROOT,
   DEFAULT_PROFILE,
+  STATE_ROOT,
   StepError,
   browserPort,
   dataDir,
   flag,
   run,
   sleep,
+  slug,
   updateSession,
 } from "./session.js";
 
@@ -29,7 +31,8 @@ if (flag("help")) {
                     the logins (cookies, local storage) of the daily Chrome profile with
                     that name, folder or email are copied in. No match: empty profile.
   --headless        No window.
-  --watch           Also log console and network of the agent browser (watch.js).`);
+  --watch           Also log console and network of the agent browser (watch.js),
+                    also when it already runs. Read the log with net.js.`);
   process.exit(0);
 }
 
@@ -64,6 +67,13 @@ function copyLogins(src, dst) {
   }
 }
 
+/** Start the logger. It exits at once if one already runs for this profile. */
+function startLogger() {
+  const watcher = join(dirname(fileURLToPath(import.meta.url)), "watch.js");
+  spawn(process.execPath, [watcher, `--profile=${profile}`], { detached: true, stdio: "ignore" }).unref();
+  console.log(`✓ logging network and console to ${join(STATE_ROOT, "logs", slug(profile))}/. Pages loaded before now are not logged.`);
+}
+
 await run(
   async () => {
     const dir = dataDir(profile);
@@ -71,6 +81,7 @@ await run(
     if (running) {
       updateSession((s) => (s.profile = profile));
       console.log(`✓ agent browser "${profile}" already running (port ${running}). This session uses it now.`);
+      if (flag("watch")) startLogger();
       return;
     }
 
@@ -107,11 +118,8 @@ await run(
     }
     updateSession((s) => (s.profile = profile));
 
-    if (flag("watch")) {
-      const watcher = join(dirname(fileURLToPath(import.meta.url)), "watch.js");
-      spawn(process.execPath, [watcher, `--profile=${profile}`], { detached: true, stdio: "ignore" }).unref();
-    }
     console.log(`✓ agent browser "${profile}" started (port ${port}). Your daily Chrome is untouched.`);
+    if (flag("watch")) startLogger();
   },
   { tabs: false },
 );

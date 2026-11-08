@@ -108,40 +108,50 @@ async function enableSession(cdp, sessionId) {
   await cdp.send("Page.enable", {}, sessionId);
 }
 
-async function attachToTarget(cdp, targetInfo) {
-  if (targetInfo.type !== "page") return;
-  if (targetState.has(targetInfo.targetId)) return;
+// Chrome holds each new tab until the logger has set it up, so even the
+// first request of a page is logged. Then the tab continues.
+async function onAttached(cdp, { sessionId, targetInfo, waitingForDebugger }) {
+  try {
+    if (targetInfo.type === "page" && !targetState.has(targetInfo.targetId)) {
+      targetState.set(targetInfo.targetId, {
+        sessionId,
+        url: targetInfo.url || null,
+        title: targetInfo.title || null,
+        stream: null,
+      });
+      sessionToTarget.set(sessionId, targetInfo.targetId);
+      await enableSession(cdp, sessionId);
+      writeLog(targetInfo.targetId, {
+        type: "target.attached",
+        url: targetInfo.url || null,
+        title: targetInfo.title || null,
+      });
+    }
+  } finally {
+    if (waitingForDebugger) await cdp.send("Runtime.runIfWaitingForDebugger", {}, sessionId).catch(() => {});
+  }
+}
 
-  const { sessionId } = await cdp.send("Target.attachToTarget", {
-    targetId: targetInfo.targetId,
-    flatten: true,
-  });
+// Response bodies worth keeping for recon: API data and page source.
+const BODY_TYPES = /json|xml|^text\/(html|plain)/;
+const BODY_MAX = 2 * 1024 * 1024;
+const responseMime = new Map();
 
-  targetState.set(targetInfo.targetId, {
-    sessionId,
-    url: targetInfo.url || null,
-    title: targetInfo.title || null,
-    stream: null,
-  });
-  sessionToTarget.set(sessionId, targetInfo.targetId);
-
-  await enableSession(cdp, sessionId);
-  writeLog(targetInfo.targetId, {
-    type: "target.attached",
-    url: targetInfo.url || null,
-    title: targetInfo.title || null,
-  });
+async function saveBody(cdp, sessionId, targetId, requestId) {
+  const { body, base64Encoded } = await cdp.send("Network.getResponseBody", { requestId }, sessionId);
+  const dir = join(dateDir, "bodies");
+  ensureDir(dir);
+  const file = join(dir, `${safeFileName(targetId)}-${safeFileName(requestId)}`);
+  const data = base64Encoded ? Buffer.from(body, "base64") : body;
+  writeFileSync(file, data, { mode: 0o600 });
+  writeLog(targetId, { type: "network.body", requestId, file, size: data.length });
 }
 
 async function main() {
   const cdp = await connectProfile(profile);
 
-  cdp.on("Target.targetCreated", async (params) => {
-    try {
-      await attachToTarget(cdp, params.targetInfo);
-    } catch (e) {
-      console.error("watch: attach error:", e.message);
-    }
+  cdp.on("Target.attachedToTarget", (params) => {
+    onAttached(cdp, params).catch((e) => console.error("watch: attach error:", e.message));
   });
 
   cdp.on("Target.targetDestroyed", (params) => {
@@ -215,9 +225,30 @@ async function main() {
       requestId: params.requestId,
       method: request.method || null,
       url: request.url || null,
+      resourceType: params.type || null,
       documentURL: params.documentURL || null,
       initiator: params.initiator?.type || null,
       hasPostData: !!request.hasPostData,
+      postData: request.postData ?? null,
+      headers: request.headers || {},
+      redirectStatus: params.redirectResponse?.status ?? null,
+    });
+    // Chrome leaves out large bodies from this event. Ask for them.
+    if (request.hasPostData && request.postData === undefined) {
+      cdp.send("Network.getRequestPostData", { requestId: params.requestId }, sessionId)
+        .then(({ postData }) => writeLog(targetId, { type: "network.postData", requestId: params.requestId, postData }))
+        .catch(() => {});
+    }
+  });
+
+  // The headers Chrome really sent, with Cookie. The event above lacks them.
+  cdp.on("Network.requestWillBeSentExtraInfo", (params, sessionId) => {
+    const targetId = sessionToTarget.get(sessionId);
+    if (!targetId) return;
+    writeLog(targetId, {
+      type: "network.requestHeaders",
+      requestId: params.requestId,
+      headers: params.headers || {},
     });
   });
 
@@ -232,9 +263,20 @@ async function main() {
       status: response.status,
       statusText: response.statusText || null,
       mimeType: response.mimeType || null,
+      headers: response.headers || {},
       fromDiskCache: !!response.fromDiskCache,
       fromServiceWorker: !!response.fromServiceWorker,
     });
+    responseMime.set(`${sessionId}:${params.requestId}`, response.mimeType || "");
+  });
+
+  cdp.on("Network.loadingFinished", (params, sessionId) => {
+    const targetId = sessionToTarget.get(sessionId);
+    const key = `${sessionId}:${params.requestId}`;
+    const mime = responseMime.get(key);
+    responseMime.delete(key);
+    if (!targetId || !BODY_TYPES.test(mime || "") || params.encodedDataLength > BODY_MAX) return;
+    saveBody(cdp, sessionId, targetId, params.requestId).catch(() => {});
   });
 
   cdp.on("Network.loadingFailed", (params, sessionId) => {
@@ -249,11 +291,8 @@ async function main() {
   });
 
   await cdp.send("Target.setDiscoverTargets", { discover: true });
-
-  const pages = await cdp.getPages();
-  for (const page of pages) {
-    await attachToTarget(cdp, page);
-  }
+  // Attaches to the tabs that exist now and to every new one.
+  await cdp.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: true, flatten: true });
 
   console.log("✓ watch started");
 }

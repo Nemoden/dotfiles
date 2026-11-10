@@ -34,10 +34,13 @@ import subprocess
 import sys
 import tomllib
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from scan import boot_time  # noqa: E402
+
 CACHE = os.path.expanduser("~/.cache/restore-agent-sessions")
 SNAPS = f"{CACHE}/snapshots"
 REGISTRY = f"{CACHE}/registry"
-KEEP = 200
+KEEP = 50
 LABEL = "local.restore-agent-sessions.snapshot"
 OLD_LABEL = "local.restore-claude-sessions.snapshot"
 PLIST = os.path.expanduser(f"~/Library/LaunchAgents/{LABEL}.plist")
@@ -163,6 +166,17 @@ def read_layout():
             for s in sessions.values()]
 
 
+def stale(paths, keep, boot):
+    """Snapshots to delete, from paths sorted oldest first: all but the newest `keep`.
+
+    The newest snapshot taken before boot is never deleted. It holds the
+    layout the last crash or reboot killed, and restore's `auto` picks it.
+    """
+    pre_boot = [p for p in paths if boot and os.path.getmtime(p) < boot]
+    guard = pre_boot[-1] if pre_boot else None
+    return [p for p in paths[:max(0, len(paths) - keep)] if p != guard]
+
+
 def take():
     snap_sessions = read_layout()
     if snap_sessions is None:
@@ -174,7 +188,7 @@ def take():
     now = dt.datetime.now()
     path = f"{SNAPS}/{now:%Y%m%d-%H%M%S}.json"
     json.dump({"taken_at": now.isoformat(timespec="seconds"), "sessions": snap_sessions}, open(path, "w"), indent=1)
-    for old in existing[:max(0, len(existing) + 1 - KEEP)]:
+    for old in stale(existing + [path], KEEP, boot_time()):
         os.remove(old)
     print("saved", path, summary(snap_sessions))
 

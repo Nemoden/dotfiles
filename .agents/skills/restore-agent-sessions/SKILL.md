@@ -36,7 +36,7 @@ Codex and pi windows that were open before the setup do not report their ids. Re
 |---|---|
 | `snapshot` | `snapshot.py`, then report the line it prints. |
 | `list` | `snapshot.py --list`. |
-| `install` / `uninstall` | `snapshot.py --install` adds a launchd job that takes a snapshot every 10 minutes, and adds the thread id to the Codex title. The job saves only when the layout changed and keeps 200. `--uninstall` removes the job. |
+| `install` / `uninstall` | `snapshot.py --install` adds a launchd job that takes a snapshot every 10 minutes, and adds the thread id to the Codex title. The job saves only when the layout changed and keeps the newest 50, plus the newest snapshot from before the last boot. `--uninstall` removes the job. |
 | `restore [FILE]`, or no argument | Restore flow below. With no FILE, use `auto`: the newest snapshot taken before the last boot. |
 | `rebuild` | Rebuild flow below. Use it when no snapshot exists or the snapshot is too old. |
 

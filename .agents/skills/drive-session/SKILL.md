@@ -30,11 +30,9 @@ python3 scripts/find-sessions.py --window 1000000 <id | name | tmux | descriptio
 
 - **Plain instruction** (text for the session to act on): use `SendMessage` to the peer name that `ListAgents` shows. It arrives as a message. It does not execute a slash command.
 - **Slash command or keys** (`/compact`, `/model`, and so on): use `bash scripts/send.sh [--wait SECS] PANE "TEXT"`. It types only when the pane is idle.
-- **Compact requests:** do not invent the text. Analyse the session first: its away summary, recent prompts, the plan or spec files it tracks, running agents, the current stage. Then propose 2-3 `/compact <focus>` options with trade-offs, for example:
-  - A: keep the stage tracker and decisions, drop tool output (smallest).
-  - B: A plus the last N messages verbatim (safest for mid-task work).
-  - C: plain `/compact` (let Claude choose).
-  The user picks the option. Write focus text that stays valid across stages ("the current stage", not "Stage 3"), because the watcher sends it again and again.
+- **Compact requests: two modes.** The watcher sends the same text at every compact, for days, while the session moves on. So the text must never name a file, stage, run or agent that can go stale.
+  - **Fixed (the default):** `scripts/compact-universal.txt`. It names only kinds of things that exist in almost every session (the goal, decisions, facts worked out, work in progress if any, open questions). The Claude that compacts reads the whole session and resolves each kind to what the session holds at that time. Show the user the text and pass it as `--msg-file`. If the user wants other priorities, write them as kinds, add "if any" to a kind that can go away, and never name an instance ("the tracker file in current use", never `progress.md`).
+  - **Dynamic (only when the user asks):** add `--dynamic`. Once the pane is idle, `scripts/focus.py` runs `claude -p` (Haiku by default, `--focus-model` to change) on the end of the transcript and appends one line, `Also keep: <current specifics>`, to the fixed text. The fixed part always goes. Any failure (timeout, bad format, over 600 characters) sends the fixed text alone and logs why. The user confirms the fixed text and this rule, never the exact line. Each report quotes the `Also keep` part that was sent. Before you start, run `focus.py` once on the transcript and show the line, so the user sees what the model picks.
 - Also confirm the threshold %, the check interval and the context window size. The status line may show it (for example `/1000k`). If it does not, a `compact_boundary` row's `preTokens` value above 200k proves a 1M window. Otherwise, ask.
 
 ## 3. Run it
@@ -44,8 +42,10 @@ Start the watcher in the private tmux server so it survives your turns:
 ```bash
 SOCK=${TMPDIR:-/tmp}/claude-tmux-sockets/claude.sock; mkdir -p "$(dirname $SOCK)"
 tmux -S $SOCK new -d -s watch-<ID8> "bash <abs>/scripts/watch.sh --session-id <ID> --window <N> \
-  --threshold <P> --interval <SECS> --msg-file <scratchpad>/msg-<ID8>.txt --log <scratchpad>/watch-<ID8>.log"
+  --threshold <P> --interval <SECS> --msg-file <abs>/scripts/compact-universal.txt --log <scratchpad>/watch-<ID8>.log [--dynamic]"
 ```
+
+For custom text, write it to `<scratchpad>/msg-<ID8>.txt` and pass that file.
 
 `<ID8>` is the first 8 characters of the target session id. Other watchers can run on the same private tmux server, so every name comes from the target id: the tmux session, the message file, the log. Then a tmux name tells you which session a watcher drives, and a restart cannot kill a different watcher. Before you start, run `tmux -S $SOCK ls`. A watcher with a name like `compact-watch` does not show its target, so read its command with `tmux -S $SOCK list-panes -a -F '#{session_name} #{pane_start_command}'`.
 
@@ -75,3 +75,4 @@ Checks run on a fixed schedule from the start time (start + k × interval), and 
 - **Joined log reasons.** Each skip has its own reason (`working`, `typed draft in prompt`, `overlay…`). Read the reason before you "fix" the timing.
 - **A real draft blocks every check.** Tell the user once which pane holds it. After that, report `blocked by your draft` in one line. Do not repeat the full explanation.
 - **Typing with a real draft present** adds your text to the user's draft. Never clear a draft without asking.
+- **The focus model guesses when its input is thin.** A last reply that is only a zero-width space, or a pasted error cut short, made Haiku invent a cause ("expired credentials") that the session never stated. `focus.py` skips blank replies and keeps long pastes. If a dynamic line looks wrong, read the excerpt (`excerpt()` in `focus.py`) before you blame the model.

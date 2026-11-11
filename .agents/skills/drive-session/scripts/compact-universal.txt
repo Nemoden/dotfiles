@@ -1,0 +1,1 @@
+/compact Keep: the user's current goal and question; decisions the user made, in their words; facts already worked out and shown to the user; work in progress and its exact state (files changed, commands or agents running), if any; open questions and next steps. Drop tool output and file dumps already acted on.

@@ -3,6 +3,9 @@
 # Usage: watch.sh --session-id ID --window TOKENS (--msg TEXT | --msg-file FILE)
 #                 [--threshold 60] [--interval 1800] [--idle-wait 1200]
 #                 [--log FILE] [--once] [--dry-run]
+#                 [--dynamic [--focus-model haiku]]
+# --dynamic: once the pane is idle, focus.py adds a model-written
+# "Also keep: ..." line after MSG; on any failure MSG goes alone.
 # One watcher per session id: a second one exits 4 while the first lives.
 # --dry-run never sends, so it skips the lock and can run next to a watcher.
 # Checks run on a fixed grid (start + k*INTERVAL), so a reporter can align to it.
@@ -13,7 +16,7 @@ unset TMUX
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 SID='' WINDOW='' MSG='' THRESHOLD=60 INTERVAL=1800 IDLE_WAIT=1200
-LOG='' ONCE=0 DRY=''
+LOG='' ONCE=0 DRY='' DYNAMIC=0 FOCUS_MODEL=haiku
 while [[ $# -gt 0 ]]; do
   case $1 in
     --session-id) SID=$2; shift 2 ;;
@@ -26,6 +29,8 @@ while [[ $# -gt 0 ]]; do
     --log) LOG=$2; shift 2 ;;
     --once) ONCE=1; shift ;;
     --dry-run) DRY=--dry-run; shift ;;
+    --dynamic) DYNAMIC=1; shift ;;
+    --focus-model) FOCUS_MODEL=$2; shift 2 ;;
     *) echo "unknown arg $1" >&2; exit 64 ;;
   esac
 done
@@ -87,8 +92,19 @@ print(m.get("preTokens"), "->", m.get("postTokens"), "tokens")')"
   log "WARNING no compact_boundary 15 min after send; check pane"
 }
 
+# Sets OUT to MSG, plus the focus line when it comes back clean.
+build_msg() {
+  local tr=$1 extra rc
+  OUT=$MSG
+  extra=$(python3 "$HERE/focus.py" --model "$FOCUS_MODEL" "$tr" 2>&1); rc=$?
+  if (( rc )); then log "dynamic focus failed ($extra); sending fixed text"
+  elif [[ -z $extra ]]; then log "dynamic focus: nothing to add"
+  else OUT="$MSG $extra"
+  fi
+}
+
 check_once() {
-  local pane tokens tr nlive pct rc err before
+  local pane tokens tr nlive pct rc err before wait=$IDLE_WAIT
   read -r pane tokens tr nlive < <(lookup) || { log "session $SID not live, exiting"; exit 2; }
   (( nlive > 1 )) && log "note: id live in $nlive processes, using newest ($pane)"
   [[ $tokens == '?' ]] && { log "pane=$pane cannot read context from transcript"; return; }
@@ -96,16 +112,24 @@ check_once() {
   log "pane=$pane context ${pct}% ($tokens tokens), threshold ${THRESHOLD}%"
   (( pct < THRESHOLD )) && return
   before=$(boundaries "$tr")
-  err=$("$HERE/send.sh" $DRY --wait "$IDLE_WAIT" "$pane" "$MSG" 2>&1); rc=$?
+  OUT=$MSG
+  if (( DYNAMIC )); then
+    # wait for idle first, so the focus line describes the session as sent
+    err=$("$HERE/send.sh" --dry-run --wait "$IDLE_WAIT" "$pane" x 2>&1) \
+      || { log "skip this check, $err after ${IDLE_WAIT}s"; return; }
+    build_msg "$tr"
+    wait=120
+  fi
+  err=$("$HERE/send.sh" $DRY --wait "$wait" "$pane" "$OUT" 2>&1); rc=$?
   case $rc in
-    0) log "sent: $MSG ${err:+($err)}"
-       [[ -z $DRY && $MSG == /compact* ]] && confirm_compact "$tr" "$before" ;;
-    3) log "skip this check, $err after ${IDLE_WAIT}s" ;;
+    0) log "sent: $OUT ${err:+($err)}"
+       [[ -z $DRY && $OUT == /compact* ]] && confirm_compact "$tr" "$before" ;;
+    3) log "skip this check, $err after ${wait}s" ;;
     *) log "send failed rc=$rc: $err" ;;
   esac
 }
 
-log "start session=$SID window=$WINDOW threshold=${THRESHOLD}% interval=${INTERVAL}s dry=${DRY:-no}"
+log "start session=$SID window=$WINDOW threshold=${THRESHOLD}% interval=${INTERVAL}s dry=${DRY:-no} dynamic=$( ((DYNAMIC)) && echo "$FOCUS_MODEL" || echo no)"
 start=$(date +%s) k=0
 while true; do
   check_once

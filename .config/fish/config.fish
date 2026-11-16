@@ -320,10 +320,6 @@ if command -sq batman
     alias man='batman'
 end
 
-if test -f ~/.phpbrew/phpbrew.fish
-    source ~/.phpbrew/phpbrew.fish
-end
-
 if test -e ~/.config/fish/config.local.fish
     source ~/.config/fish/config.local.fish
 end

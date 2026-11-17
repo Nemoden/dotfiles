@@ -53,7 +53,21 @@ For custom text, write it to `<scratchpad>/msg-<ID8>.txt` and pass that file.
 
 Put the text in a file and pass `--msg-file`, so quotes in the text cannot break the command. The watcher reads the file once at start. To change the text, edit the file and restart the watcher. A restart moves the check times, so move the report cron too. Test first with `--once --dry-run`. The watcher finds the pane again from the registry on each check, so a session resumed in a new pane is still followed.
 
-Checks run on a fixed schedule from the start time (start + k × interval), and after a `/compact` send the watcher logs `compact confirmed: pre -> post` or a WARNING.
+Checks run on a fixed schedule from the start time (start + k × interval), and after a `/compact` send the watcher logs `compact confirmed: pre -> post` or a WARNING. A logged `sent` line proves only that keys were typed. The compact ran only when a new `compact_boundary` row appears in the transcript. If the send arrived as pasted text or stayed in the prompt, the watcher logs a WARNING and retries once after the session is idle again.
+
+## Sending a long slash command
+
+A long burst of keys can reach Claude Code as one paste. A paste is plain text: a `/compact Keep: …` inside it goes to the model as a chat message, and the command never runs. The session usually answers that it "arrived as pasted text". Short texts got through and long ones did not, which points to a size or speed threshold for paste detection; the exact limit is not known.
+
+`send.sh` types every slash command in three steps, and only this order works:
+
+1. The command word and a space: `/compact `.
+2. The rest of the text. It may land as `[Pasted text #N]`; after a typed command and space, that is a valid argument.
+3. Enter, as a separate key after a pause.
+
+Two orders fail. `/compact` with no space glues the paste to the word (`/compact[Pasted text +1 lines]`), which is no command, and the Enter goes into the paste, so the text sits unsent in the prompt. One burst for the whole text turns the slash into pasted text.
+
+`send.sh` checks the prompt before Enter (the command word must still be there) and after Enter (the prompt must be empty). On a failure it clears the prompt with `End` `C-u` and exits 5. To check a manual send, read the transcript, not the pane: a `compact_boundary` row means it ran, and a user row that starts with `<pasted_content>` followed by `/compact` means it did not.
 
 **Report after each check:** `CronCreate` a recurring job 3-5 minutes after each check time (for example, watcher started at :48 with a 30 min interval → cron `52,22`). It reads the new log lines and tells the user in 1-3 lines: context %, whether a send happened, and any "skip" or error line. If context is at or over the threshold with no send, capture the pane with `-e`, find the cause and fix it. Cron jobs last only while this session is open and expire after 7 days. Tell the user this.
 
@@ -61,6 +75,7 @@ Checks run on a fixed schedule from the start time (start + k × interval), and 
 
 | Signal | Use it? |
 |---|---|
+| tmux `#{pane_in_mode}` = 1 (copy mode, the user scrolled back) | Busy. `capture-pane` still shows the normal screen, but typed keys run as copy-mode commands, so the text is lost and tmux prints `not in a mode` for each key. |
 | Registry `status` | **No.** It stays `busy` while background agents run, even when the prompt is free. |
 | `esc to interrupt` or a spinner line `… (1m 5s` | Busy. |
 | `Esc to close` or a permission question | Overlay open. The keys would go into the overlay. |
@@ -73,6 +88,8 @@ Checks run on a fixed schedule from the start time (start + k × interval), and 
 - **Stale context after a compact.** Until the next reply, the last usage row still shows the old size. The `compact_boundary` row's `postTokens` value replaces it. Without this rule, the watcher compacts twice.
 - **`<synthetic>` assistant rows or zero usage** (API errors) are not real readings. The scripts skip them.
 - **Joined log reasons.** Each skip has its own reason (`working`, `typed draft in prompt`, `overlay…`). Read the reason before you "fix" the timing.
+- **A `sent` line taken as a compact.** It only means keys went out. Before you report a compact, find the new `compact_boundary` row, and check its time is after the send: a later manual compact also satisfies a count-only check.
+- **Filtering the transcript by time in the wrong zone.** Transcript timestamps are UTC. A local-time filter can skip the compact you are looking for.
 - **A real draft blocks every check.** Tell the user once which pane holds it. After that, report `blocked by your draft` in one line. Do not repeat the full explanation.
 - **Typing with a real draft present** adds your text to the user's draft. Never clear a draft without asking.
 - **The focus model guesses when its input is thin.** A last reply that is only a zero-width space, or a pasted error cut short, made Haiku invent a cause ("expired credentials") that the session never stated. `focus.py` skips blank replies and keeps long pastes. If a dynamic line looks wrong, read the excerpt (`excerpt()` in `focus.py`) before you blame the model.

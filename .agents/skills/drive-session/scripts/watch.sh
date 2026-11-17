@@ -76,9 +76,24 @@ print(s["pane"] or "-", s.get("context_tokens") or "?", s["transcript"] or "-", 
 
 boundaries() { grep -c '"compact_boundary"' "$1" 2>/dev/null || echo 0; }
 
+# True when a user row after transcript line N holds the send as pasted text:
+# the session got it as a chat message and the command never ran.
+pasted_since() {
+  tail -n +"$(( $2 + 1 ))" "$1" | python3 -c '
+import json, re, sys
+for line in sys.stdin:
+    try: r = json.loads(line)
+    except ValueError: continue
+    if r.get("type") != "user": continue
+    c = json.dumps(r.get("message", {}).get("content"))
+    if re.search(r"<pasted_content[^>]*>(\\n|\s)*/compact", c): sys.exit(0)
+sys.exit(1)'
+}
+
 # After a /compact send, wait up to 15 min for a new compact_boundary row.
+# Returns 0 compacted, 1 arrived as pasted text (retry), 2 nothing seen.
 confirm_compact() {
-  local tr=$1 before=$2 i
+  local tr=$1 before=$2 lines=$3 i
   for i in $(seq 90); do
     sleep 10
     if (( $(boundaries "$tr") > before )); then
@@ -86,10 +101,15 @@ confirm_compact() {
 import json, sys
 m = json.loads(sys.stdin.read())["compactMetadata"]
 print(m.get("preTokens"), "->", m.get("postTokens"), "tokens")')"
-      return
+      return 0
+    fi
+    if pasted_since "$tr" "$lines"; then
+      log "WARNING send arrived as pasted text, /compact did not run"
+      return 1
     fi
   done
   log "WARNING no compact_boundary 15 min after send; check pane"
+  return 2
 }
 
 # Sets OUT to MSG, plus the focus line when it comes back clean.
@@ -120,13 +140,23 @@ check_once() {
     build_msg "$tr"
     wait=120
   fi
-  err=$("$HERE/send.sh" $DRY --wait "$wait" "$pane" "$OUT" 2>&1); rc=$?
-  case $rc in
-    0) log "sent: $OUT ${err:+($err)}"
-       [[ -z $DRY && $OUT == /compact* ]] && confirm_compact "$tr" "$before" ;;
-    3) log "skip this check, $err after ${wait}s" ;;
-    *) log "send failed rc=$rc: $err" ;;
-  esac
+  # One retry: a failed send leaves the session busy answering it, so the
+  # retry waits for idle again.
+  local try lines
+  for try in 1 2; do
+    lines=$(wc -l <"$tr"); before=$(boundaries "$tr")
+    err=$("$HERE/send.sh" $DRY --wait "$wait" "$pane" "$OUT" 2>&1); rc=$?
+    case $rc in
+      0) log "sent (try $try): $OUT ${err:+($err)}"
+         [[ -n $DRY || $OUT != /compact* ]] && return
+         confirm_compact "$tr" "$before" "$lines"; (( $? == 1 )) || return ;;
+      5) log "WARNING send not submitted (try $try): $err" ;;
+      3) log "skip this check, $err after ${wait}s"; return ;;
+      *) log "send failed rc=$rc: $err"; return ;;
+    esac
+    wait=$IDLE_WAIT
+  done
+  log "WARNING /compact still not run after retry; check pane $pane"
 }
 
 log "start session=$SID window=$WINDOW threshold=${THRESHOLD}% interval=${INTERVAL}s dry=${DRY:-no} dynamic=$( ((DYNAMIC)) && echo "$FOCUS_MODEL" || echo no)"

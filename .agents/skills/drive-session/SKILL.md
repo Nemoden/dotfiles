@@ -67,7 +67,7 @@ A long burst of keys can reach Claude Code as one paste. A paste is plain text: 
 
 Two orders fail. `/compact` with no space glues the paste to the word (`/compact[Pasted text +1 lines]`), which is no command, and the Enter goes into the paste, so the text sits unsent in the prompt. One burst for the whole text turns the slash into pasted text.
 
-`send.sh` checks the prompt before Enter (the command word must still be there) and after Enter (the prompt must be empty). On a failure it clears the prompt with `End` `C-u` and exits 5. To check a manual send, read the transcript, not the pane: a `compact_boundary` row means it ran, and a user row that starts with `<pasted_content>` followed by `/compact` means it did not.
+`send.sh` checks the prompt before Enter (the command word must still be there) and after Enter (the prompt must be empty). Each check looks up to 5 times, 1 second apart: a capture taken while the screen redraws (a new turn, subagent output) can miss the prompt line. On a failure it clears the prompt and exits 5. `C-u` deletes one wrapped line only, so the clear repeats `End` `C-u` until the prompt is empty. Two presses on a 6-line text left 4 lines behind, cut mid-sentence, in the user's prompt. To check a manual send, read the transcript, not the pane: a `compact_boundary` row means it ran, and a user row that starts with `<pasted_content>` followed by `/compact` means it did not.
 
 **Report after each check:** `CronCreate` a recurring job 3-5 minutes after each check time (for example, watcher started at :48 with a 30 min interval → cron `52,22`). It reads the new log lines and tells the user in 1-3 lines: context %, whether a send happened, and any "skip" or error line. If context is at or over the threshold with no send, capture the pane with `-e`, find the cause and fix it. Cron jobs last only while this session is open and expire after 7 days. Tell the user this.
 
@@ -89,6 +89,7 @@ Two orders fail. `/compact` with no space glues the paste to the word (`/compact
 - **`<synthetic>` assistant rows or zero usage** (API errors) are not real readings. The scripts skip them.
 - **Joined log reasons.** Each skip has its own reason (`working`, `typed draft in prompt`, `overlay…`). Read the reason before you "fix" the timing.
 - **A `sent` line taken as a compact.** It only means keys went out. Before you report a compact, find the new `compact_boundary` row, and check its time is after the send: a later manual compact also satisfies a count-only check.
+- **Matching `❯ ` with a plain space.** Claude Code puts a no-break space (bytes `c2 a0`) after the `❯`. A check for `❯ /compact ` then never matches, and every send fails before Enter. `send.sh` turns it into a plain space. Check with `xxd` before you trust a match on the prompt line.
 - **Filtering the transcript by time in the wrong zone.** Transcript timestamps are UTC. A local-time filter can skip the compact you are looking for.
 - **A real draft blocks every check.** Tell the user once which pane holds it. After that, report `blocked by your draft` in one line. Do not repeat the full explanation.
 - **Typing with a real draft present** adds your text to the user's draft. Never clear a draft without asking.

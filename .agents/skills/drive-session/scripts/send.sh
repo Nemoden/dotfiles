@@ -42,12 +42,27 @@ until is_idle; do
 done
 if (( DRY )); then echo "DRY RUN: would send: $TEXT"; exit 0; fi
 
-# Prompt line as shown, placeholder (dim) text removed.
+# Prompt line as shown, placeholder (dim) text removed. Claude Code puts a
+# no-break space (c2 a0) after the ❯; make it a plain space.
 prompt_line() {
   tmux capture-pane -p -e -t "$PANE" \
-    | perl -pe 's/\e\[2m.*?\e\[0m//g; s/\e\[[0-9;]*m//g' | grep -E '^❯' | tail -1
+    | perl -pe 's/\e\[2m.*?\e\[0m//g; s/\e\[[0-9;]*m//g; s/\xc2\xa0/ /g' \
+    | grep -E '^❯' | tail -1
 }
-clear_prompt() { tmux send-keys -t "$PANE" End C-u; sleep 0.3; tmux send-keys -t "$PANE" End C-u; }
+prompt_empty() { grep -qE '^❯[^[:alnum:]]{0,4}$' <<<"$(prompt_line)"; }
+# C-u deletes one wrapped line only; a long text spans several.
+clear_prompt() {
+  local i
+  for i in $(seq 30); do
+    prompt_empty && return 0
+    tmux send-keys -t "$PANE" End C-u; sleep 0.3
+  done
+  prompt_empty
+}
+# The screen can be caught mid-redraw (subagent output, a new turn), so look
+# up to 5 times before deciding. Usage: settle CHECK [ARG]
+settle() { local i; for i in 1 2 3 4 5; do "$@" && return 0; sleep 1; done; return 1; }
+prompt_has() { grep -qF -- "$1" <<<"$(prompt_line)"; }
 
 # A long burst of keys can land as one paste. A paste is plain text, so a
 # slash command inside it never runs, and "/cmd" glued to a paste is no
@@ -63,14 +78,16 @@ else
   tmux send-keys -t "$PANE" -l -- "$TEXT"
 fi
 sleep 1
-if [[ -n $CMD ]] && ! grep -qF -- "❯ $CMD " <<<"$(prompt_line)"; then
-  clear_prompt
-  echo "command word lost in prompt: $(prompt_line)" >&2; exit 5
+if [[ -n $CMD ]] && ! settle prompt_has "❯ $CMD "; then
+  seen=$(prompt_line)
+  clear_prompt || seen="$seen (COULD NOT CLEAR, prompt: $(prompt_line))"
+  echo "command word lost in prompt: $seen" >&2; exit 5
 fi
 tmux send-keys -t "$PANE" Enter
-sleep 2
+sleep 1
 # Enter swallowed into a paste leaves the text sitting in the prompt.
-if ! grep -qE '^❯[^[:alnum:]]{0,4}$' <<<"$(prompt_line)"; then
-  clear_prompt
-  echo "text still in prompt after Enter, cleared: $(prompt_line)" >&2; exit 5
+if ! settle prompt_empty; then
+  seen=$(prompt_line)
+  clear_prompt || seen="$seen (COULD NOT CLEAR, prompt: $(prompt_line))"
+  echo "text still in prompt after Enter: $seen" >&2; exit 5
 fi
